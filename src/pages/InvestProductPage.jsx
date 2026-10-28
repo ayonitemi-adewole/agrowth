@@ -1,133 +1,129 @@
-import { useLocation, useNavigate } from "react-router-dom";
-import { CircularProgressbar, buildStyles } from "react-circular-progressbar";
-import "react-circular-progressbar/dist/styles.css";
-import { useEffect, useState } from "react";
+import { useLocation, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { CalendarCheck, CalendarClock, CalendarPlus, PackageOpen } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { useInvestment, useNow } from '../hooks/useData';
+import { cn, formatDate, formatNaira } from '../lib/format';
+import {
+  STATUS_STYLES,
+  cropEmoji,
+  getExpectedProfit,
+  getMaturityDate,
+  getPeriodLabel,
+  getProgress,
+  getStartDate,
+  getTimeLeft,
+  isQuickInvestment,
+} from '../lib/investments';
+import { Badge, Button, Card, EmptyState, PageHeader, ProgressRing } from '../components/ui';
+import { PageLoader } from '../components/layout/FullPageLoader';
 
 const InvestProductPage = () => {
-    const { state } = useLocation();
-    const navigate = useNavigate();
+  const { id } = useParams();
+  const { state } = useLocation();
+  const { user } = useApp();
+  const { investment, loading } = useInvestment(user?.uid, id, state?.investment);
+  const now = useNow(30000);
 
-    const accent = localStorage.getItem("accent") || "#0FA280";
-    const theme = localStorage.getItem("theme") || "light";
-    const investment = state?.investment;
-
-    if (!investment) {
-        return (
-            <div className="p-6">
-                <p className="text-red-500 font-semibold">No investment data found.</p>
-                <button
-                    className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"
-                    onClick={() => navigate(-1)}
-                >
-                    Go Back
-                </button>
-            </div>
-        );
-    }
-
-    const getProgress = (inv) => {
-        const startRaw = inv.productName === 'Fast Vegetables' ? inv.createdAt : inv.startDate;
-        const start = new Date(startRaw);
-        const now = new Date();
-        const totalDays = inv.productName === 'Fast Vegetables'
-            ? inv.investmentPeriod
-            : inv.investmentPeriod * 30;
-        const duration = totalDays * 24 * 60 * 60 * 1000; // convert days to ms
-        const elapsed = now - start;
-        const percentage = (elapsed / duration) * 100;
-        return Math.min(Math.max(percentage, 0), 100); // clamp between 0-100
-    };
-
-
-    const getDaysLeft = (inv) => {
-        const startRaw = inv.productName === 'Fast Vegetables' ? inv.createdAt : inv.startDate;
-        const start = new Date(startRaw);
-        const now = new Date();
-
-        const totalDays = inv.productName === 'Fast Vegetables'
-            ? inv.investmentPeriod
-            : inv.investmentPeriod * 30;
-
-        const msLeft = (start.getTime() + (totalDays * 24 * 60 * 60 * 1000)) - now.getTime();
-        const daysLeft = Math.floor(msLeft / (1000 * 60 * 60 * 24));
-
-        if (daysLeft < 1 && msLeft > 0) {
-            const hoursLeft = Math.floor((msLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutesLeft = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
-            return `${hoursLeft}h ${minutesLeft}m`;
-        }
-
-        return `${Math.max(0, Math.ceil(daysLeft))}  day${daysLeft !== 1 ? 's' : ''} `;
-    };
-
-    const [progress, setProgress] = useState(getProgress(investment));
-    const [daysLeft, setDaysLeft] = useState(getDaysLeft(investment));
-
-    // Update every minute
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setProgress(getProgress(investment));
-            setDaysLeft(getDaysLeft(investment));
-        }, 60000);
-
-        return () => clearInterval(interval);
-    }, [investment]);
-
-    const getProgressColor = (progress) => {
-        if (progress < 50) {
-            return "#FF5733";
-        } else if (progress < 75) {
-            return "#FFC300";
-        } else {
-            return "#00FF00";
-        }
-    };
-
+  if (loading) return <PageLoader />;
+  if (!investment) {
     return (
-        <div className={`min-h-screen flex flex-col items-center justify-center px-6 bg-gradient-to-br ${theme === 'dark' ? 'from-gray-800 to-gray-900' : 'from-[#0FA280] to-[#054D3B]'}`}>
-            <div className={`w-full max-w-2xl mx-auto mt-8 p-6 ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'} rounded-lg shadow-md z-50`}>
-                <h1 className="text-2xl font-bold text-center mb-4">{investment.productName}</h1>
-                <div className="flex flex-col sm:flex-row sm:justify-between gap-6">
-                    <div className="flex-1 space-y-2">
-                        <p><strong>Amount:</strong> ₦{investment.investmentAmount.toLocaleString()}</p>
-                        {investment.productName !== 'Fast Vegetables' && <p><strong>Units Bought:</strong> {investment.unitsBought}</p>}
-                        <p><strong>ROI:</strong> {investment.expectedROI}%</p>
-                        {investment.productName === 'Fast Vegetables' ? <p><strong>Start Date:</strong> {new Date(investment.createdAt).toLocaleDateString()}</p>
-                            : <>
-                                <p><strong>Start Date:</strong> {new Date(investment.startDate).toLocaleDateString()}</p>
-                                <p><strong>Created At:</strong> {new Date(investment.createdAt).toLocaleDateString()}</p>
-                            </>
-                        }
-                        <p><strong>Duration:</strong> {investment.investmentPeriod} {investment.productName === "Fast Vegetables" ? `day${investment.investmentPeriod !== 1 ? 's' : ''}` : 'months'}</p>
-                        <p><strong>Time Left:</strong> {daysLeft}</p>
-                        <p className={`${investment.status === 'Active' ? 'text-blue-500' : investment.status === 'Pending' ? 'text-amber-400' : 'text-green-500'} font-semibold`}><strong className={theme === 'dark' ? 'text-white' : 'text-black'}>Status:</strong> {investment.status}</p>
-                        <p><strong>{investment.status === 'Completed' ? 'Profit' : 'Expected Profit'}:</strong> ₦{((investment.investmentAmount * investment.expectedROI) / 100).toLocaleString()}</p>
-                        <p><strong>{investment.status === 'Completed' ? 'Payout' : 'Expected Payout'}:</strong> ₦{((investment.investmentAmount * investment.expectedROI) / 100 + investment.investmentAmount).toLocaleString()}</p>
-                    </div>
-                    <div className="w-32 h-32 mx-auto sm:mx-0">
-                        <CircularProgressbar
-                            value={progress}
-                            text={progress === 100 ? '✓' : `${Math.round(progress)}%`}
-                            styles={buildStyles({
-                                textSize: "28px",
-                                textColor: progress === 100 ? `${accent}` : getProgressColor(progress),
-                                pathColor: progress === 100 ? `${accent}` : getProgressColor(progress),
-                                trailColor: theme === "dark" ? "#4B5563" : "#d1d5dc",
-                            })}
-                        />
-                    </div>
-                </div>
+      <>
+        <PageHeader title="Investment" back="/invest" />
+        <Card>
+          <EmptyState icon={PackageOpen} title="Investment not found" description="We couldn't load this investment." action={<Button to="/invest">Back to portfolio</Button>} />
+        </Card>
+      </>
+    );
+  }
 
-                <div className="mt-6 text-center">
-                    <button
-                        className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-800 hover:bg-gray-700'} text-white rounded transition`}
-                        onClick={() => navigate(-1)}
-                    >
-                        Back
-                    </button>
-                </div>
+  const progress = getProgress(investment, now);
+  const timeLeft = getTimeLeft(investment, now);
+  const profit = getExpectedProfit(investment);
+  const amount = Number(investment.investmentAmount) || 0;
+  const completed = investment.status === 'Completed';
+  const quick = isQuickInvestment(investment);
+  const start = getStartDate(investment);
+  const maturity = getMaturityDate(investment);
+
+  const timeline = [
+    { icon: CalendarPlus, label: 'Invested', date: investment.createdAt, done: true },
+    ...(!quick ? [{ icon: CalendarClock, label: 'Cycle starts', date: start, done: start && now >= start }] : []),
+    { icon: CalendarCheck, label: completed ? 'Paid out' : 'Maturity', date: investment.completedAt || maturity, done: completed },
+  ];
+
+  return (
+    <div>
+      <PageHeader title={investment.productName} subtitle={`Invested ${formatDate(investment.createdAt)}`} back />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <Card className="flex flex-col items-center p-6 text-center sm:p-8">
+          <div className="relative">
+            <ProgressRing value={progress} size={200} stroke={14}>
+              <div>
+                <span className="text-5xl">{cropEmoji(investment.productName)}</span>
+                <p className="mt-1 text-2xl font-extrabold tabular-nums">{Math.round(progress)}%</p>
+              </div>
+            </ProgressRing>
+          </div>
+          <Badge className={cn('mt-5', STATUS_STYLES[investment.status] || 'bg-surface-2 text-muted')} dot>
+            {investment.status}
+          </Badge>
+          <p className="mt-2 text-sm text-muted">{completed ? 'This cycle is complete' : investment.status === 'Pending' ? 'Waiting for the cycle to begin' : timeLeft.label}</p>
+
+          <div className="mt-6 grid w-full grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-surface-2/70 p-4">
+              <p className="text-xs text-muted">Invested</p>
+              <p className="text-lg font-extrabold tabular-nums">{formatNaira(amount)}</p>
             </div>
-        </div>);
+            <div className="rounded-2xl bg-accent/10 p-4">
+              <p className="text-xs text-muted">{completed ? 'Payout' : 'Expected payout'}</p>
+              <p className="text-lg font-extrabold text-accent tabular-nums">{formatNaira(amount + profit)}</p>
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-6">
+          <Card className="p-5 sm:p-6">
+            <h2 className="mb-2 font-bold">Details</h2>
+            <dl className="divide-y divide-line text-sm">
+              {[
+                ['Amount', formatNaira(amount)],
+                ...(!quick && investment.unitsBought ? [['Units bought', investment.unitsBought]] : []),
+                ['Total ROI', `${investment.expectedROI}%`],
+                ...(quick && investment.investmentPeriod ? [['Daily ROI', `${(investment.expectedROI / investment.investmentPeriod).toFixed(2)}%`]] : []),
+                ['Duration', getPeriodLabel(investment)],
+                [completed ? 'Profit' : 'Expected profit', <span key="p" className="text-accent">+{formatNaira(profit)}</span>],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-4 py-3">
+                  <dt className="text-muted">{label}</dt>
+                  <dd className="font-semibold tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
+
+          <Card className="p-5 sm:p-6">
+            <h2 className="mb-4 font-bold">Timeline</h2>
+            <ol className="relative space-y-6">
+              <span className="absolute bottom-3 left-5 top-3 w-0.5 bg-line" aria-hidden="true" />
+              {timeline.map(({ icon: Icon, label, date, done }, i) => (
+                <motion.li key={label} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }} className="relative flex items-center gap-4">
+                  <span className={cn('relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2', done ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-muted')}>
+                    <Icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">{label}</p>
+                    <p className="text-xs text-muted">{formatDate(date)}</p>
+                  </div>
+                </motion.li>
+              ))}
+            </ol>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default InvestProductPage;

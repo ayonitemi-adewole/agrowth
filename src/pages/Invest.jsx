@@ -1,456 +1,208 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import Footer from '../components/component/Footer';
+import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import FloatingBackground from '../components/component/FloatingBackground';
-import { collection, doc, getDocs, increment, onSnapshot, updateDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { CircleCheck, Hourglass, PiggyBank, Sprout, TrendingUp, Wallet } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { useInvestmentProducts, useInvestments, useNow, useQuickInvestments } from '../hooks/useData';
+import { formatNaira, toDate } from '../lib/format';
+import { cropEmoji, getExpectedProfit, getProgress } from '../lib/investments';
+import { Card, EmptyState, PageHeader, SectionTitle, Segmented, Select, Skeleton } from '../components/ui';
+import InvestmentCard from '../components/InvestmentCard';
+import ProductExplorer from '../components/ProductExplorer';
+import QuickInvestCard from '../components/QuickInvestCard';
 
-import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
-import 'react-circular-progressbar/dist/styles.css';
-import CropsSection from '../components/component/cropsSection';
-import QuickInvestCard from '../components/component/QuickInvestCard';
+const PAGE_SIZE = 6;
+const ALLOCATION_COLORS = ['bg-accent', 'bg-gold-400', 'bg-sky-500', 'bg-violet-500', 'bg-rose-500', 'bg-lime-500'];
 
+const Stat = ({ icon: Icon, label, value, tone = 'text-accent bg-accent/12', index }) => (
+  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}>
+    <Card className="h-full p-4 sm:p-5">
+      <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <p className="mt-3 text-xs font-medium text-muted sm:text-sm">{label}</p>
+      <p className="mt-0.5 truncate text-lg font-extrabold tracking-tight tabular-nums sm:text-xl">{value}</p>
+    </Card>
+  </motion.div>
+);
 
-const Invest = () => {
-  const [user, setUser] = useState(null);
-  const [investments, setInvestments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [sortBy, setSortBy] = useState('latest');
-  const [crops, setCrops] = useState([]);
-  const [cropsLoading, setCropsLoading] = useState(true);
-  const [quickInvestments, setQuickInvestments] = useState([]);
+// Share of active + pending capital per product
+const Allocation = ({ investments }) => {
+  const slices = useMemo(() => {
+    const totals = new Map();
+    investments
+      .filter((inv) => inv.status !== 'Completed')
+      .forEach((inv) => totals.set(inv.productName, (totals.get(inv.productName) || 0) + (Number(inv.investmentAmount) || 0)));
+    const sum = [...totals.values()].reduce((a, b) => a + b, 0);
+    return [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, amount]) => ({ name, amount, share: sum ? (amount / sum) * 100 : 0 }));
+  }, [investments]);
 
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 4;
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-
-
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  const [accent, setAccent] = useState(localStorage.getItem('accent') || '#0FA280');
-
-
-
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        setUser({
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName: currentUser.displayName || 'User',
-          photoURL: currentUser.photoURL,
-        });
-      } else {
-        navigate('/sign-in');
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!auth.currentUser?.uid) return;
-
-    const unsubscribe = onSnapshot(doc(db, "users", auth.currentUser.uid), (doc) => {
-      if (doc.exists()) {
-        setTheme(doc.data().theme || 'light');
-        setAccent(doc.data().accent || '#0FA280');
-      }
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const investmentsRef = collection(db, "users", user.uid, "investments");
-
-    const unsubscribe = onSnapshot(investmentsRef, (querySnapshot) => {
-      const updatedInvestments = [];
-
-      querySnapshot.forEach((docSnap) => {
-        const inv = { id: docSnap.id, ...docSnap.data() };
-        const progress = getProgress(inv);
-        const daysLeft = getDaysLeft(inv);
-
-        updatedInvestments.push({ ...inv, progress, daysLeft });
-      });
-
-      setInvestments(updatedInvestments);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-  useEffect(() => {
-    if (!user?.uid) return;
-
-    const quickInvestmentsRef = collection(db, "quickInvestments");
-    const unsubscribe = onSnapshot(quickInvestmentsRef, (querySnapshot) => {
-      const quickInvestmentsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setQuickInvestments(quickInvestmentsData);
-    });
-
-    return () => unsubscribe();
-  }, [user]);
-
-
-
-  const openQuickInvestments = useMemo(
-    () => quickInvestments.filter(inv => inv.status === "open"),
-    [quickInvestments]
-  );
-
-  useEffect(() => {
-    const cropsRef = collection(db, 'investmentProducts');
-    const unsubscribe = onSnapshot(cropsRef, (snapshot) => {
-      setCropsLoading(true);
-      try {
-        const cropsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          name: doc.data().name || doc.id,
-          ...doc.data()
-        }));
-        setCrops(cropsData);
-      } catch (error) {
-        console.error('Error fetching investment products:', error);
-        setCrops([]);
-      } finally {
-        setCropsLoading(false);
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  let sortedInvestments = [...investments];
-
-  if (sortBy === 'progress') {
-    sortedInvestments.sort((a, b) => {
-      const getPercent = (item) => {
-        const start = new Date(item.startDate).getTime();
-        const end = new Date(item.endDate).getTime();
-        const now = new Date().getTime();
-        return Math.min(100, Math.max(0, ((now - start) / (end - start)) * 100));
-      };
-      return getPercent(b) - getPercent(a);
-    });
-  } else {
-    sortedInvestments.sort((a, b) => new Date(b.startDate) - new Date(a.startDate));
-  }
-
-  const [currentTime, setCurrentTime] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000); // Update every second instead of minute for more accurate tracking
-
-    return () => clearInterval(timer);
-  }, []);
-
-  const getProgress = (inv) => {
-    const startRaw = inv.productName === 'Fast Vegetables' ? inv.createdAt : inv.startDate;
-    const start = startRaw instanceof Date ? startRaw : new Date(startRaw);
-
-    const totalDays = inv.productName === 'Fast Vegetables'
-      ? inv.investmentPeriod
-      : inv.investmentPeriod * 30;
-
-    const duration = totalDays * 24 * 60 * 60 * 1000;
-    const elapsed = currentTime.getTime() - start.getTime();
-    const percentage = (elapsed / duration) * 100;
-
-    return Math.min(Math.max(percentage, 0), 100);
-  };
-
-  const getDaysLeft = (inv) => {
-    const startRaw = inv.productName === 'Fast Vegetables' ? inv.createdAt : inv.startDate;
-    const start = startRaw instanceof Date ? startRaw : new Date(startRaw);
-
-    const totalDays = inv.productName === 'Fast Vegetables'
-      ? inv.investmentPeriod
-      : inv.investmentPeriod * 30;
-
-    const msElapsed = currentTime.getTime() - start.getTime();
-    const daysElapsed = msElapsed / (1000 * 60 * 60 * 24);
-    const daysLeft = totalDays - daysElapsed;
-
-    if (daysLeft < 1 && daysLeft > 0) {
-      const hoursLeft = Math.floor(daysLeft * 24);
-      const minutesLeft = Math.floor((daysLeft * 24 - hoursLeft) * 60);
-      return `${hoursLeft}h ${minutesLeft}m`;
-    }
-
-    return `${Math.max(0, Math.ceil(daysLeft))}  day${daysLeft === 1 ? 's' : ''} `;
-  };
-  const getProgressColor = (progress) => {
-    if (progress < 50) {
-      return "#FF5733";
-    } else if (progress < 75) {
-      return "#FFC300";
-    } else {
-      return "#00FF00";
-    }
-  };
-
-  const displayedInvestments = useMemo(() => {
-    return sortedInvestments
-      .filter(inv => statusFilter === 'All' || inv.status === statusFilter)
-      .sort((a, b) => {
-        if (sortBy === 'latest') {
-          return new Date(b.createdAt) - new Date(a.createdAt);
-        } else if (sortBy === 'progress') {
-          return getProgress(b) - getProgress(a);
-        }
-        return 0;
-      });
-  }, [sortedInvestments, statusFilter, sortBy]);
-
-  const totalInvested = investments.reduce((sum, inv) => sum + inv.investmentAmount, 0);
-  const totalActiveInvestment = investments.filter(inv => inv.status === 'Active').reduce((sum, inv) => sum + inv.investmentAmount, 0);
-
-  const totalExpectedReturn = investments.filter(inv => inv.status === 'Active').reduce((sum, inv) => {
-    const roi = (inv.investmentAmount * inv.expectedROI) / 100;
-    return sum + roi;
-  }, 0);
-
-  const activeCount = investments.filter(inv => inv.status === 'Active').length;
-  const pendingCount = investments.filter(inv => inv.status === 'Pending').length;
-  const completedCount = investments.filter(inv => inv.status === 'Completed').length;
-
-
-  const formatCurrency = (amount) => `₦${amount.toLocaleString()}`;
-
+  if (!slices.length) return null;
 
   return (
+    <Card className="p-5">
+      <SectionTitle title="Portfolio mix" subtitle="Where your running capital sits" />
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-2">
+        {slices.map((slice, i) => (
+          <motion.div
+            key={slice.name}
+            className={`${ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]} h-full first:rounded-l-full last:rounded-r-full`}
+            initial={{ width: 0 }}
+            animate={{ width: `${slice.share}%` }}
+            transition={{ duration: 0.8, delay: i * 0.08 }}
+            title={`${slice.name}: ${slice.share.toFixed(1)}%`}
+          />
+        ))}
+      </div>
+      <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+        {slices.map((slice, i) => (
+          <li key={slice.name} className="flex items-center gap-2 text-sm">
+            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${ALLOCATION_COLORS[i % ALLOCATION_COLORS.length]}`} />
+            <span className="truncate">
+              {cropEmoji(slice.name)} {slice.name}
+            </span>
+            <span className="ml-auto shrink-0 font-semibold tabular-nums">{formatNaira(slice.amount, { compact: true })}</span>
+            <span className="w-11 shrink-0 text-right text-xs text-muted tabular-nums">{slice.share.toFixed(0)}%</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+};
 
-    <div className={`${theme === "dark" ? 'bg-gradient-to-br from-gray-800 to-gray-900' : ''} text-gray-200 font-sans h-screen overflow-y-scroll`}>
-      <div className='min-h-screen max-w-3xl px-3 flex flex-col items-center mx-auto py-6 pb-20 z-50 relative'>
-        <header className='w-full mx-auto flex items-center gap-3 mb-6'>
-          <button onClick={() => navigate(-1)}>
-            <ArrowLeft className={`w-6 h-6`} />
-          </button>
-          <h1 className={`text-lg font-semibold`}>Investment</h1>
-        </header>
+const Invest = () => {
+  const { user } = useApp();
+  const { hash } = useLocation();
+  const { investments, loading } = useInvestments(user?.uid);
+  const { products, loading: productsLoading } = useInvestmentProducts();
+  const { quickInvestments } = useQuickInvestments();
+  const now = useNow(30000);
+  const [status, setStatus] = useState('All');
+  const [sortBy, setSortBy] = useState('latest');
+  const [visible, setVisible] = useState(PAGE_SIZE);
 
+  useEffect(() => {
+    if (hash === '#explore') document.getElementById('explore')?.scrollIntoView({ behavior: 'smooth' });
+  }, [hash]);
+
+  const summary = useMemo(() => {
+    const active = investments.filter((inv) => inv.status === 'Active');
+    return {
+      totalInvested: investments.reduce((sum, inv) => sum + (Number(inv.investmentAmount) || 0), 0),
+      activeValue: active.reduce((sum, inv) => sum + (Number(inv.investmentAmount) || 0), 0),
+      expectedReturns: active.reduce((sum, inv) => sum + getExpectedProfit(inv), 0),
+      counts: {
+        All: investments.length,
+        Active: active.length,
+        Pending: investments.filter((inv) => inv.status === 'Pending').length,
+        Completed: investments.filter((inv) => inv.status === 'Completed').length,
+      },
+    };
+  }, [investments]);
+
+  const displayed = useMemo(() => {
+    const list = investments.filter((inv) => status === 'All' || inv.status === status);
+    const sorters = {
+      latest: (a, b) => (toDate(b.createdAt)?.getTime() || 0) - (toDate(a.createdAt)?.getTime() || 0),
+      progress: (a, b) => getProgress(b, now) - getProgress(a, now),
+      amount: (a, b) => (Number(b.investmentAmount) || 0) - (Number(a.investmentAmount) || 0),
+    };
+    return [...list].sort(sorters[sortBy]);
+  }, [investments, status, sortBy, now]);
+
+  const openQuickInvest = quickInvestments.find((inv) => inv.status === 'open');
+
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Invest" subtitle="Your portfolio and new opportunities" />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {loading ? (
-          <div className='text-center py-10'>
-            <div className={`animate-spin h-6 w-6 border-4 ${theme === "dark" ? 'border-white border-t-transparent' : 'border-gray-800 border-t-transparent'} rounded-full mx-auto mb-3`} />
-            <p >Loading investments...</p>
-          </div>
+          Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-32 rounded-3xl" />)
         ) : (
           <>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className={`w-full ${theme === "dark" ? 'bg-gray-800' : 'bg-gray-200 text-gray-900'} shadow-md p-6 rounded-2xl ${theme === "dark" ? '' : 'border border-gray-300'} mb-6`}
-            >
-              <h2 className={`text-xl font-bold mb-4`}>Investment Summary</h2>
-              <div className='grid grid-cols-1 sm:grid-cols-3 gap-4 text-center'>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Total Invested</p>
-                  <p className='text-lg font-bold text-green-700'>{formatCurrency(totalInvested)}</p>
-                </div>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Total Active Investments</p>
-                  <p className='text-lg font-bold text-green-700'>{formatCurrency(totalActiveInvestment)}</p>
-                </div>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Expected ROI</p>
-                  <p className='text-lg font-bold text-green-700'>{formatCurrency(totalExpectedReturn)}</p>
-                </div>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Active Investments</p>
-                  <p className='text-lg font-bold text-blue-600'>{activeCount}</p>
-                </div>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Pending Investments</p>
-                  <p className='text-lg font-bold text-blue-600'>{pendingCount}</p>
-                </div>
-                <div className='bg-gray-100 p-4 rounded-lg shadow-sm'>
-                  <p className='text-sm text-gray-500'>Completed Investments</p>
-                  <p className='text-lg font-bold text-green-600'>{completedCount}</p>
-                </div>
-              </div>
-            </motion.div>
-
-            {openQuickInvestments.length > 0 && (
-              <QuickInvestCard investment={openQuickInvestments[0]} theme={theme} accent={accent} />
-            )}
-
-            {/* Your Investment Tracking */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className={`w-full ${theme === "dark" ? 'bg-gray-800' : 'bg-gray-200 text-gray-900'} shadow-md p-6 rounded-2xl border border-gray-300 mb-6 z-10`}
-            >
-              <h2 className={`text-xl font-bold mb-4`}>Your Investments</h2>
-              {investments.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className={`text-center py-8 ${theme === "dark" ? 'text-gray-300' : 'text-gray-600'}`}
-                >
-                  <img
-                    src='assets\empty-prevew.png'
-                    alt='No investments'
-                    className='w-full mx-auto mb-3'
-                  />
-                  <p className='text-sm font-medium'>
-                    No {statusFilter === 'All' ? '' : statusFilter.toLowerCase()} investments found.
-                  </p>
-                  <p className='text-sm font-medium'>You have no active investments yet.</p>
-                  <p className='text-xs mt-1'>Explore investment options below to get started.</p>
-                </motion.div>
-
-              ) : (
-                <div className='space-y-4'>
-                  <div className="flex justify-between items-center mb-4">
-                    <div className="flex gap-3 flex-wrap">
-                      {['All', 'Active', 'Completed', 'Pending'].map((status) => (
-                        <button
-                          key={status}
-                          onClick={() => setStatusFilter(status)}
-                          className={`px-4 py-1 rounded-full text-sm font-medium transition cursor-pointer'
-                            }`}
-                          style={{
-                            backgroundColor: statusFilter === status ? accent : '#d1d5dc',
-                            color: statusFilter === status ? '#fff' : '#333',
-                            fontWeight: statusFilter === status ? 'bold' : 'normal',
-                          }}
-                        >
-                          {status}
-                        </button>
-                      ))}
-                    </div>
-
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="bg-white border border-gray-300 rounded-md px-3 py-1 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-1 focus:ring-[#0FA280]"
-                    >
-                      <option value="latest">Latest</option>
-                      <option value="progress">Progress</option>
-                    </select>
-                  </div>
-
-                  {displayedInvestments
-                    .slice(startIndex, endIndex)
-                    .map((inv, index) => {
-                      const progress = getProgress(inv);
-                      const daysLeft = getDaysLeft(inv);
-
-                      return (
-                        <motion.div
-                          key={inv.id || index}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          onClick={() => navigate(`/invest/product/${inv.id}`, { state: { investment: inv } })}
-                          className={`${theme === "dark" ? 'bg-gray-700 border-gray-700 hover:bg-gray-700' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} border rounded-xl p-4 shadow-sm flex justify-between items-center gap-4 cursor-pointer transition-colors`}
-                        >
-                          <div className='flex-1'>
-                            <p className={`font-semibold ${theme === "dark" ? 'text-white' : 'text-gray-800'}`}>{inv.productName}</p>
-                            {inv.productName !== "Fast Vegetables" ?
-
-                              <p className={`text-xs ${theme === "dark" ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
-                                Duration: {inv.investmentPeriod} months | ROI: {inv.expectedROI}% monthly
-                              </p>
-                              :
-                              <p className={`text-xs ${theme === "dark" ? 'text-gray-400' : 'text-gray-500'} mb-1`}>
-                                Duration: {inv.investmentPeriod} days | ROI: {inv.expectedROI / inv.investmentPeriod}% daily
-                              </p>
-                            }
-                            <p className='text-green-600 font-semibold'>₦{inv.investmentAmount.toLocaleString()}</p>
-                            <p className={`text-xs font-bold mt-1 ${inv.status === 'Active' ? 'text-blue-600' : theme === "dark" ? 'text-gray-400' : 'text-gray-500'}`}>
-                              {inv.status}
-                            </p>
-                            {inv.status === 'Active' && (
-                              <p className={`text-xs ${theme === "dark" ? 'text-gray-400' : 'text-gray-400'}`}>⏳ {daysLeft} left</p>
-                            )}
-                          </div>
-
-                          <div className='w-16 h-16'>
-                            <CircularProgressbar
-                              value={progress}
-                              text={progress === 100 ? '✓' : `${Math.round(progress)}%`}
-                              styles={buildStyles({
-                                textSize: "28px",
-                                textColor: progress === 100 ? `${accent}` : getProgressColor(progress),
-                                pathColor: progress === 100 ? `${accent}` : getProgressColor(progress),
-                                trailColor: theme === "dark" ? "#4B5563" : "#d1d5dc",
-                                pathTransition: "stroke-dashoffset 0.5s ease 0s",
-                                transition: "stroke-dashoffset 0.5s ease 0s"
-                              })}
-                            />
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-
-                  {/* Pagination Controls */}
-                  {investments && (
-                    <div className="flex justify-center gap-4 mt-6">
-                      <button
-                        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        className="px-4 py-2 bg-gray-200 rounded cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed text-gray-900 disabled:bg-gray-300 disabled:text-gray-500"
-                      >
-                        Previous
-                      </button>
-
-                      <span className={`px-2 py-2 text-sm font-semibold ${theme === "dark" ? 'text-white' : 'text-gray-800'}`}>
-                        Page {currentPage} of {Math.ceil(displayedInvestments.length / itemsPerPage)}
-                      </span>
-                      <button
-                        onClick={() => {
-                          const totalPages = Math.ceil(
-                            investments.filter(inv => statusFilter === 'All' || inv.status === statusFilter).length / itemsPerPage
-                          );
-                          setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-                        }}
-                        disabled={
-                          currentPage >= Math.ceil(
-                            investments.filter(inv => statusFilter === 'All' || inv.status === statusFilter).length / itemsPerPage
-                          )
-                        }
-                        className="px-4 py-2 bg-gray-200 rounded disabled:opacity-45 disabled:cursor-not-allowed text-gray-900 disabled:bg-gray-300 disabled:text-gray-500"
-                      >
-                        Next
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </motion.div>
-
-            {/* Explore Investment Categories */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className={`w-full shadow-md rounded-sm border-r z-10`}
-            >
-              <h2 className='text-xl font-bold mb-4'>Explore More Investments</h2>
-              <CropsSection crops={crops} cropsLoading={cropsLoading} theme={theme} accent={accent} />
-            </motion.div>
+            <Stat index={0} icon={PiggyBank} label="Total invested" value={formatNaira(summary.totalInvested)} />
+            <Stat index={1} icon={Wallet} label="Active capital" value={formatNaira(summary.activeValue)} tone="text-sky-600 bg-sky-500/15 dark:text-sky-400" />
+            <Stat index={2} icon={TrendingUp} label="Expected returns" value={`+${formatNaira(summary.expectedReturns)}`} tone="text-gold-500 bg-gold-400/20" />
+            <Stat
+              index={3}
+              icon={CircleCheck}
+              label="Active · Pending · Done"
+              value={`${summary.counts.Active} · ${summary.counts.Pending} · ${summary.counts.Completed}`}
+              tone="text-violet-600 bg-violet-500/15 dark:text-violet-400"
+            />
           </>
         )}
       </div>
+
+      {!loading && <Allocation investments={investments} />}
+
+      {openQuickInvest && <QuickInvestCard investment={openQuickInvest} />}
+
+      <section>
+        <SectionTitle title="Your investments" />
+        {loading ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-40 rounded-3xl" />
+            ))}
+          </div>
+        ) : investments.length === 0 ? (
+          <Card className="border-dashed">
+            <EmptyState icon={Sprout} title="No investments yet" description="Pick a crop cycle below to start growing your money." />
+          </Card>
+        ) : (
+          <>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Segmented
+                options={['All', 'Active', 'Pending', 'Completed'].map((value) => ({ value, label: value, count: summary.counts[value] }))}
+                value={status}
+                onChange={(value) => {
+                  setStatus(value);
+                  setVisible(PAGE_SIZE);
+                }}
+                layoutId="investment-status"
+                className="flex-1"
+              />
+              <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)} fieldClassName="sm:w-44" aria-label="Sort investments">
+                <option value="latest">Newest first</option>
+                <option value="progress">Most progress</option>
+                <option value="amount">Largest amount</option>
+              </Select>
+            </div>
+
+            {displayed.length === 0 ? (
+              <Card className="border-dashed">
+                <EmptyState icon={Hourglass} title={`No ${status.toLowerCase()} investments`} description="Try a different filter." />
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {displayed.slice(0, visible).map((inv) => (
+                  <InvestmentCard key={inv.id} investment={inv} now={now} />
+                ))}
+              </div>
+            )}
+
+            {visible < displayed.length && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => setVisible((v) => v + PAGE_SIZE)}
+                  className="rounded-xl border border-line bg-surface px-5 py-2.5 text-sm font-semibold transition hover:bg-surface-2"
+                >
+                  Show more ({displayed.length - visible} left)
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      <section id="explore" className="scroll-mt-6">
+        <SectionTitle title="Explore opportunities" subtitle="Open crop cycles you can invest in today" />
+        <ProductExplorer products={products} loading={productsLoading} />
+      </section>
     </div>
   );
 };

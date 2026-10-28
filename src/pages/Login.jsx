@@ -1,139 +1,159 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { toast } from 'react-toastify';
+import { ArrowRight, Lock, Mail, MailCheck } from 'lucide-react';
 import { auth } from '../firebase';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { motion } from "framer-motion";
-import FloatingBackground from '../components/component/FloatingBackground';
+import { useApp } from '../context/AppContext';
+import AuthLayout from '../components/layout/AuthLayout';
+import { Alert, Button, Input, Modal, PasswordInput } from '../components/ui';
+
+const ERROR_MESSAGES = {
+  'auth/invalid-email': 'That email address looks invalid.',
+  'auth/user-not-found': 'No account found with that email.',
+  'auth/invalid-credential': 'Incorrect email or password.',
+  'auth/wrong-password': 'Incorrect email or password.',
+  'auth/too-many-requests': 'Too many attempts. Reset your password or try again later.',
+  'auth/network-request-failed': 'Network error. Check your connection and try again.',
+};
 
 const Login = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useApp();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [unverified, setUnverified] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSending, setResetSending] = useState(false);
+
+  const redirectTo = location.state?.from || '/dashboard';
+
+  if (user?.emailVerified && !isLoading) return <Navigate to={redirectTo} replace />;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
+    setError('');
+    setUnverified(false);
 
     if (!email || !password) {
-      toast.error('Please fill in all fields');
-      setIsLoading(false);
+      setError('Please enter your email and password.');
       return;
     }
 
+    setIsLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      localStorage.setItem('user', JSON.stringify(user));
+      const { user: signedIn } = await signInWithEmailAndPassword(auth, email, password);
 
-      if (!user.emailVerified) {
-        toast.error('Please verify your email before logging in.');
-        await sendEmailVerification(user);
-
-        await auth.signOut();
-        setIsLoading(false);
+      if (!signedIn.emailVerified) {
+        await sendEmailVerification(signedIn);
+        await signOut(auth);
+        setUnverified(true);
         return;
       }
 
-      toast.success('Login successful! Redirecting...');
-      setTimeout(() => navigate('/dashboard'), 2000);
-    } catch (error) {
-      const errorMessages = {
-        'auth/invalid-email': 'Invalid email',
-        'auth/user-not-found': 'User not found',
-        'auth/invalid-credential': 'Incorrect email/password',
-        'auth/too-many-requests': 'Too many attempts. Please reset your password.'
-      };
-      toast.error(errorMessages[error.code] || 'Error logging in: ' + error.message);
+      toast.success(`Welcome back${signedIn.displayName ? `, ${signedIn.displayName}` : ''}!`);
+      navigate(redirectTo, { replace: true });
+    } catch (err) {
+      setError(ERROR_MESSAGES[err.code] || `Couldn't sign in: ${err.message}`);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleForgotPassword = async () => {
-    if (!email) {
-      toast.error('Please enter your email to reset your password.');
-      return;
-    }
+  const openReset = () => {
+    setResetEmail(email);
+    setResetOpen(true);
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    setResetSending(true);
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, resetEmail);
       toast.success('Password reset email sent. Check your inbox.');
-    } catch (error) {
-      toast.error('Error sending reset email: ' + error.message);
+      setResetOpen(false);
+    } catch (err) {
+      toast.error(ERROR_MESSAGES[err.code] || `Couldn't send reset email: ${err.message}`);
+    } finally {
+      setResetSending(false);
     }
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-gradient-to-br from-[#0FA280] to-[#054D3B]">
-      <ToastContainer position="top-right" autoClose={2300} />
-      <motion.div
-        className=" bg-white/15 backdrop-blur-xs shadow-xl p-8 rounded-2xl w-[95%] sm:w-[60%] lg:w-[40%] flex flex-col items-center border border-gray-200 z-10"
-        initial={{ opacity: 0, y: -30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <h1 className="text-3xl font-bold text-white">Login</h1>
-        <p className="text-gray-100 mt-2">Access your account</p>
+    <AuthLayout title="Welcome back 👋" subtitle="Sign in to check on your farms and wallet.">
+      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+        {error && <Alert tone="error">{error}</Alert>}
+        {unverified && (
+          <Alert tone="info" title="Verify your email to continue">
+            We’ve sent a fresh verification link to <strong>{email}</strong>. Open it, then sign in again.
+          </Alert>
+        )}
 
-        <form className="w-full flex flex-col mt-6 space-y-5" onSubmit={handleSubmit} disabled={isLoading}>
-          <div className="flex flex-col">
-            <label className="text-gray-100 font-semibold">Email</label>
-            <input
-              type="email"
-              className="p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0FA280] text-gray-100"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="relative flex flex-col">
-            <label className="text-gray-100 font-semibold">Password</label>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              className="p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-[#0FA280] text-gray-100"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            <button
-              type="button"
-              className="absolute right-4 top-1/2 transform cursor-pointer"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff className="text-gray-100" /> : <Eye className="text-gray-100" />}
+        <Input
+          label="Email address"
+          type="email"
+          icon={Mail}
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <PasswordInput
+          label="Password"
+          icon={Lock}
+          autoComplete="current-password"
+          placeholder="Enter your password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          labelAction={
+            <button type="button" onClick={openReset} className="text-sm font-semibold text-accent hover:underline">
+              Forgot password?
             </button>
-          </div>
+          }
+        />
 
-          <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.95 }}
-            type="submit"
-            className="bg-[#0FA280] hover:bg-[#0FA280] text-white p-3 w-full rounded-lg font-semibold text-lg"
-            disabled={isLoading}
-          >
-            {isLoading ? <Loader2 className="animate-spin mx-auto text-white h-7 w-7" /> : 'Log in'}
-          </motion.button>
+        <Button type="submit" size="lg" className="w-full" loading={isLoading} iconRight={ArrowRight}>
+          Sign in
+        </Button>
 
-          <div className="text-center">
-            <span className="text-gray-100">Don't have an account? </span>
-            <Link to="/sign-up" className="cursor-pointer text-blue-800 hover:text-[#0FA280] font-semibold">Sign up</Link>
-          </div>
+        <p className="text-center text-sm text-muted">
+          New to Agrowth?{' '}
+          <Link to="/sign-up" className="font-semibold text-accent hover:underline">
+            Create an account
+          </Link>
+        </p>
+      </form>
 
-          <button
-            type="button"
-            className="cursor-pointer text-blue-800 hover:text-[#0FA280] font-semibold mt-2 w-fit mx-auto"
-            onClick={handleForgotPassword}
-          >
-            Forgot Password?
-          </button>
+      <Modal
+        open={resetOpen}
+        onClose={() => setResetOpen(false)}
+        title="Reset your password"
+        description="We'll email you a secure link to choose a new password."
+      >
+        <form onSubmit={handleReset} className="space-y-4">
+          <Input
+            label="Email address"
+            type="email"
+            icon={MailCheck}
+            value={resetEmail}
+            onChange={(e) => setResetEmail(e.target.value)}
+            placeholder="you@example.com"
+            autoFocus
+            required
+          />
+          <Button type="submit" className="w-full" loading={resetSending} disabled={!resetEmail}>
+            Send reset link
+          </Button>
         </form>
-      </motion.div>
-    </div>
+      </Modal>
+    </AuthLayout>
   );
 };
 

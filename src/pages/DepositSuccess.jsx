@@ -1,199 +1,175 @@
-import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import Lottie from 'lottie-react';
+import Confetti from 'react-confetti';
+import { useWindowSize } from 'react-use';
+import { collection, doc, getDoc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { AlertTriangle, RotateCcw, SearchX, UserX, XCircle } from 'lucide-react';
+import { db } from '../firebase';
+import { formatNaira } from '../lib/format';
+import { Button, Logo, Spinner } from '../components/ui';
+import successAnimation from '../animations/success.json';
 
-// import { Player } from "@lottiefiles/react-lottie-player"; // optional alternative
-// import Lottie from "lottie-react";
-// import successAnim from "../animations/success.json";
+const BASE_URL = 'https://smart-farmer-ercaspay-api.onrender.com';
 
-
-import {
-    collection,
-    doc,
-    getDoc,
-    getDocs,
-    query,
-    updateDoc,
-    where,
-} from "firebase/firestore";
-import { db } from "../firebase";
+const STATES = {
+  failed: { icon: XCircle, tone: 'text-red-500 bg-red-500/12', title: 'Payment failed', text: "We couldn't confirm your payment. If you were charged, it will be reversed by your bank." },
+  'user-not-found': { icon: UserX, tone: 'text-amber-500 bg-amber-500/15', title: 'Account not found', text: "We couldn't match this payment to an account. Please contact support with your reference." },
+  invalid: { icon: SearchX, tone: 'text-red-500 bg-red-500/12', title: 'Invalid payment link', text: 'The transaction reference is missing or invalid.' },
+  error: { icon: AlertTriangle, tone: 'text-red-500 bg-red-500/12', title: 'Something went wrong', text: "We couldn't verify your payment right now. Please check your wallet shortly or try again." },
+};
 
 const DepositSuccess = () => {
-    const [searchParams] = useSearchParams();
-    const [amount, setAmount] = useState(0);
-    const [newBalance, setNewBalance] = useState(0);
-    const transactionRef = searchParams.get("transRef");
-    const reference = searchParams.get("reference");
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { width, height } = useWindowSize();
+  const [status, setStatus] = useState('verifying');
+  const [amount, setAmount] = useState(0);
+  const [newBalance, setNewBalance] = useState(0);
+  const transRef = searchParams.get('transRef');
+  const reference = searchParams.get('reference');
 
-    const [status, setStatus] = useState("verifying");
-    const navigate = useNavigate();
-    const BASE_URL = 'https://smart-farmer-ercaspay-api.onrender.com';
+  // Guard against StrictMode's double effect run crediting the wallet twice
+  const started = useRef(false);
 
-    useEffect(() => {
-        const verifyPayment = async () => {
-            if (!transactionRef || !reference) {
-                setStatus("invalid");
-                return;
-            }
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
 
-            try {
-                const res = await fetch(`${BASE_URL}/api/ercaspay/verify-payment?transactionRef=${transactionRef}`);
-                const data = await res.json();
-                console.log("Verification result:", data);
+    const verifyPayment = async () => {
+      if (!transRef || !reference) {
+        setStatus('invalid');
+        return;
+      }
 
-                if (data.success && data.status === "SUCCESSFUL") {
-                    let uid = null;
-                    try {
-                        const parsedMeta = typeof data.metadata === "string" ? JSON.parse(data.metadata) : data.metadata;
-                        uid = parsedMeta?.userId;
-                    } catch (parseError) {
-                        console.error("Metadata parsing failed:", parseError);
-                        setStatus("error");
-                        return;
-                    }
+      try {
+        const res = await fetch(`${BASE_URL}/api/ercaspay/verify-payment?transactionRef=${transRef}`);
+        const data = await res.json();
 
-                    const parsedAmount = parseFloat(data.amount || 0);
-                    if (!uid || isNaN(parsedAmount) || parsedAmount <= 0) {
-                        setStatus("error");
-                        return;
-                    }
-
-                    const userRef = doc(db, "users", uid);
-                    const userSnap = await getDoc(userRef);
-                    if (!userSnap.exists()) {
-                        setStatus("user-not-found");
-                        return;
-                    }
-
-                    // Fetch transaction by reference
-                    const q = query(collection(db, "transactions"), where("reference", "==", reference));
-                    const querySnapshot = await getDocs(q);
-
-                    if (querySnapshot.empty) {
-                        console.warn("Transaction not found.");
-                        setStatus("error");
-                        return;
-                    }
-
-                    const transactionDoc = querySnapshot.docs[0];
-                    const transactionRef = transactionDoc.ref;
-                    const currentStatus = transactionDoc.data().status;
-
-                    if (currentStatus === "successful") {
-                        console.log("Transaction already completed.");
-                        navigate("/dashboard");
-                        return;
-                    }
-
-                    const prevBalance = userSnap.data().availableBalance || 0;
-                    const updatedBalance = prevBalance + parsedAmount;
-
-                    // Update user balance
-                    await updateDoc(userRef, {
-                        availableBalance: updatedBalance,
-                    });
-                    setNewBalance(updatedBalance);
-                    setAmount(parsedAmount);
-
-                    // Mark transaction as successful
-                    await updateDoc(transactionRef, {
-                        status: "successful",
-                        verifiedAt: new Date().toISOString(),
-                        transactionId: data.transactionReference || transactionRef,
-                        paymentMethod: data.paymentMethod || "unknown",
-                        rawResponse: data,
-                    });
-
-                    setStatus("success");
-                } else {
-                    setStatus("failed");
-                }
-            } catch (err) {
-                console.error("Verification error:", err);
-                setStatus("error");
-            }
-        };
-
-        verifyPayment();
-    }, [transactionRef, reference]);
-
-    const formatCurrency = (value) => {
-        return new Intl.NumberFormat("en-NG", {
-            style: "currency",
-            currency: "NGN",
-        }).format(value);
-    };
-
-    const renderContent = () => {
-        switch (status) {
-            case "verifying":
-                return (
-                    <div className="flex flex-col items-center space-y-4">
-                        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-500 border-opacity-50"></div>
-                        <p className="text-lg font-medium text-gray-600 dark:text-gray-300">Verifying your payment...</p>
-                    </div>
-                );
-            case "success":
-                return (
-                    <div className="relative overflow-hidden px-4">
-                        <div className="relative z-10 backdrop-blur-xl bg-white/30 dark:bg-white/10 shadow-2xl rounded-2xl p-8 max-w-md mx-auto text-center space-y-6 border border-white/20">
-                            <h2 className="text-2xl md:text-3xl font-bold text-green-700 dark:text-green-300">
-                                Deposit Successful 🎉
-                            </h2>
-                            <p className="text-lg text-gray-700 dark:text-gray-300">
-                                You’ve deposited <span className="font-semibold">{formatCurrency(amount)}</span>
-                            </p>
-                            <p className="text-md text-gray-600 dark:text-gray-400">
-                                Your new balance is <span className="font-semibold">{formatCurrency(newBalance)}</span>
-                            </p>
-                            <button
-                                onClick={() => navigate("/dashboard")}
-                                className="w-full py-3 px-6 rounded-xl bg-green-600 text-white font-medium hover:bg-green-700 transition duration-300 shadow-md"
-                            >
-                                Go to Dashboard
-                            </button>
-                        </div>
-                    </div>
-                );
-            case "failed":
-                return (
-                    <div className="space-y-3">
-                        <p className="text-xl font-semibold text-red-600">❌ Payment Failed</p>
-                        <p className="text-gray-600 dark:text-gray-300">We couldn't verify your payment. Please try again.</p>
-                    </div>
-                );
-            case "user-not-found":
-                return (
-                    <div className="space-y-3">
-                        <p className="text-xl font-semibold text-yellow-600">⚠️ User Not Found</p>
-                        <p className="text-gray-600 dark:text-gray-300">The user ID could not be found. Contact support.</p>
-                    </div>
-                );
-            case "invalid":
-                return (
-                    <div className="space-y-3">
-                        <p className="text-xl font-semibold text-red-500">Invalid Payment</p>
-                        <p className="text-gray-600 dark:text-gray-300">Missing or invalid transaction reference.</p>
-                    </div>
-                );
-            case "error":
-            default:
-                return (
-                    <div className="space-y-3">
-                        <p className="text-xl font-semibold text-red-600">🚫 Error</p>
-                        <p className="text-gray-600 dark:text-gray-300">Something went wrong. Please try again later.</p>
-                    </div>
-                );
+        if (!(data.success && data.status === 'SUCCESSFUL')) {
+          setStatus('failed');
+          return;
         }
+
+        let uid = null;
+        try {
+          const meta = typeof data.metadata === 'string' ? JSON.parse(data.metadata) : data.metadata;
+          uid = meta?.userId;
+        } catch (parseError) {
+          console.error('Metadata parsing failed:', parseError);
+          setStatus('error');
+          return;
+        }
+
+        const paidAmount = parseFloat(data.amount || 0);
+        if (!uid || Number.isNaN(paidAmount) || paidAmount <= 0) {
+          setStatus('error');
+          return;
+        }
+
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+          setStatus('user-not-found');
+          return;
+        }
+
+        const txnSnapshot = await getDocs(query(collection(db, 'transactions'), where('reference', '==', reference)));
+        if (txnSnapshot.empty) {
+          setStatus('error');
+          return;
+        }
+
+        const transactionDoc = txnSnapshot.docs[0];
+        if (transactionDoc.data().status === 'successful') {
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+
+        const updatedBalance = (userSnap.data().availableBalance || 0) + paidAmount;
+        await updateDoc(userRef, { availableBalance: updatedBalance });
+        await updateDoc(transactionDoc.ref, {
+          status: 'successful',
+          verifiedAt: new Date().toISOString(),
+          transactionId: data.transactionReference || transRef,
+          paymentMethod: data.paymentMethod || 'unknown',
+          rawResponse: data,
+        });
+
+        setAmount(paidAmount);
+        setNewBalance(updatedBalance);
+        setStatus('success');
+      } catch (err) {
+        console.error('Verification error:', err);
+        setStatus('error');
+      }
     };
 
+    verifyPayment();
+  }, [transRef, reference, navigate]);
 
-    return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-white p-4">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg w-full max-w-md text-center z-5">
-                {renderContent()}
+  const failure = STATES[status];
+
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-canvas p-5">
+      {status === 'success' && <Confetti width={width} height={height} recycle={false} numberOfPieces={350} />}
+      <Logo className="mb-8" to="/dashboard" />
+
+      <motion.div
+        key={status}
+        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        className="w-full max-w-md rounded-[2rem] border border-line bg-surface p-8 text-center shadow-xl shadow-black/5"
+      >
+        {status === 'verifying' && (
+          <div className="py-6">
+            <Spinner className="h-12 w-12 border-4" />
+            <h1 className="mt-6 text-xl font-extrabold">Confirming your payment</h1>
+            <p className="mt-2 text-sm text-muted">This usually takes a few seconds. Please don’t close this page.</p>
+          </div>
+        )}
+
+        {status === 'success' && (
+          <>
+            <Lottie animationData={successAnimation} loop={false} className="mx-auto -my-4 h-40 w-40" />
+            <h1 className="text-2xl font-extrabold">Deposit successful 🎉</h1>
+            <p className="mt-2 text-muted">Your wallet has been funded.</p>
+            <p className="mt-6 text-4xl font-extrabold tracking-tight text-accent tabular-nums">+{formatNaira(amount)}</p>
+            <div className="mt-6 flex justify-between rounded-2xl bg-surface-2/70 px-4 py-3 text-sm">
+              <span className="text-muted">New balance</span>
+              <span className="font-bold tabular-nums">{formatNaira(newBalance)}</span>
             </div>
-        </div>
-    );
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button to="/invest" variant="secondary">
+                Start investing
+              </Button>
+              <Button to="/dashboard">Go to dashboard</Button>
+            </div>
+          </>
+        )}
+
+        {failure && (
+          <>
+            <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl ${failure.tone}`}>
+              <failure.icon className="h-8 w-8" />
+            </div>
+            <h1 className="mt-5 text-xl font-extrabold">{failure.title}</h1>
+            <p className="mt-2 text-sm text-muted">{failure.text}</p>
+            {reference && <p className="mt-4 break-all rounded-xl bg-surface-2 px-3 py-2 font-mono text-xs text-muted">Ref: {reference}</p>}
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <Button to="/dashboard" variant="secondary">
+                Dashboard
+              </Button>
+              <Button to="/transact/deposit" icon={RotateCcw}>
+                Try again
+              </Button>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </div>
+  );
 };
 
 export default DepositSuccess;
