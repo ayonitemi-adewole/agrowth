@@ -2,15 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/assets/Submark-removebg-preview.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Agrowth — invest in real farm cycles, track your returns and grow your wealth with agriculture." />
+    <meta name="theme-color" content="#0FA280" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      rel="icon"
-      type="image/png"
-      href="\assets\Submark-removebg-preview.png"
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
     />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Smart Farmer</title>
+    <title>Agrowth</title>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash of the wrong theme
+      try {
+        var t = localStorage.getItem('theme');
+        var dark = t === 'dark' || (t === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+        var a = localStorage.getItem('accent');
+        if (a) document.documentElement.style.setProperty('--accent', a);
+      } catch (e) {}
+    </script>
   </head>
-  <body style="background-image: linear-gradient(45deg, #0fa280, #054d3b)">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

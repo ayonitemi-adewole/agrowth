@@ -1,104 +1,83 @@
-import React, { useEffect, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Banknote, ChevronLeftCircle, ChevronRightCircle, CircleDollarSign, Loader, Wallet } from "lucide-react";
-import { motion } from "framer-motion";
-import Footer from "../components/component/Footer";
-import { useNavigate } from "react-router-dom";
-import { auth, db } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, query, where, onSnapshot, doc } from "firebase/firestore";
-import TransactionList from "../components/component/TransactionList";
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowDownLeft, ArrowUpRight, Sprout } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { useTransactions } from '../hooks/useData';
+import { formatNaira } from '../lib/format';
+import { Button, Card, PageHeader, SectionTitle } from '../components/ui';
+import BalanceCard from '../components/BalanceCard';
+import TransactionList from '../components/TransactionList';
 
 const Transact = () => {
-    const [balance, setBalance] = useState(0);
-    const [transactions, setTransactions] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const { user, availableBalance, investmentBalance, profileLoading } = useApp();
+  const { transactions, loading } = useTransactions(user?.uid);
 
-    const navigate = useNavigate();
-    const [user, setUser] = useState(null);
-    const [theme, setTheme] = useState(localStorage.getItem("theme") || "light");
-    const [accent, setAccent] = useState(localStorage.getItem("accent") || "#0FA280");
+  const totals = useMemo(() => {
+    const sums = { deposit: 0, invest: 0, withdraw: 0 };
+    transactions
+      .filter((txn) => txn.status === 'successful')
+      .forEach((txn) => {
+        const type = String(txn.type || '').toLowerCase();
+        if (type in sums) sums[type] += Number(txn.amount) || 0;
+      });
+    return sums;
+  }, [transactions]);
 
-    useEffect(() => {
-        const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                fetchTransactions(currentUser.uid);
-                const userDoc = doc(db, "users", currentUser.uid);
-                onSnapshot(userDoc, (doc) => {
-                    setBalance(doc.data().availableBalance);
-                    setTheme(doc.data().theme);
-                    setAccent(doc.data().accent);
-                });
-            } else {
-                navigate("/sign-in");
-            }
-        });
+  return (
+    <div className="space-y-8">
+      <PageHeader title="Wallet" subtitle="Fund your account and review activity" />
 
-        return () => unsubscribeAuth();
-    }, [navigate]);
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+        <BalanceCard title="Available balance" available={availableBalance} invested={investmentBalance} loading={profileLoading} showTotal={false}>
+          <div className="flex gap-3">
+            <Link
+              to="/transact/deposit"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-white font-bold text-brand-900 transition hover:bg-white/90 active:scale-[0.98]"
+            >
+              <ArrowDownLeft className="h-5 w-5" /> Deposit
+            </Link>
+            <Link
+              to="/transact/withdraw"
+              className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-white/15 font-bold backdrop-blur-sm transition hover:bg-white/25 active:scale-[0.98]"
+            >
+              <ArrowUpRight className="h-5 w-5" /> Withdraw
+            </Link>
+          </div>
+        </BalanceCard>
 
-    const fetchTransactions = (userId) => {
-        const q = query(collection(db, "transactions"), where("uid", "==", userId) && where("status", "==", "successful"));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            let totalBalance = 0;
-            const txnList = snapshot.docs.map(doc => {
-                const data = doc.data();
-                if (data.type === "deposit" && data.status === "successful") {
-                    totalBalance += data.amount;
-                }
-                if (data.type === "withdraw" && data.status === "successful") {
-                    const withdrawalFee = data.amount * 0.05;
-                    totalBalance -= (data.amount + withdrawalFee);
-                }
-                if (data.type === "invest" && data.status === "successful") {
-                    totalBalance -= data.amount
-                };
-                return { id: doc.id, ...data };
-            });
-
-            setTransactions(txnList);
-            setLoading(false);
-        });
-
-        return unsubscribe;
-    };
-    return (
-        <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-gray-800 to-gray-900' : 'bg-gradient-to-br from-[#0FA280] to-[#054D3B]'} text-gray-900 font-sans overflow-scroll h-screen flex flex-col items-center pb-20`}>
-            <div className='w-full max-w-3xl px-4 pt-6 z-50'>
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className={`${theme === "dark" ? 'bg-gray-800' : 'bg-gray-200 border border-gray-300'} shadow-lg rounded-xl p-4 w-full text-center relative overflow-hidden`}
-                >
-                    <h2 className="text-sm font-semibold text-gray-600">Available Balance</h2>
-                    <p className="text-xl font-bold text-[#0FA280]">NGN {balance.toLocaleString() || 0}</p>
-                    <CircleDollarSign className='text-[#0fa280] w-16 h-16 opacity-20 rotate-12 scale-200 absolute right-12 top-5 select-none pointer-events-none' />
-                    <Banknote className='text-[#0FA280] w-16 h-16 opacity-20 -rotate-12 scale-200 absolute left-12 top-5 select-none pointer-events-none' />
-                </motion.div>
-
-                {/* Quick Actions */}
-                <div className="mt-4 w-full grid grid-cols-2 gap-4 z-50">
-                    {["Deposit", "Withdraw"].map((action, index) => (
-                        <motion.button
-                            key={index}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`flex flex-col items-center p-3 rounded-lg shadow-md hover:shadow-xl transition ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white'}`}
-                            onClick={() => navigate(`/transact/${action.toLowerCase()}`)}
-                        >
-                            {action === "Deposit" ? <ArrowDownLeft className="text-green-600 w-5 h-5" /> : <ArrowUpRight className="text-red-600 w-5 h-5" />}
-                            <span className="text-sm font-semibold mt-2">{action}</span>
-                        </motion.button>
-                    ))}
-                </div>
-
-                {/* Transaction History */}
-                <TransactionList transactions={transactions} loading={loading} theme={theme} accent={accent} />
-            </div>
+        <div className="grid grid-cols-3 gap-3 lg:grid-cols-1">
+          {[
+            { label: 'Deposited', value: totals.deposit, icon: ArrowDownLeft, tone: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+            { label: 'Invested', value: totals.invest, icon: Sprout, tone: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
+            { label: 'Withdrawn', value: totals.withdraw, icon: ArrowUpRight, tone: 'bg-rose-500/15 text-rose-600 dark:text-rose-400' },
+          ].map(({ label, value, icon: Icon, tone }) => (
+            <Card key={label} className="flex flex-col gap-2 p-4 lg:flex-row lg:items-center lg:gap-4">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tone}`}>
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-muted">{label}</p>
+                <p className="truncate font-extrabold tabular-nums">{formatNaira(value, { compact: true })}</p>
+              </div>
+            </Card>
+          ))}
         </div>
-    );
+      </div>
+
+      <section>
+        <SectionTitle title="Transaction history" />
+        <TransactionList
+          transactions={transactions}
+          loading={loading}
+          emptyAction={
+            <Button to="/transact/deposit" size="sm" icon={ArrowDownLeft}>
+              Make your first deposit
+            </Button>
+          }
+        />
+      </section>
+    </div>
+  );
 };
 
 export default Transact;

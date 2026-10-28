@@ -1,161 +1,159 @@
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import {
-    ArrowLeft,
-    BadgeDollarSign,
-    Bell,
-    LogOut,
-    Pencil,
-    History,
-    Settings,
-    ChevronRight,
-} from 'lucide-react';
-import React, { useEffect, useState } from 'react';
-import { auth, db } from '../firebase';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import Footer from '../components/component/Footer';
-import Barloader from '../components/component/Barloader';
-import { doc, getDoc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { toast } from 'react-toastify';
+import { Bell, ChevronRight, CreditCard, History, LogOut, Moon, Palette, Pencil, ShieldCheck, Sprout, TriangleAlert, UserRound } from 'lucide-react';
+import { auth } from '../firebase';
+import { useApp } from '../context/AppContext';
+import { cn, formatDate, formatNaira } from '../lib/format';
+import { Avatar, Badge, Button, Card, Modal, Switch } from '../components/ui';
+
+const MenuItem = ({ icon: Icon, label, hint, to, onClick, trailing, danger }) => {
+  const content = (
+    <>
+      <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', danger ? 'bg-red-500/12 text-red-500' : 'bg-accent/10 text-accent')}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn('block text-sm font-semibold', danger && 'text-red-500')}>{label}</span>
+        {hint && <span className="block truncate text-xs text-muted">{hint}</span>}
+      </span>
+      {trailing ?? <ChevronRight className="h-5 w-5 text-muted" />}
+    </>
+  );
+  const classes = 'flex w-full items-center gap-4 px-4 py-3.5 text-left transition hover:bg-surface-2/70';
+  if (to) {
+    return (
+      <Link to={to} className={classes}>
+        {content}
+      </Link>
+    );
+  }
+  if (!onClick) return <div className={classes}>{content}</div>;
+  return (
+    <button type="button" onClick={onClick} className={classes}>
+      {content}
+    </button>
+  );
+};
+
+const MenuGroup = ({ title, children }) => (
+  <section>
+    <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wider text-muted">{title}</h2>
+    <Card className="divide-y divide-line overflow-hidden">{children}</Card>
+  </section>
+);
 
 const Profile = () => {
-    const navigate = useNavigate();
-    const [user, setUser] = useState({});
-    const [balance, setBalance] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const navigate = useNavigate();
+  const { user, profile, displayName, availableBalance, investmentBalance, theme, updateAppearance } = useApp();
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-    const [accent, setAccent] = useState(localStorage.getItem('accent') || '#0FA280');
+  const fullName = [profile?.firstName || displayName, profile?.lastName].filter(Boolean).join(' ');
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await signOut(auth);
+      toast.success('Signed out. See you soon!');
+      navigate('/sign-in', { replace: true });
+    } catch (err) {
+      console.error('Sign out error:', err);
+      toast.error('Could not sign out. Please try again.');
+      setLoggingOut(false);
+    }
+  };
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser(currentUser);
-                try {
-                    const userRef = doc(db, 'users', currentUser.uid);
-                    const userSnap = await getDoc(userRef);
-                    if (userSnap.exists()) {
-                        setBalance(userSnap.data().availableBalance || 0);
-                        setTheme(userSnap.data().theme || 'light');
-                        setAccent(userSnap.data().accent || '#0FA280');
-                    } else {
-                        setBalance(0);
-                    }
-                } catch (error) {
-                    console.error('Error fetching balance:', error);
-                    setBalance(0);
-                }
-            } else {
-                navigate('/sign-in');
-            }
-            setLoading(false);
-        });
+  const toggleDark = (dark) => updateAppearance({ theme: dark ? 'dark' : 'light' }).catch(() => toast.error('Theme changed on this device only.'));
 
-        return () => unsubscribe();
-    }, [navigate]);
-
-    const handleLogout = () => {
-        setIsLoggingOut(true);
-        setTimeout(() => {
-            signOut(auth);
-            navigate('/sign-in');
-        }, 1000);
-    };
-
-    const formatDate = (timestamp) => {
-        return new Date(timestamp).toLocaleDateString('en-NG', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-        });
-    };
-
-    return (
-        <div className={`relative z-50 ${theme === "dark" ? 'bg-gradient-to-br from-gray-800 to-gray-900' : 'bg-gradient-to-br'} ${theme === "dark" ? '' : `from-[${accent}] to-[${accent}]`} text-white font-sans`} style={{ filter: theme === "dark" ? 'none' : 'brightness(0.9)' }}>
-            <div className='min-h-screen max-w-3xl px-3 flex flex-col items-center mx-auto pb-20'>
-                {isLoggingOut || loading ? <Barloader /> : null}
-
-                <div className='w-full py-5 flex flex-col flex-grow'>
-                    {/* Header */}
-                    <header className='w-full flex items-center gap-3 mb-6'>
-                        <button onClick={() => navigate('/dashboard')}>
-                            <ArrowLeft className='text-white w-6 h-6 cursor-pointer' />
-                        </button>
-                        <LogOut onClick={handleLogout} className='text-white w-6 h-6 ml-auto cursor-pointer' />
-                        <Bell className='text-white w-6 h-6 cursor-pointer' />
-                    </header>
-
-                    {/* User Info */}
-                    <div className={`${theme === "dark" ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} shadow-lg px-6 py-4 rounded-2xl flex items-center justify-between`}>
-                        <div>
-                            <h1 className='text-base sm:text-lg font-semibold'>Hi, {user?.displayName || 'User'}</h1>
-                            <p className={`text-xs sm:text-base ${theme === "dark" ? 'text-gray-400' : 'text-gray-500'}`}>{user?.email}</p>
-                            {user?.metadata?.creationTime && (
-                                <p className={`text-xs sm:text-base ${theme === "dark" ? 'text-gray-500' : 'text-gray-400'}`}>
-                                    Joined: {formatDate(user.metadata.creationTime)}
-                                </p>
-                            )}
-                        </div>
-                        <img
-                            className='w-12 h-12 rounded-full border border-gray-300 object-cover'
-                            src={user?.photoURL || '/default-avatar.png'}
-                            alt='User Avatar'
-                        />
-                    </div>
-
-                    {/* Balance Section */}
-                    <section className='mt-4'>
-                        <div className={`${theme === "dark" ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-900'} shadow-md rounded-2xl p-5 border ${theme === "dark" ? 'border-gray-700' : 'border-gray-300'} flex justify-between items-center overflow-hidden`}>
-                            <div>
-                                <h1 className={`font-semibold text-sm ${theme === "dark" ? 'text-gray-300' : 'text-gray-700'}`}>Available Balance</h1>
-                                <p className='text-lg font-bold mt-1'>₦ {balance?.toLocaleString() || '0'}</p>
-                                <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.9 }}
-                                    className={`mt-4 py-2 px-4 rounded-lg shadow w-full`}
-                                    style={
-                                        {
-                                            backgroundColor: accent,
-                                            color: accent === '#D4F1F4' || accent === '#75E6DA' ? 'black' : 'white',
-                                        }
-                                    }
-                                    onClick={() => navigate('/transact/deposit')}
-                                >
-                                    Fund Account
-                                </motion.button>
-                            </div>
-                            <BadgeDollarSign style={{ color: accent }} className='w-16 h-16 opacity-20 rotate-12 scale-400' />
-                        </div>
-                    </section>
-
-                    {/* More Options */}
-                    <section className='mt-4 space-y-2'>
-                        <motion.div
-                            whileTap={{ scale: 0.97 }}
-                            className={`${theme === "dark" ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} shadow-md p-4 rounded-xl flex items-center gap-4 cursor-pointer`}
-                            onClick={() => navigate('/transact')}
-                        >
-                            <History style={{ color: accent }} />
-                            <p className='text-sm font-semibold'>Transaction History</p>
-                            <ChevronRight className={`ml-auto ${theme === "dark" ? 'text-gray-400' : 'text-gray-500'}`} />
-                        </motion.div>
-
-                        <motion.div
-                            whileTap={{ scale: 0.97 }}
-                            className={`${theme === "dark" ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'} shadow-md p-4 rounded-xl flex items-center gap-4 cursor-pointer`}
-                            onClick={() => navigate('/settings')}
-                        >
-                            <Settings style={{ color: accent }} />
-                            <p className='text-sm font-semibold'>Settings</p>
-                            <ChevronRight className={`ml-auto ${theme === "dark" ? 'text-gray-400' : 'text-gray-500'}`} />
-                        </motion.div>
-                    </section>
-                </div>
-
-                <Footer page='profile' />
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+        <Card className="overflow-hidden">
+          <div className="accent-gradient h-24" />
+          <div className="-mt-12 flex flex-col items-center px-6 pb-6 text-center">
+            <div className="relative">
+              <Avatar src={user?.photoURL} name={fullName} size={96} className="ring-4" />
+              <Link
+                to="/settings/profile"
+                className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent text-on-accent shadow-md ring-4 ring-surface"
+                aria-label="Edit profile"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Link>
             </div>
-        </div>);
+            <h1 className="mt-3 text-xl font-extrabold tracking-tight">{fullName}</h1>
+            <p className="text-sm text-muted">{user?.email}</p>
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              {user?.emailVerified && (
+                <Badge className="bg-accent/12 text-accent">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Verified
+                </Badge>
+              )}
+              {user?.metadata?.creationTime && <Badge className="bg-surface-2 text-muted">Member since {formatDate(user.metadata.creationTime, { month: 'short', year: 'numeric' })}</Badge>}
+            </div>
+
+            <div className="mt-6 grid w-full grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-surface-2/70 p-4 text-left">
+                <p className="text-xs text-muted">Available</p>
+                <p className="font-extrabold tabular-nums">{formatNaira(availableBalance)}</p>
+              </div>
+              <div className="rounded-2xl bg-surface-2/70 p-4 text-left">
+                <p className="text-xs text-muted">Invested</p>
+                <p className="font-extrabold tabular-nums">{formatNaira(investmentBalance)}</p>
+              </div>
+            </div>
+            <Button to="/transact/deposit" className="mt-4 w-full">
+              Fund account
+            </Button>
+          </div>
+        </Card>
+      </motion.div>
+
+      <MenuGroup title="Account">
+        <MenuItem icon={UserRound} label="Personal details" hint="Name, phone and photo" to="/settings/profile" />
+        <MenuItem icon={ShieldCheck} label="Security" hint="Password and two-factor authentication" to="/settings/security" />
+        <MenuItem icon={CreditCard} label="Withdrawal details" hint="Bank account for payouts" to="/settings/withdrawals" />
+      </MenuGroup>
+
+      <MenuGroup title="Activity">
+        <MenuItem icon={Sprout} label="My investments" to="/invest" />
+        <MenuItem icon={History} label="Transaction history" to="/transact" />
+      </MenuGroup>
+
+      <MenuGroup title="Preferences">
+        <MenuItem icon={Moon} label="Dark mode" trailing={<Switch checked={theme === 'dark'} onChange={toggleDark} label="Dark mode" />} />
+        <MenuItem icon={Palette} label="Appearance" hint="Theme and accent colour" to="/settings/appearance" />
+        <MenuItem icon={Bell} label="Notifications" to="/settings/notifications" />
+      </MenuGroup>
+
+      <MenuGroup title="Other">
+        <MenuItem icon={LogOut} label="Sign out" onClick={() => setLogoutOpen(true)} />
+        <MenuItem icon={TriangleAlert} label="Danger zone" hint="Deactivate or delete your account" to="/settings/danger" danger />
+      </MenuGroup>
+
+      <p className="pb-4 text-center text-xs text-muted">Agrowth · Grow with every harvest</p>
+
+      <Modal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        title="Sign out?"
+        description="You'll need your email and password to sign back in."
+        footer={
+          <>
+            <Button variant="secondary" className="flex-1" onClick={() => setLogoutOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" className="flex-1" onClick={handleLogout} loading={loggingOut} icon={LogOut}>
+              Sign out
+            </Button>
+          </>
+        }
+      />
+    </div>
+  );
 };
 
 export default Profile;

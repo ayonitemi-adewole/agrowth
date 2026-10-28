@@ -1,1 +1,153 @@
 @import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --color-brand-50: #e9faf4;
+  --color-brand-100: #c9f2e3;
+  --color-brand-200: #97e4cb;
+  --color-brand-300: #5ccfae;
+  --color-brand-400: #2bb790;
+  --color-brand-500: #0fa280;
+  --color-brand-600: #0a8468;
+  --color-brand-700: #086a55;
+  --color-brand-800: #065444;
+  --color-brand-900: #054d3b;
+  --color-brand-950: #022a20;
+
+  --color-gold-300: #fcd667;
+  --color-gold-400: #f8c23a;
+  --color-gold-500: #f5a524;
+
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+}
+
+/* Semantic tokens: switch with light/dark and the user's accent colour */
+@theme inline {
+  --color-canvas: var(--app-canvas);
+  --color-surface: var(--app-surface);
+  --color-surface-2: var(--app-surface-2);
+  --color-line: var(--app-line);
+  --color-fg: var(--app-fg);
+  --color-muted: var(--app-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+}
+
+:root {
+  --accent: #0fa280;
+  --on-accent: #ffffff;
+  --app-canvas: #f4f7f5;
+  --app-surface: #ffffff;
+  --app-surface-2: #eef3f0;
+  --app-line: #e1e8e4;
+  --app-fg: #0e1a16;
+  --app-muted: #5f6e68;
+  color-scheme: light;
+}
+
+.dark {
+  --app-canvas: #0a110f;
+  --app-surface: #111a17;
+  --app-surface-2: #17221e;
+  --app-line: #22302b;
+  --app-fg: #e8efec;
+  --app-muted: #8c9a95;
+  color-scheme: dark;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-line);
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas text-fg font-sans antialiased;
+    min-height: 100dvh;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+  }
+
+  input[type="range"] {
+    accent-color: var(--accent);
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+}
+
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@utility skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--app-surface-2) 0%,
+    color-mix(in oklab, var(--app-surface-2) 60%, var(--app-line)) 50%,
+    var(--app-surface-2) 100%
+  );
+  background-size: 800px 100%;
+  animation: var(--animate-shimmer);
+}
+
+@utility accent-gradient {
+  background-image:
+    radial-gradient(120% 120% at 100% 0%, color-mix(in oklab, var(--accent) 55%, white) 0%, transparent 45%),
+    linear-gradient(135deg, var(--accent) 0%, color-mix(in oklab, var(--accent) 55%, black) 100%);
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* react-toastify, matched to the app's surfaces */
+.Toastify__toast {
+  border-radius: 14px;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  border: 1px solid var(--app-line);
+  box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.25);
+}
+
+.Toastify__toast-theme--light,
+.Toastify__toast-theme--dark {
+  background: var(--app-surface);
+  color: var(--app-fg);
+}

@@ -1,252 +1,168 @@
-import { ArrowLeft } from "lucide-react";
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "../firebase";
-import {
-    doc,
-    getDoc,
-    collection,
-    addDoc,
-} from "firebase/firestore";
-import { toast, ToastContainer } from "react-toastify";
+import { useState } from 'react';
+import { addDoc, collection } from 'firebase/firestore';
+import { toast } from 'react-toastify';
+import { CreditCard, Landmark, Lock, QrCode, Smartphone } from 'lucide-react';
+import { db } from '../firebase';
+import { useApp } from '../context/AppContext';
+import { cn, formatNaira } from '../lib/format';
+import { Alert, AmountInput, Button, Card, PageHeader } from '../components/ui';
+
+const BASE_URL = 'https://smart-farmer-ercaspay-api.onrender.com';
+const MINIMUM_DEPOSIT = 100;
+const QUICK_AMOUNTS = [1000, 5000, 10000, 50000];
+
+const METHODS = [
+  { icon: CreditCard, label: 'Card' },
+  { icon: Landmark, label: 'Transfer' },
+  { icon: Smartphone, label: 'USSD' },
+  { icon: QrCode, label: 'QR code' },
+];
 
 const Deposit = () => {
-    const navigate = useNavigate();
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [amount, setAmount] = useState("");
-    const [email, setEmail] = useState("");
-    const [fullName, setFullName] = useState("");
-    const [balance, setBalance] = useState(0);
-    const [minimumDeposit] = useState(100);
-    const [isProcessing, setIsProcessing] = useState(false);
+  const { user, profile, availableBalance } = useApp();
+  const [amount, setAmount] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-    const accent = localStorage.getItem("accent") || "#0FA280";
-    const theme = localStorage.getItem("theme") || "light";
+  const value = Number(amount) || 0;
+  const fullName = `${profile?.lastName || ''} ${profile?.firstName || ''}`.trim();
+  const tooLow = value > 0 && value < MINIMUM_DEPOSIT;
 
-    const BASE_URL = "https://smart-farmer-ercaspay-api.onrender.com";
+  const handleDeposit = async () => {
+    if (isProcessing) return;
+    if (value < MINIMUM_DEPOSIT) {
+      toast.warning(`Please enter at least ${formatNaira(MINIMUM_DEPOSIT)}`);
+      return;
+    }
+    setIsProcessing(true);
 
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            if (currentUser) {
-                setUser({ uid: currentUser.uid, email: currentUser.email });
-                setEmail(currentUser.email);
-
-                try {
-                    const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-                    if (userDoc.exists()) {
-                        const data = userDoc.data();
-                        setBalance(data.availableBalance || 0);
-                        setFullName(
-                            `${data.lastName || ""} ${data.firstName || ""}`.trim()
-                        );
-                    }
-                } catch (err) {
-                    console.error("Error fetching user data:", err);
-                    toast.error("Unable to load user information.");
-                }
-            } else {
-                navigate("/sign-in");
-            }
-            setLoading(false);
-        });
-
-        return () => unsubscribe();
-    }, [navigate]);
-
-    const handleErcaspayDeposit = async () => {
-        if (isProcessing) return;
-        setIsProcessing(true);
-
-        const parsedAmount = parseFloat(amount);
-        if (isNaN(parsedAmount) || parsedAmount < minimumDeposit) {
-            toast.warning(`Please enter at least ₦${minimumDeposit}`);
-            setIsProcessing(false);
-            return;
-        }
-
-        const paymentReference = user.uid + Date.now();
-
-        const depositData = {
-            amount: parsedAmount,
-            paymentReference,
-            paymentMethods: "card,bank-transfer,ussd,qrcode",
-            customerName: fullName,
-            customerEmail: email,
-            currency: "NGN",
-            redirectUrl: window.location.origin + "/transact/deposit-success",
-            description: "Deposit to your account",
-            metadata: {
-                userId: user.uid,
-                userEmail: email,
-                userName: fullName,
-            },
-        };
-
-        try {
-            const response = await fetch(`${BASE_URL}/api/ercaspay/initiate-payment`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(depositData),
-            });
-
-            const text = await response.text();
-
-            if (response.ok) {
-                const data = JSON.parse(text);
-                if (data.responseMessage === "success") {
-                    await addDoc(collection(db, "transactions"), {
-                        uid: user.uid,
-                        email: user.email,
-                        type: "deposit",
-                        amount: parsedAmount,
-                        status: "pending",
-                        reference: paymentReference,
-                        txn_data: depositData,
-                        createdAt: new Date().toISOString()
-                    });
-
-                    window.location.href = data.responseBody.checkoutUrl;
-                } else {
-                    toast.error("Payment initiation failed.");
-                }
-            } else {
-                toast.error("Unable to initiate payment.");
-            }
-        } catch (err) {
-            console.error("Payment error:", err);
-            toast.error("An error occurred during deposit.");
-        }
-
-        setIsProcessing(false);
+    const paymentReference = user.uid + Date.now();
+    const depositData = {
+      amount: value,
+      paymentReference,
+      paymentMethods: 'card,bank-transfer,ussd,qrcode',
+      customerName: fullName,
+      customerEmail: user.email,
+      currency: 'NGN',
+      redirectUrl: `${window.location.origin}/transact/deposit-success`,
+      description: 'Deposit to your account',
+      metadata: { userId: user.uid, userEmail: user.email, userName: fullName },
     };
 
-    const formatCurrency = (value) =>
-        new Intl.NumberFormat("en-NG", {
-            style: "currency",
-            currency: "NGN",
-        }).format(value);
+    try {
+      const response = await fetch(`${BASE_URL}/api/ercaspay/initiate-payment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(depositData),
+      });
 
-    const isDisabled =
-        !amount || parseFloat(amount) < minimumDeposit || isProcessing;
+      if (!response.ok) {
+        toast.error('Unable to initiate payment. Please try again.');
+        return;
+      }
 
-    return (
-        <div
-            className={`min-h-screen text-white font-sans flex items-center justify-center p-4 ${theme === "dark"
-                ? "bg-gradient-to-br from-gray-800 to-gray-900"
-                : "bg-gradient-to-br from-[#0FA280] to-[#054D3B]"
-                }`}
-        >
-            <ToastContainer position="top-right" autoClose={2300} />
-            <div
-                className={`${theme === "dark"
-                    ? "bg-gray-800 text-white"
-                    : "bg-gray-200 text-gray-800"
-                    } backdrop-blur-md p-8 rounded-2xl shadow-xl max-w-md w-full space-y-6 z-50`}
-            >
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => navigate(-1)}
-                        className={`p-2 rounded-full ${theme === "dark"
-                            ? "bg-white/20 hover:bg-white/30"
-                            : "bg-black/20 hover:bg-black/30"
-                            }`}
-                    >
-                        <ArrowLeft className="w-5 h-5 text-white" />
-                    </button>
-                    <h1 className="text-2xl font-bold mx-auto">Make a Deposit</h1>
-                </div>
+      const data = await response.json();
+      if (data.responseMessage !== 'success') {
+        toast.error('Payment initiation failed.');
+        return;
+      }
 
-                {loading ? (
-                    <p className="text-center text-sm">Loading user info...</p>
-                ) : (
-                    <div className="flex flex-col gap-2">
-                        <p className='text-red-600 font-semibold flex gap-2 items-center mb-2'> <AlertTriangle size={20} /><span>(Deposits is still in development. Funds may be lost.)</span></p>
+      await addDoc(collection(db, 'transactions'), {
+        uid: user.uid,
+        email: user.email,
+        type: 'deposit',
+        amount: value,
+        status: 'pending',
+        reference: paymentReference,
+        txn_data: depositData,
+        createdAt: new Date().toISOString(),
+      });
 
-                        <p>
-                            Available Balance:{" "}
-                            <span className="font-semibold">{formatCurrency(balance)}</span>
-                        </p>
-                        <p>
-                            Minimum Deposit:{" "}
-                            <span className="font-semibold">
-                                {formatCurrency(minimumDeposit)}
-                            </span>
-                        </p>
+      toast.info('Redirecting you to secure checkout…');
+      window.location.href = data.responseBody.checkoutUrl;
+    } catch (err) {
+      console.error('Payment error:', err);
+      toast.error('An error occurred during deposit.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-                        <div>
-                            <label className="text-sm font-semibold">Full Name</label>
-                            <input
-                                type="text"
-                                placeholder={fullName}
-                                disabled
-                                className={`w-full mt-2 p-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[${accent}] ${theme === "dark"
-                                    ? "bg-white/10 border-white/30"
-                                    : "bg-black/10 border-black/30"
-                                    }`}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-semibold">Email</label>
-                            <input
-                                type="email"
-                                placeholder={email}
-                                disabled
-                                className={`w-full mt-2 p-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[${accent}] ${theme === "dark"
-                                    ? "bg-white/10 border-white/30"
-                                    : "bg-black/10 border-black/30"
-                                    }`}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-semibold">Amount (₦)</label>
-                            <input
-                                type="number"
-                                min={minimumDeposit}
-                                value={amount}
-                                onChange={(e) => {
-                                    const val = e.target.value;
-                                    if (/^\d*\.?\d*$/.test(val)) setAmount(val);
-                                }}
-                                className={`w-full mt-2 p-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-[${accent}] ${theme === "dark"
-                                    ? "bg-white/10 border-white/30"
-                                    : "bg-black/10 border-black/30"
-                                    }`}
-                            />
-                            {amount && parseFloat(amount) >= minimumDeposit && (
-                                <p className="text-xs text-gray-400 mt-2">
-                                    You’ll be redirected to complete a deposit of{" "}
-                                    <strong>{formatCurrency(parseFloat(amount))}</strong>
-                                </p>
-                            )}
-                        </div>
+  return (
+    <div className="mx-auto max-w-xl pb-24 lg:pb-0">
+      <PageHeader title="Add money" subtitle={`Balance: ${formatNaira(availableBalance)}`} back="/transact" />
 
-                        <button
-                            onClick={handleErcaspayDeposit}
-                            disabled={isDisabled}
-                            className={`w-full text-center py-3 rounded-xl font-semibold transition ${isDisabled
-                                ? `${theme === "dark"
-                                    ? "bg-white/30"
-                                    : "bg-black/30"
-                                } cursor-not-allowed`
-                                : theme === "dark"
-                                    ? "bg-white text-black hover:bg-gray-300"
-                                    : "bg-black text-white hover:bg-gray-900"
-                                }`}
-                        >
-                            {isProcessing
-                                ? "Processing...Please wait."
-                                : `Deposit ${amount
-                                    ? `₦${amount.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
-                                    : ""
-                                }`}
-                        </button>
-                    </div>
+      <div className="space-y-5">
+        <Alert tone="warning" title="Deposits are in beta">
+          Deposits are still in development. Funds may be lost, so please start with small amounts.
+        </Alert>
+
+        <Card className="space-y-5 p-5 sm:p-6">
+          <AmountInput
+            label="Amount"
+            value={amount}
+            onChange={setAmount}
+            placeholder="0"
+            autoFocus
+            error={tooLow ? `Minimum deposit is ${formatNaira(MINIMUM_DEPOSIT)}` : ''}
+            hint={`Minimum ${formatNaira(MINIMUM_DEPOSIT)}`}
+          />
+          <div className="grid grid-cols-4 gap-2">
+            {QUICK_AMOUNTS.map((n) => (
+              <button
+                key={n}
+                onClick={() => setAmount(String(n))}
+                className={cn(
+                  'rounded-xl border py-2.5 text-sm font-bold transition',
+                  value === n ? 'border-accent bg-accent/10 text-accent' : 'border-line hover:bg-surface-2'
                 )}
+              >
+                {formatNaira(n)}
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded-2xl bg-surface-2/60 p-4 text-sm">
+            <div className="flex justify-between py-1">
+              <span className="text-muted">Account name</span>
+              <span className="font-semibold">{fullName || '—'}</span>
             </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted">Email</span>
+              <span className="truncate pl-4 font-semibold">{user?.email}</span>
+            </div>
+            <div className="flex justify-between py-1">
+              <span className="text-muted">New balance</span>
+              <span className="font-semibold tabular-nums">{formatNaira(availableBalance + value)}</span>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Pay with</p>
+            <div className="grid grid-cols-4 gap-2">
+              {METHODS.map(({ icon: Icon, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1.5 rounded-xl border border-line py-3 text-xs font-medium text-muted">
+                  <Icon className="h-5 w-5 text-fg" />
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        <p className="flex items-center justify-center gap-1.5 text-xs text-muted">
+          <Lock className="h-3.5 w-3.5" /> You’ll complete payment on Ercaspay’s secure checkout
+        </p>
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 p-4 pb-safe backdrop-blur-xl lg:static lg:mt-5 lg:border-0 lg:bg-transparent lg:p-0">
+        <div className="mx-auto max-w-xl">
+          <Button size="lg" className="w-full" onClick={handleDeposit} loading={isProcessing} disabled={value < MINIMUM_DEPOSIT}>
+            {isProcessing ? 'Preparing checkout…' : value ? `Deposit ${formatNaira(value)}` : 'Enter an amount'}
+          </Button>
         </div>
-    );
+      </div>
+    </div>
+  );
 };
 
 export default Deposit;

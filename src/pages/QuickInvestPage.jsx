@@ -1,228 +1,255 @@
-import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { db } from "../firebase";
-import { doc, updateDoc, getDoc, addDoc, collection } from "firebase/firestore";
-import { toast, ToastContainer } from "react-toastify";
-import { Banknote, Calculator } from "lucide-react";
+import { useState } from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { addDoc, collection, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { toast } from 'react-toastify';
+import { PackageOpen, Zap } from 'lucide-react';
+import { db } from '../firebase';
+import { useApp } from '../context/AppContext';
+import { useQuickInvestments } from '../hooks/useData';
+import { cn, formatNaira } from '../lib/format';
+import { Alert, AmountInput, Button, Card, EmptyState, Field, Modal, PageHeader } from '../components/ui';
+import { PageLoader } from '../components/layout/FullPageLoader';
 
-const InvestProductPage = () => {
-    const location = useLocation();
-    const navigate = useNavigate();
-    const { investment } = location.state || {}; // Get the investment details passed from the QuickInvestCard
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-    const [userBalance, setUserBalance] = useState(0);
-    const [user, setUser] = useState(null);
-    const [investmentBalance, setInvestmentBalance] = useState(0);
-    const [investmentAmount, setInvestmentAmount] = useState("");
-    const [numberOfDays, setNumberOfDays] = useState(investment.minimumInvestmentPeriod); // Default to 30 days
-    const [calculatedProfit, setCalculatedProfit] = useState(0);
-    const [isInvesting, setIsInvesting] = useState(false);
+const QuickInvestPage = () => {
+  const { id } = useParams();
+  const { state } = useLocation();
+  const navigate = useNavigate();
+  const { user, availableBalance } = useApp();
+  const { quickInvestments, loading } = useQuickInvestments();
+  const investment = state?.investment || quickInvestments.find((inv) => inv.id === id || inv.productName === id);
 
+  const [amount, setAmount] = useState('');
+  const [days, setDays] = useState(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [investing, setInvesting] = useState(false);
 
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-    const [accent, setAccent] = useState(localStorage.getItem('accent') || '#0FA280');
-    // Fetch user balance from Firestore
-    useEffect(() => {
-        const fetchUserBalance = async () => {
-            const user = JSON.parse(localStorage.getItem("user"));
-            setUser(user);
-            if (user?.uid) {
-                const userRef = doc(db, "users", user.uid);
-                const userSnap = await getDoc(userRef);
-                setUserBalance(userSnap.exists() ? userSnap.data().availableBalance || 0 : 0);
-                setInvestmentBalance(userSnap.exists() ? userSnap.data().investmentBalance || 0 : 0);
-                setTheme(userSnap.exists() ? userSnap.data().theme || 'light' : 'light');
-                setAccent(userSnap.exists() ? userSnap.data().accent || '#0FA280' : '#0FA280');
-            } else {
-                toast.error("Please log in to invest.");
-                navigate("/sign-in");
-            }
-        };
-        fetchUserBalance();
-    }, [navigate]);
-
-    // Investment calculation function
-    const calculateProfit = (amount, days) => {
-        if (!amount || amount <= 0 || isNaN(amount)) return 0;
-        const dailyROI = investment?.expectedROI || 0;
-        const profit = amount * (dailyROI / 100) * days;
-        setCalculatedProfit(profit);
-    };
-
-    const handleInvestmentChange = (e) => {
-        const amount = e.target.value;
-        setInvestmentAmount(amount);
-        calculateProfit(amount, numberOfDays); // Recalculate profit on amount change
-    };
-
-    const handleDaysChange = (e) => {
-        const days = e.target.value;
-        setNumberOfDays(days);
-        calculateProfit(investmentAmount, days); // Recalculate profit on days change
-    };
-
-    const handleInvestNow = async () => {
-        if (investmentAmount <= 0 || isNaN(investmentAmount)) {
-            toast.error("Please enter a valid investment amount.");
-            return;
-        }
-
-        if (investmentAmount < investment.minimumInvestment) {
-            toast.error(`Minimum investment is ₦${investment.minimumInvestment.toLocaleString()}`);
-            return;
-        }
-
-        if (investmentAmount > userBalance) {
-            toast.error("You do not have sufficient funds for this investment.");
-            return;
-        }
-
-        if (numberOfDays < investment.minWithdrawalDays) {
-            toast.error(`The minimum Investment period is ${investment.minWithdrawalDays} days`);
-            return;
-        }
-        setIsInvesting(true);
-
-        try {
-            // Update user balance in Firestore (subtract the invested amount)
-            const user = JSON.parse(localStorage.getItem("user"));
-            const userRef = doc(db, "users", user.uid);
-            const userDoc = await getDoc(userRef);
-
-            await updateDoc(userRef, {
-                availableBalance: userBalance - Number(investmentAmount),
-                investmentBalance: Number(investmentBalance || 0) + Number(investmentAmount),
-            });
-
-            // Log the investment in Firestore (save the investment record)
-            const userInvestmentsRef = collection(db, "users", user.uid, "investments");
-            await addDoc(userInvestmentsRef, {
-                status: "Active",
-                expectedReturn: calculatedProfit,
-                uid: user.uid,
-                productName: investment.productName,
-                investmentAmount: Number(investmentAmount),
-                investmentPeriod: Number(numberOfDays),
-                expectedROI: Number(investment.expectedROI * numberOfDays),
-                endDate: new Date(new Date().getTime() + numberOfDays * 24 * 60 * 60 * 1000).toISOString(),
-                earningsSoFar: 0,
-                createdAt: new Date().toISOString(),
-            });
-
-            const investmentRef = collection(db, "quickInvestments", "fastVegetables", "investors");
-            await addDoc(investmentRef, {
-                status: "Active",
-                expectedReturn: calculatedProfit,
-                uid: user.uid,
-                productName: investment.productName,
-                investmentAmount: Number(investmentAmount),
-                investmentPeriod: Number(numberOfDays),
-                expectedROI: Number(investment.expectedROI * numberOfDays),
-                endDate: new Date(new Date().getTime() + numberOfDays * 24 * 60 * 60 * 1000).toISOString(),
-                earningsSoFar: 0,
-                createdAt: new Date().toISOString(),
-            });
-
-            await addDoc(collection(db, "transactions"), {
-                userId: user.uid,
-                email: user.email,
-                amount: Number(investmentAmount),
-                status: "successful",
-                type: "invest",
-                investmentId: investment?.productName,
-                timestamp: new Date().toISOString(),
-                createdAt: new Date().toISOString(),
-            });
-
-            toast.success(`Successfully invested ₦${Number(investmentAmount).toLocaleString()} in ${investment.productName}!`);
-            navigate("/dashboard");
-        } catch (error) {
-            console.error("Error making investment:", error);
-            toast.error("Something went wrong. Please try again.");
-        } finally {
-            setIsInvesting(false);
-        }
-    };
+  if (!investment && loading) return <PageLoader />;
+  if (!investment) {
     return (
-        <div className={`${theme === 'dark' ? 'bg-gradient-to-br from-gray-800 to-gray-900' : 'bg-gradient-to-br from-[#0FA280] to-[#054D3B]'} text-white min-h-screen flex flex-col items-center pt-6 px-4 pb-20`}>
-            <ToastContainer position="top-right" autoClose={2300} />
-
-            <div className={`max-w-xl w-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} p-8 rounded-2xl shadow-lg z-10 relative`}>
-                <div className="flex items-center mb-6">
-                    <button onClick={() => navigate(-1)} className={`mr-4 ${theme === 'dark' ? 'text-white' : 'text-gray-800'} cursor-pointer`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                        </svg>
-                    </button>
-                    <h2 className={`text-3xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>{investment?.productName}</h2>
-                </div>
-                {/* Investment Details */}
-                <div className={`mb-8 text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                    <p><strong>Expected ROI:</strong> {investment?.expectedROI}% {investment?.ROIFrequency}</p>
-                    <p><strong>Minimum Investment Period:</strong> {investment?.minimumInvestmentPeriod} days</p>
-                    {/* <p><strong>Minimum Withdrawal:</strong> {investment?.minWithdrawalDays} days</p> */}
-                    <p><strong>Min Investment:</strong> ₦{investment?.minimumInvestment.toLocaleString()}</p>
-                    <p><strong>Status:</strong> {investment?.status === "open" ? "Available" : "Closed"}</p>
-                </div>
-
-                {/* Investment Amount and Days */}
-                <div className="mb-6">
-                    <label htmlFor="investmentAmount" className={`block ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} font-medium mb-2`}>
-                        Enter Investment Amount (₦)
-                    </label>
-                    <input
-                        id="investmentAmount"
-                        type="number"
-                        value={investmentAmount}
-                        onChange={handleInvestmentChange}
-                        className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} focus:ring-2 focus:ring-[#0FA280] transition`}
-                        placeholder="Enter amount"
-                    />
-                </div>
-
-                <div className="mb-6">
-                    <label htmlFor="investmentDays" className={`block ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} font-medium mb-2`}>
-                        Investment Duration (Days)
-                    </label>
-                    <input
-                        id="investmentDays"
-                        type="number"
-                        value={numberOfDays}
-                        onChange={handleDaysChange}
-                        className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'} focus:ring-2 focus:ring-[#0FA280] transition`}
-                        placeholder="Enter number of days"
-                    />
-                </div>
-
-                {/* Profit Calculation */}
-                <div className={`mb-6 p-4 border rounded-lg ${theme === 'dark' ? 'border-gray-600 bg-gray-700' : 'border-gray-300 bg-gray-50'}`}>
-                    <h3 className={`text-lg font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>Investment Profit</h3>
-                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} mt-2`}>Expected Profit for {numberOfDays} days:</p>
-                    <div className="text-2xl font-semibold text-[#0FA280] mt-2">
-                        ₦{calculatedProfit.toFixed(2)}
-                    </div>
-                </div>
-
-                {/* Available Balance */}
-                <div className="flex justify-between items-center mb-4">
-                    <p className={`font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Available Balance:</p>
-                    <p className={theme === 'dark' ? 'text-white' : 'text-gray-900'}>₦{userBalance.toLocaleString()}</p>
-                </div>
-
-                {/* Invest Button */}
-                <button
-                    onClick={handleInvestNow}
-                    disabled={isInvesting || investment?.status !== "open"}
-                    className={`w-full py-3 px-6 text-white font-semibold rounded-lg transition ${isInvesting || investment?.status !== "open"
-                        ? "bg-gray-400 cursor-not-allowed"
-                        : `${theme === 'dark' ? 'bg-[#0FA280] hover:bg-[#0d8b6d]' : 'bg-[#0FA280] hover:bg-[#0d8b6d]'}`
-                        }`}
-                >
-                    {isInvesting ? "Investing..." : "Invest Now"}
-                </button>
-            </div>
-        </div>
+      <>
+        <PageHeader title="Quick invest" back="/invest" />
+        <Card>
+          <EmptyState icon={PackageOpen} title="Offer not available" description="This quick-invest offer couldn't be found." action={<Button to="/invest">Back to Invest</Button>} />
+        </Card>
+      </>
     );
+  }
+
+  const dailyROI = Number(investment.expectedROI) || 0;
+  const minDays = Math.max(Number(investment.minimumInvestmentPeriod) || 1, Number(investment.minWithdrawalDays) || 0);
+  const maxDays = Math.max(minDays * 6, 90);
+  const duration = days ?? minDays;
+  const value = Number(amount) || 0;
+  const profit = value * (dailyROI / 100) * duration;
+  const open = investment.status === 'open';
+  const minAmount = Number(investment.minimumInvestment) || 0;
+
+  const error =
+    value && value < minAmount
+      ? `Minimum investment is ${formatNaira(minAmount)}`
+      : value > availableBalance
+        ? `Insufficient balance. You have ${formatNaira(availableBalance)}`
+        : '';
+  const canInvest = open && value >= minAmount && value <= availableBalance && duration >= minDays;
+
+  const handleInvest = async () => {
+    setInvesting(true);
+    try {
+      const userRef = doc(db, 'users', user.uid);
+      const userData = (await getDoc(userRef)).data() || {};
+      if (Number(userData.availableBalance || 0) < value) {
+        toast.error('You do not have sufficient funds for this investment.');
+        return;
+      }
+
+      await updateDoc(userRef, {
+        availableBalance: Number(userData.availableBalance || 0) - value,
+        investmentBalance: Number(userData.investmentBalance || 0) + value,
+      });
+
+      const record = {
+        status: 'Active',
+        expectedReturn: profit,
+        uid: user.uid,
+        productName: investment.productName,
+        investmentAmount: value,
+        investmentPeriod: duration,
+        expectedROI: dailyROI * duration,
+        endDate: new Date(Date.now() + duration * DAY_MS).toISOString(),
+        earningsSoFar: 0,
+        createdAt: new Date().toISOString(),
+      };
+      await addDoc(collection(db, 'users', user.uid, 'investments'), record);
+      await addDoc(collection(db, 'quickInvestments', 'fastVegetables', 'investors'), record);
+
+      await addDoc(collection(db, 'transactions'), {
+        userId: user.uid,
+        email: user.email,
+        amount: value,
+        status: 'successful',
+        type: 'invest',
+        investmentId: investment.productName,
+        timestamp: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+      });
+
+      toast.success(`Successfully invested ${formatNaira(value)} in ${investment.productName}!`);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Error making investment:', err);
+      toast.error('Something went wrong. Please try again.');
+    } finally {
+      setInvesting(false);
+    }
+  };
+
+  const quickAmounts = [minAmount, minAmount * 2, minAmount * 5, minAmount * 10].filter((n, i, arr) => n > 0 && arr.indexOf(n) === i);
+
+  return (
+    <div className="pb-24 lg:pb-0">
+      <PageHeader title={investment.productName} subtitle="Quick invest · daily returns" back />
+
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <div className="space-y-6">
+          <div className="relative overflow-hidden rounded-3xl bg-brand-950 p-6 text-white">
+            <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-gold-400/30 blur-3xl" />
+            <span className="relative inline-flex items-center gap-1.5 rounded-full bg-gold-400/20 px-2.5 py-1 text-xs font-bold text-gold-300">
+              <Zap className="h-3.5 w-3.5 fill-current" /> {open ? 'Open now' : 'Closed'}
+            </span>
+            <div className="relative mt-4 grid grid-cols-3 gap-3 text-center">
+              {[
+                ['ROI', `${dailyROI}%`, investment.ROIFrequency],
+                ['Min. period', minDays, 'days'],
+                ['Min. amount', formatNaira(minAmount, { compact: true }), 'to start'],
+              ].map(([label, val, sub]) => (
+                <div key={label} className="rounded-2xl bg-white/10 p-3">
+                  <p className="text-[11px] text-white/65">{label}</p>
+                  <p className="text-lg font-extrabold">{val}</p>
+                  <p className="text-[11px] text-white/65">{sub}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Card className="space-y-6 p-5 sm:p-6">
+            <AmountInput
+              label="How much do you want to invest?"
+              value={amount}
+              onChange={setAmount}
+              placeholder="0"
+              error={error}
+              hint={`Wallet balance: ${formatNaira(availableBalance)}`}
+            />
+            <div className="flex flex-wrap gap-2">
+              {quickAmounts.map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setAmount(String(n))}
+                  className={cn('rounded-full border px-3.5 py-1.5 text-sm font-semibold transition', value === n ? 'border-accent bg-accent/10 text-accent' : 'border-line hover:bg-surface-2')}
+                >
+                  {formatNaira(n, { compact: true })}
+                </button>
+              ))}
+            </div>
+
+            <Field label="Duration" labelAction={<span className="text-sm font-extrabold text-accent">{duration} days</span>}>
+              <input
+                type="range"
+                min={minDays}
+                max={maxDays}
+                value={duration}
+                onChange={(e) => setDays(Number(e.target.value))}
+                className="w-full"
+                aria-label="Investment duration in days"
+              />
+              <div className="flex justify-between text-xs text-muted">
+                <span>{minDays} days</span>
+                <span>{maxDays} days</span>
+              </div>
+            </Field>
+            <div className="flex flex-wrap gap-2">
+              {[minDays, 14, 30, 60].filter((d, i, arr) => d >= minDays && d <= maxDays && arr.indexOf(d) === i).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDays(d)}
+                  className={cn('rounded-full border px-3.5 py-1.5 text-sm font-semibold transition', duration === d ? 'border-accent bg-accent/10 text-accent' : 'border-line hover:bg-surface-2')}
+                >
+                  {d} days
+                </button>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        <Card className="h-fit p-5 sm:p-6 lg:sticky lg:top-8">
+          <h2 className="font-bold">Your projection</h2>
+          <p className="text-sm text-muted">Based on {dailyROI}% per day</p>
+          <motion.p key={Math.round(profit)} initial={{ scale: 0.95, opacity: 0.6 }} animate={{ scale: 1, opacity: 1 }} className="mt-5 text-4xl font-extrabold tracking-tight text-accent tabular-nums">
+            +{formatNaira(profit)}
+          </motion.p>
+          <p className="text-sm text-muted">profit after {duration} days</p>
+
+          <div className="mt-5 divide-y divide-line rounded-2xl bg-surface-2/60 px-4 py-1 text-sm">
+            {[
+              ['You invest', formatNaira(value)],
+              ['Total ROI', `${(dailyROI * duration).toFixed(1)}%`],
+              ['Matures on', new Date(Date.now() + duration * DAY_MS).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })],
+              ['Total payout', formatNaira(value + profit)],
+            ].map(([label, val]) => (
+              <div key={label} className="flex justify-between py-2.5">
+                <span className="text-muted">{label}</span>
+                <span className="font-semibold tabular-nums">{val}</span>
+              </div>
+            ))}
+          </div>
+
+          {!open && (
+            <Alert tone="warning" className="mt-4">
+              This offer is currently closed.
+            </Alert>
+          )}
+          {value > availableBalance && (
+            <Button to="/transact/deposit" variant="soft" size="sm" className="mt-4">
+              Fund wallet
+            </Button>
+          )}
+
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 p-4 pb-safe backdrop-blur-xl lg:static lg:mt-5 lg:border-0 lg:bg-transparent lg:p-0">
+            <Button size="lg" className="w-full" disabled={!canInvest} onClick={() => setConfirmOpen(true)}>
+              {value ? `Invest ${formatNaira(value)}` : 'Enter an amount'}
+            </Button>
+          </div>
+        </Card>
+      </div>
+
+      <Modal
+        open={confirmOpen}
+        onClose={() => !investing && setConfirmOpen(false)}
+        title="Confirm quick invest"
+        description={`${investment.productName} for ${duration} days`}
+        footer={
+          <>
+            <Button variant="secondary" className="flex-1" onClick={() => setConfirmOpen(false)} disabled={investing}>
+              Cancel
+            </Button>
+            <Button className="flex-1" onClick={handleInvest} loading={investing}>
+              Confirm
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-1 text-center">
+          <p className="text-sm text-muted">You’re investing</p>
+          <p className="text-3xl font-extrabold tabular-nums">{formatNaira(value)}</p>
+          <p className="text-sm text-accent">Expected profit +{formatNaira(profit)}</p>
+          <p className="pt-3 text-xs text-muted">Balance after: {formatNaira(availableBalance - value)}</p>
+        </div>
+      </Modal>
+    </div>
+  );
 };
 
-export default InvestProductPage;
+export default QuickInvestPage;
