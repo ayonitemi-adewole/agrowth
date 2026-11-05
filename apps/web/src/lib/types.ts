@@ -126,6 +126,12 @@ export interface Cycle {
   review_note: string | null;
   submitted_at: string | null;
   approved_at: string | null;
+  /** Settlement terms, in basis points (100 = 1%). */
+  management_fee_bps: number;
+  funder_profit_share_bps: number;
+  harvest_completed_at: string | null;
+  settlement_started_at: string | null;
+  settled_at: string | null;
   created_at: string;
 }
 
@@ -251,6 +257,81 @@ export interface Disbursement {
   instructed_at: string;
   executed_at: string | null;
   trustee_reference: string | null;
+}
+
+export type HarvestGrade = 'grade_a' | 'grade_b' | 'grade_c' | 'rejected';
+
+export interface HarvestDelivery {
+  id: string;
+  cycle_id: string;
+  farm_id: string;
+  offtake_contract_id: string;
+  delivered_on: string;
+  weight_kg: number;
+  grade: HarvestGrade;
+  moisture_pct: number | null;
+  waybill_reference: string;
+  notes: string | null;
+  created_at: string;
+  voided_at: string | null;
+  void_reason: string | null;
+}
+
+export type ReceiptKind = 'offtake_payment' | 'insurance_payout';
+
+export interface CycleReceipt {
+  id: string;
+  cycle_id: string;
+  kind: ReceiptKind;
+  payer_name: string;
+  amount_kobo: Money;
+  trustee_reference: string;
+  received_on: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type PayoutKind = 'platform_fee' | 'funder' | 'farmer';
+
+export interface SettlementPayout {
+  id: string;
+  cycle_id: string;
+  kind: PayoutKind;
+  contribution_id: string | null;
+  farmer_id: string | null;
+  payee_name: string;
+  amount_kobo: Money;
+  capital_kobo: Money;
+  status: 'instructed' | 'executed' | 'cancelled';
+  paid_at: string | null;
+  trustee_reference: string | null;
+  created_at: string;
+}
+
+/** The waterfall from settlement_preview; amounts are kobo as strings. */
+export interface SettlementPreview {
+  cash: string;
+  capital: string;
+  deployed: string;
+  fee: string;
+  capital_returned: string;
+  capital_loss: string;
+  profit: string;
+  funder_return: string;
+  farmer_surplus: string;
+  accepted_kg: number;
+  management_fee_bps: number;
+  funder_profit_share_bps: number;
+  funders: {
+    contribution_id: string;
+    name: string;
+    contributed: string;
+    capital: string;
+    return: string;
+    loss: string;
+    total: string;
+  }[];
+  farmers: { farmer_id: string; name: string; kg: number; amount: string }[];
 }
 
 export interface LedgerBalance {

@@ -2,15 +2,19 @@ import { supabase } from '../../lib/supabase';
 import type {
   Cycle,
   CycleEvent,
+  CycleReceipt,
   Disbursement,
   FarmMap,
   FieldVisit,
   FundingContribution,
+  HarvestDelivery,
   InsurancePolicy,
   KycStatus,
   Milestone,
   OfftakeContract,
   ReadinessCheck,
+  SettlementPayout,
+  SettlementPreview,
 } from '../../lib/types';
 import { useAsync } from '../../lib/useAsync';
 
@@ -28,6 +32,11 @@ export interface CycleData {
   disbursements: Disbursement[];
   visits: FieldVisit[];
   readiness: ReadinessCheck[] | null;
+  deliveries: HarvestDelivery[];
+  receipts: CycleReceipt[];
+  payouts: SettlementPayout[];
+  /** The waterfall as it would run now; null once settlement has run or before the season. */
+  settlement: SettlementPreview | null;
   hectares: number;
   /** Names of people who appear in the cycle's history, by id. */
   people: Map<string, string>;
@@ -43,21 +52,51 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
   const cycle = must(cycleRes) as Cycle | null;
   if (!cycle) return null;
 
-  const [farmLinks, milestones, offtake, insurance, contributions, funding, events, disbursements] =
-    await Promise.all([
-      supabase.from('cycle_farms').select('farm_id').eq('cycle_id', id),
-      supabase.from('milestones').select('*').eq('cycle_id', id).order('sequence'),
-      supabase.from('offtake_contracts').select('*').eq('cycle_id', id).order('created_at'),
-      supabase.from('insurance_policies').select('*').eq('cycle_id', id).order('created_at'),
-      supabase.from('funding_contributions').select('*').eq('cycle_id', id).order('created_at'),
-      supabase.from('cycle_funding').select('raised_kobo').eq('cycle_id', id).maybeSingle(),
-      supabase
-        .from('cycle_events')
-        .select('*')
-        .eq('cycle_id', id)
-        .order('created_at', { ascending: false }),
-      supabase.from('disbursements').select('*').eq('cycle_id', id).order('instructed_at'),
-    ]);
+  const underway = ['in_progress', 'harvested', 'settled'].includes(cycle.status);
+  const [
+    farmLinks,
+    milestones,
+    offtake,
+    insurance,
+    contributions,
+    funding,
+    events,
+    disbursements,
+    deliveries,
+    receipts,
+    payouts,
+    settlement,
+  ] = await Promise.all([
+    supabase.from('cycle_farms').select('farm_id').eq('cycle_id', id),
+    supabase.from('milestones').select('*').eq('cycle_id', id).order('sequence'),
+    supabase.from('offtake_contracts').select('*').eq('cycle_id', id).order('created_at'),
+    supabase.from('insurance_policies').select('*').eq('cycle_id', id).order('created_at'),
+    supabase.from('funding_contributions').select('*').eq('cycle_id', id).order('created_at'),
+    supabase.from('cycle_funding').select('raised_kobo').eq('cycle_id', id).maybeSingle(),
+    supabase
+      .from('cycle_events')
+      .select('*')
+      .eq('cycle_id', id)
+      .order('created_at', { ascending: false }),
+    supabase.from('disbursements').select('*').eq('cycle_id', id).order('instructed_at'),
+    underway
+      ? supabase
+          .from('harvest_deliveries')
+          .select('*')
+          .eq('cycle_id', id)
+          .order('delivered_on', { ascending: false })
+          .order('created_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    underway
+      ? supabase.from('cycle_receipts').select('*').eq('cycle_id', id).order('received_on')
+      : Promise.resolve({ data: [], error: null }),
+    underway
+      ? supabase.from('settlement_payouts').select('*').eq('cycle_id', id).order('created_at')
+      : Promise.resolve({ data: [], error: null }),
+    ['in_progress', 'harvested'].includes(cycle.status) && !cycle.settlement_started_at
+      ? supabase.rpc('settlement_preview', { p_cycle_id: id })
+      : Promise.resolve({ data: null, error: null }),
+  ]);
 
   const farmIds = must(farmLinks).map((f: { farm_id: string }) => f.farm_id);
   const milestoneRows = must(milestones) as Milestone[];
@@ -111,6 +150,10 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     disbursements: must(disbursements) as Disbursement[],
     visits: must(visits) as FieldVisit[],
     readiness: must(readiness) as ReadinessCheck[] | null,
+    deliveries: must(deliveries) as HarvestDelivery[],
+    receipts: must(receipts) as CycleReceipt[],
+    payouts: must(payouts) as SettlementPayout[],
+    settlement: must(settlement) as SettlementPreview | null,
     hectares: farmRows.reduce((s, f) => s + Number(f.area_hectares), 0),
     people,
   };

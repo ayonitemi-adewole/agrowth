@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { CycleStatus, MilestoneStatus, PayeeKind } from './types';
+import type { CycleStatus, HarvestGrade, MilestoneStatus, PayeeKind, PayoutKind } from './types';
 
 type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'blue' | 'violet';
 
@@ -28,6 +28,26 @@ export const PAYEE_KIND: Record<PayeeKind, string> = {
   service_provider: 'Service provider',
   farmer_cash: 'Cash to farmers',
 };
+
+export const HARVEST_GRADE: Record<HarvestGrade, { label: string; tone: Tone }> = {
+  grade_a: { label: 'Grade A', tone: 'green' },
+  grade_b: { label: 'Grade B', tone: 'blue' },
+  grade_c: { label: 'Grade C', tone: 'amber' },
+  rejected: { label: 'Rejected', tone: 'red' },
+};
+
+export const PAYOUT_KIND: Record<PayoutKind, string> = {
+  platform_fee: 'Management fee',
+  funder: 'Funder',
+  farmer: 'Farmer surplus',
+};
+
+/** Basis points → "2%" / "12.5%". */
+export const formatBps = (bps: number) => `${(bps / 100).toLocaleString('en-NG')}%`;
+
+/** Kilograms → "4.2 t". */
+export const formatTonnes = (kg: number) =>
+  `${(kg / 1000).toLocaleString('en-NG', { maximumFractionDigits: 2 })} t`;
 
 export const FUNDING_SOURCE = {
   investor: 'Investors',

@@ -21,18 +21,21 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform)Phase 1 (core platform) is feature-complete: a demo cycle can run from draft to released funds. Next is Phase 2 (investor and government editions, vouchers, offl| Area | State |
-| ----------------------------------------------------------------------------------------------- | ----- |
-| Accounts and roles: sign-up, admin assigns staff roles, deactivation | Done |
-| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review | Done |
-| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check | Done |
-| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents | Done |
-| Approval: readiness checklist, compliance review, separation of duties | Done |
-| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled | Done |
-| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release | Done |
-| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments | Done |
-| Ledger: double-entry, append-only, balanced, no money moving between cycles | Done |
-| Harvest, settlement waterfall, statements | Next |
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Next is Phase 2 (investor and government editions, vouchers, the offline agent app, USSD).
+
+| Area                                                                                                           | State |
+| -------------------------------------------------------------------------------------------------------------- | ----- |
+| Accounts and roles: sign-up, admin assigns staff roles, deactivation                                           | Done  |
+| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                                        | Done  |
+| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check                        | Done  |
+| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents                | Done  |
+| Approval: readiness checklist, compliance review, separation of duties                                         | Done  |
+| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled                  | Done  |
+| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release                | Done  |
+| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments                            | Done  |
+| Ledger: double-entry, append-only, balanced, no money moving between cycles                                    | Done  |
+| Harvest: weighed and graded deliveries per farm, voids with a reason                                           | Done  |
+| Settlement: offtake and insurance receipts, fee → capital → profit-share waterfall, payouts, funder statements | Done  |
 
 ## Getting started
 
@@ -180,6 +183,8 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 | Funding deadline                   | 2026-11-20                                        |
 | Season starts                      | 2026-11-25                                        |
 | Expected harvest                   | 2027-03-15                                        |
+| Management fee (% of capital)      | 2                                                 |
+| Funders' share of profit (%)       | 30                                                |
 | Notes                              | Irrigated dry-season maize on three family farms. |
 
 > The target can't exceed budget per hectare × mapped hectares. With ₦600,000/ha you need at least 2.5 ha mapped. If your farms are smaller, the readiness checklist tells you the maximum, and you can lower the target to fit (then scale the amounts below to match).
@@ -263,6 +268,52 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 **Step 17 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Repeat steps 13–16 for milestones 2 and 3.
 
+**Step 18 — Field agent: record the harvest** (open the cycle → Harvest tab → Record delivery). One row per load, as the offtaker weighs and grades it. The offtake agreement is Northern Mills Ltd for every load.
+
+| Farm       | Weight (kg) | Grade    | Moisture (%) | Waybill     |
+| ---------- | ----------- | -------- | ------------ | ----------- |
+| North plot | 2000        | Grade A  | 13.5         | WB-DEMO-001 |
+| North plot | 1200        | Grade B  | 14           | WB-DEMO-002 |
+| River plot | 2700        | Grade A  | 13           | WB-DEMO-003 |
+| East plot  | 3100        | Grade B  | 14.5         | WB-DEMO-004 |
+| East plot  | 350         | Rejected | 19           | WB-DEMO-005 |
+
+> To see a correction, record a sixth load (North plot, 1000 kg, `WB-DEMO-006`) and press **Void** with the reason "Entered twice". It stays in the list, struck out, and stops counting. Reusing a waybill number is refused.
+
+The tab now shows 9 t accepted (3 t/ha, the expected yield). The rejected load is kept on record but earns nothing.
+
+**Step 19 — Cycle manager: complete the harvest.** Harvest tab → **Complete harvest**. It's refused while any milestone is unreleased. The cycle is now _Harvested_ and no more loads can be recorded.
+
+**Step 20 — Trustee: record the offtaker's payment** (Settlement tab → Record receipt)
+
+| Field          | Value                                |
+| -------------- | ------------------------------------ |
+| From           | Harvest payment · Northern Mills Ltd |
+| Amount (₦)     | 4050000                              |
+| Received on    | today                                |
+| Bank reference | RCV-DEMO-001                         |
+| Notes          | 9 t at ₦450,000/t                    |
+
+> An insurer's claim payout is recorded the same way (choose **Insurance payout**). It joins the same waterfall, so funders and farmers see exactly what was recovered.
+
+**Step 21 — Trustee: run the settlement.** The Settlement tab previews the waterfall. Each step is paid in full before the next:
+
+| Step                                          | Amount (₦) |
+| --------------------------------------------- | ---------- |
+| Cash held by the trustee                      | 4,050,000  |
+| 1. Management fee (2% of ₦1,500,000 capital)  | 30,000     |
+| 2. Funders' capital back                      | 1,500,000  |
+| 3. Funders' return (30% of ₦2,520,000 profit) | 756,000    |
+| 4. Farmer surplus (by kg delivered)           | 1,764,000  |
+
+Funders are paid in proportion to what they put in: Adaeze Okoro ₦1,353,600 and Chidi Nwosu ₦902,400, +50.4% each. Farmers are paid by kilograms accepted: Amina Ibrahim ₦627,200 (3.2 t), Musa Bello ₦529,200 (2.7 t) and Hauwa Sani ₦607,600 (3.1 t). Press **Run settlement**. That fixes the six payouts.
+
+> If your cycle was approved before settlement terms existed, its fee is 0% and its funders' share is 30%. The total paid out is the same, but there's no fee line and the screen shows the exact split.
+
+**Step 22 — Trustee: make the payouts.** Settlement tab → **Confirm payment** for each, with references `SET-DEMO-001` to `SET-DEMO-006`. After the last one the cycle is _Settled_.
+
+**Step 23 — Check the result.** The **Funder statements** card shows each funder's money in, capital back, return and result. In the Ledger, the trustee's cash, funder capital and farm deployment are all ₦0. The income and expense accounts show where every naira went: ₦4,050,000 harvest proceeds against ₦1,500,000 cost of production, ₦30,000 fee, ₦756,000 funder returns and ₦1,764,000 farmer surplus.
+
 ## Tests
 
 ```bash
@@ -271,7 +322,7 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Web tests** (`apps/web`) — money, map and error helpers.
 
 ## Repository layout

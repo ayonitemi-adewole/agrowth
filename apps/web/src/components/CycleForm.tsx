@@ -42,6 +42,8 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
     start_date: cycle?.start_date ?? '',
     expected_harvest_date: cycle?.expected_harvest_date ?? '',
     description: cycle?.description ?? '',
+    fee_pct: ((cycle?.management_fee_bps ?? 0) / 100).toString(),
+    funder_share_pct: ((cycle?.funder_profit_share_bps ?? 3000) / 100).toString(),
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,12 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
       return kobo.toString();
     };
     const num = (v: string) => Number(v);
+    const bps = (label: string, v: string, max: number) => {
+      const pct = Number(v);
+      if (v.trim() === '' || !Number.isFinite(pct) || pct < 0 || pct > max)
+        throw new Error(`${label} must be a percentage between 0 and ${max}`);
+      return Math.round(pct * 100);
+    };
 
     let row: Record<string, unknown>;
     try {
@@ -90,6 +98,8 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
         start_date: form.start_date || null,
         expected_harvest_date: form.expected_harvest_date || null,
         description: form.description.trim() || null,
+        management_fee_bps: bps('Management fee', form.fee_pct, 20),
+        funder_profit_share_bps: bps("Funders' share of profit", form.funder_share_pct, 100),
       };
     } catch (err) {
       setError((err as Error).message);
@@ -253,6 +263,36 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
           </Field>
           <Field label="Price, high (₦/t)">
             <Input value={form.price_high} onChange={set('price_high')} inputMode="decimal" />
+          </Field>
+        </div>
+      </Group>
+
+      <Group title="Settlement terms">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Management fee (% of capital)" hint="Paid first at settlement; up to 20%">
+            <Input
+              value={form.fee_pct}
+              onChange={set('fee_pct')}
+              type="number"
+              min={0}
+              max={20}
+              step={0.01}
+              required
+            />
+          </Field>
+          <Field
+            label="Funders' share of profit (%)"
+            hint="After capital is returned; farmers share the rest by kg delivered"
+          >
+            <Input
+              value={form.funder_share_pct}
+              onChange={set('funder_share_pct')}
+              type="number"
+              min={0}
+              max={100}
+              step={0.01}
+              required
+            />
           </Field>
         </div>
       </Group>

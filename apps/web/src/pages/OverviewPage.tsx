@@ -1,10 +1,12 @@
 import {
   ArrowRight,
+  Banknote,
   ClipboardCheck,
   Coins,
   Landmark,
   Lock,
   MapPinned,
+  Scale,
   ShieldCheck,
   UserCheck,
   UsersRound,
@@ -90,6 +92,18 @@ async function loadTodo(role: Role | undefined): Promise<Todo[]> {
       'Payments to confirm',
       '/cycles',
       count('disbursements', (q) => q.eq('status', 'instructed')),
+    );
+    add(
+      Scale,
+      'Harvested cycles to settle',
+      '/cycles',
+      count('cycles', (q) => q.eq('status', 'harvested').is('settlement_started_at', null)),
+    );
+    add(
+      Banknote,
+      'Settlement payouts to make',
+      '/cycles',
+      count('settlement_payouts', (q) => q.eq('status', 'instructed')),
     );
     add(
       Coins,

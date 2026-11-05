@@ -8,12 +8,22 @@ import { titleCase } from '../../lib/format';
 import { ContractsTab } from './ContractsTab';
 import { FarmsTab } from './FarmsTab';
 import { FundingTab } from './FundingTab';
+import { HarvestTab } from './HarvestTab';
 import { HistoryTab } from './HistoryTab';
 import { MilestonesTab } from './MilestonesTab';
 import { OverviewTab } from './OverviewTab';
+import { SettlementTab } from './SettlementTab';
 import { useCycleData } from './useCycleData';
 
-type Tab = 'overview' | 'farms' | 'milestones' | 'contracts' | 'funding' | 'history';
+type Tab =
+  | 'overview'
+  | 'farms'
+  | 'milestones'
+  | 'contracts'
+  | 'funding'
+  | 'harvest'
+  | 'settlement'
+  | 'history';
 
 export function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +47,7 @@ export function CycleDetailPage() {
 
   const { cycle } = data;
   const props = { data, reload: state.reload };
+  const underway = ['in_progress', 'harvested', 'settled'].includes(cycle.status);
 
   return (
     <>
@@ -72,6 +83,16 @@ export function CycleDetailPage() {
             count: data.offtake.length + data.insurance.length,
           },
           { id: 'funding', label: 'Funding', count: data.contributions.length },
+          ...(underway
+            ? [
+                {
+                  id: 'harvest' as const,
+                  label: 'Harvest',
+                  count: data.deliveries.filter((d) => !d.voided_at).length,
+                },
+                { id: 'settlement' as const, label: 'Settlement', count: data.payouts.length },
+              ]
+            : []),
           { id: 'history', label: 'History', count: data.events.length },
         ]}
       />
@@ -82,6 +103,8 @@ export function CycleDetailPage() {
         {tab === 'milestones' && <MilestonesTab {...props} />}
         {tab === 'contracts' && <ContractsTab {...props} />}
         {tab === 'funding' && <FundingTab {...props} />}
+        {tab === 'harvest' && <HarvestTab {...props} />}
+        {tab === 'settlement' && <SettlementTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}
       </div>
     </>

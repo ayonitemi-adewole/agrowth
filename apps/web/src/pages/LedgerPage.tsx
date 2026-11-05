@@ -104,7 +104,12 @@ export function LedgerPage() {
               <Card key={b.account_id}>
                 <p className="text-sm text-zinc-500">{b.name}</p>
                 <p className="mt-2 text-2xl font-semibold tracking-tight text-zinc-950 tabular-nums">
-                  {formatNaira(b.type === 'liability' ? -toKobo(b.balance_kobo) : b.balance_kobo)}
+                  {/* Liability, equity and income accounts are credit-normal: show them positive. */}
+                  {formatNaira(
+                    ['liability', 'equity', 'income'].includes(b.type)
+                      ? -toKobo(b.balance_kobo)
+                      : b.balance_kobo,
+                  )}
                 </p>
                 <p className="mt-1 font-mono text-xs text-zinc-400">{b.code}</p>
               </Card>

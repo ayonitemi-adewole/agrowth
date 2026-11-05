@@ -44,5 +44,7 @@ export const can = {
   reviewCycles: (r?: Role) => has(r, ['admin', 'compliance_officer']),
   actAsTrustee: (r?: Role) => has(r, ['trustee']),
   doFieldVisits: (r?: Role) => has(r, ['admin', 'field_agent']),
+  recordHarvest: (r?: Role) =>
+    has(r, ['admin', 'cycle_manager', 'programme_manager', 'field_agent']),
   readLedger: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
 };

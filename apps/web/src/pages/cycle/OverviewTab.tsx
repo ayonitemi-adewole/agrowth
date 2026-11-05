@@ -26,6 +26,7 @@ import {
   Stat,
   Textarea,
 } from '../../components/ui';
+import { formatBps } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, formatHectares } from '../../lib/format';
 import { formatNaira, ratio, toKobo } from '../../lib/money';
@@ -35,7 +36,9 @@ import type { ReadinessCheck } from '../../lib/types';
 import type { TabProps } from './useCycleData';
 import { RecordFundingButton, RefundButton } from './FundingTab';
 
-type Goto = (tab: 'farms' | 'milestones' | 'contracts' | 'funding') => void;
+type Goto = (
+  tab: 'farms' | 'milestones' | 'contracts' | 'funding' | 'harvest' | 'settlement',
+) => void;
 
 export function OverviewTab({ data, reload, goTo }: TabProps & { goTo: Goto }) {
   const { cycle, hectares } = data;
@@ -141,6 +144,10 @@ export function OverviewTab({ data, reload, goTo }: TabProps & { goTo: Goto }) {
                 cycle.price_expected_per_tonne_kobo
                   ? `${formatNaira(cycle.price_low_per_tonne_kobo, { compact: true })} – ${formatNaira(cycle.price_expected_per_tonne_kobo, { compact: true })} – ${formatNaira(cycle.price_high_per_tonne_kobo, { compact: true })}`
                   : '—',
+              ],
+              [
+                'Settlement',
+                `${formatBps(cycle.management_fee_bps)} fee · funders get ${formatBps(cycle.funder_profit_share_bps)} of profit`,
               ],
               ['Funding deadline', formatDate(cycle.funding_deadline)],
               ['Approved', cycle.approved_at ? formatDate(cycle.approved_at) : '—'],
@@ -330,9 +337,44 @@ function NextStep({ data, reload, goTo }: TabProps & { goTo: Goto }) {
           </Button>
         </>
       ) : (
-        <p className="text-sm text-zinc-600">
-          All milestones are released. Harvest and settlement come next.
-        </p>
+        <>
+          <p className="text-sm text-zinc-600">
+            All milestones are released. Record each delivery to the offtaker, then complete the
+            harvest so the trustee can settle.
+          </p>
+          <Button variant="secondary" onClick={() => goTo('harvest')}>
+            Go to harvest
+          </Button>
+        </>
+      );
+      break;
+    }
+    case 'harvested': {
+      body = (
+        <>
+          <p className="text-sm text-zinc-600">
+            {cycle.settlement_started_at
+              ? 'Settlement is running. The trustee confirms each payout as it is paid.'
+              : "The harvest is in. The trustee records the offtaker's payment, then runs the settlement waterfall."}
+          </p>
+          <Button variant="secondary" onClick={() => goTo('settlement')}>
+            Go to settlement
+          </Button>
+        </>
+      );
+      break;
+    }
+    case 'settled': {
+      body = (
+        <>
+          <p className="text-sm text-zinc-600">
+            Settled on {formatDate(cycle.settled_at)}. Every payout has been made and the ledger is
+            closed.
+          </p>
+          <Button variant="secondary" onClick={() => goTo('settlement')}>
+            See statements
+          </Button>
+        </>
       );
       break;
     }
