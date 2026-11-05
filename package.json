@@ -14,7 +14,8 @@
     "test": "npm run test --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "dev": "npm run dev -w @agrowth/web"
+    "dev": "npm run dev -w @agrowth/web",
+    "dev:phone": "npm run dev:phone -w @agrowth/web"
   },
   "devDependencies": {
     "prettier": "^3.9.10"

@@ -21,18 +21,18 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform)Phase 1 (core platform) is feature-complete: a demo cycle can run from draft to released funds. Next is Phase 2 (investor and government editions, vouchers, offl| Area                                                                                            | State |
+Phase 1 (core platform)Phase 1 (core platform) is feature-complete: a demo cycle can run from draft to released funds. Next is Phase 2 (investor and government editions, vouchers, offl| Area | State |
 | ----------------------------------------------------------------------------------------------- | ----- |
-| Accounts and roles: sign-up, admin assigns staff roles, deactivation                            | Done  |
-| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                         | Done  |
-| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check         | Done  |
-| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents | Done  |
-| Approval: readiness checklist, compliance review, separation of duties                          | Done  |
-| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled   | Done  |
-| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release | Done  |
-| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments             | Done  |
-| Ledger: double-entry, append-only, balanced, no money moving between cycles                     | Done  |
-| Harvest, settlement waterfall, statements                                                       | Next  |
+| Accounts and roles: sign-up, admin assigns staff roles, deactivation | Done |
+| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review | Done |
+| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check | Done |
+| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents | Done |
+| Approval: readiness checklist, compliance review, separation of duties | Done |
+| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled | Done |
+| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release | Done |
+| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments | Done |
+| Ledger: double-entry, append-only, balanced, no money moving between cycles | Done |
+| Harvest, settlement waterfall, statements | Next |
 
 ## Getting started
 
@@ -71,7 +71,7 @@ In Supabase, open **Project Settings → API Keys** and copy the **Project URL**
 npm run dev
 ```
 
-Open http://localhost:5173 and create an account.
+Open http://localhost:5173 and create an account. (To use the app on a phone, run `npm run dev:phone` instead; see [Testing field visits on a phone](#testing-field-visits-on-a-phone).)
 
 ### 5. Make yourself an admin
 
@@ -87,31 +87,181 @@ Reload the app. From then on, use the **Users** page to give other staff their r
 
 ## Running a demo cycle
 
-The Phase 1 gate is "a demo cycle runs". You need several accounts, because the platform separates duties on purpose: whoever builds a cycle can't approve it, and only the trustee can confirm money. Sign up each one (a different email each), then give them roles on the **Users** page.
+The Phase 1 gate is "a demo cycle runs". You need several accounts, because the platform separates duties on purpose: whoever builds a cycle can't approve it, and only the trustee can confirm money. Sign up each one, then give them roles on the **Users** page.
 
-| Account            | Role                 | Does                                                        | Email
-| ------------------ | -------------------- | ----------------------------------------------------------- |
-| You                | Admin                | Assigns roles                                               | agrowth.farmlands@gmail.com
-| Field agent        | `field_agent`        | Enrols farmers, maps farms, records verification visits     | damola@agent.test
-| Compliance officer | `compliance_officer` | Verifies farmer KYC, approves cycles                        | comply@officer.test
-| Cycle manager      | `cycle_manager`      | Builds the cycle, requests verification, instructs releases | tolu@manager.test
-| Trustee            | `trustee`            | Confirms deposits and payments, refunds                     | bank@trustee.test
+| Account            | Role                 | Does                                                        | Email                       |
+| ------------------ | -------------------- | ----------------------------------------------------------- | --------------------------- |
+| You                | `admin`              | Assigns roles                                               | agrowth.farmlands@gmail.com |
+| Field agent        | `field_agent`        | Enrols farmers, maps farms, records verification visits     | damola@agent.test           |
+| Compliance officer | `compliance_officer` | Verifies farmer KYC, approves cycles                        | comply@officer.test         |
+| Cycle manager      | `cycle_manager`      | Builds the cycle, requests verification, instructs releases | tolu@manager.test           |
+| Trustee            | `trustee`            | Confirms deposits and payments, refunds                     | bank@trustee.test           |
 
-Then:
+### One-click demo sign-in
 
-1. **Field agent:** create a cooperative, enrol two or three farmers, map a farm for each.
-2. **Compliance officer:** open each farmer and **Verify** their KYC.
-3. **Cycle manager:** on **Funding cycles**, create a cycle. Add the farms, then milestones that add up to the target. Upload a signed offtake agreement and an insurance policy. When the readiness checklist is all green, **Submit for approval**.
-4. **Compliance officer:** open the cycle and **Approve** it.
-5. **Trustee:** **Record deposit** until the target is reached. The cycle becomes _Funded_.
-6. **Cycle manager:** on **Milestones**, **Request field verification** for milestone 1.
-7. **Field agent:** on **Field visits**, visit each farm. On a phone, standing inside the farm, the GPS check-in must be within 20 m. Add the checklist and a photo.
-8. **Cycle manager:** once every farm has passed, **Instruct release** to vendors (at most 20% as cash to farmers).
-9. **Trustee:** **Confirm payment** for each payee. The milestone is _Released_ and the **Ledger** shows every naira.
-h to farmers).
-9. **Trustee:** **Confirm payment** for each payee. The milestone is *Released* and the **Ledger** shows every naira.
+Add these to `apps/web/.env.local` (never committed) and restart `npm run dev`. The sign-in page then shows a button per account, and the sidebar gets a **Demo: switch account** menu:
 
-> Tip: field visits check your real GPS position against the mapped boundary. To try it at a desk, map a small farm around where you are sitting.
+```
+VITE_DEMO_PASSWORD=the password the demo accounts share
+VITE_ADMIN_DEMO_PASSWORD=optional: a different password for the admin account
+VITE_DEMO_ACCOUNTS=admin:agrowth.farmlands@gmail.com,field_agent:damola@agent.test,compliance_officer:comply@officer.test,cycle_manager:tolu@manager.test,trustee:bank@trustee.test
+```
+
+Any role can have its own password the same way: `VITE_<ROLE>_DEMO_PASSWORD`, for example `VITE_TRUSTEE_DEMO_PASSWORD`. Otherwise the shared one is used.
+
+> The buttons only appear on the development server (`npm run dev` and `npm run dev:phone`). A production build (`npm run build`) leaves the demo accounts and passwords out entirely.
+
+### Testing field visits on a phone
+
+A field visit passes only if the GPS fix is accurate to 20 m and within 20 m of the mapped boundary. Laptops usually report 20–100 m accuracy, so visits from a laptop will (correctly) fail. Use a phone:
+
+1. Run `npm run dev:phone`. It prints a `Network` address such as `https://192.168.0.81:5173`.
+2. On a phone on the same Wi-Fi, open that address. Accept the certificate warning: it's a self-signed certificate for local testing. Browsers only share GPS with secure pages.
+3. Map the demo farms **around where you are** (step 3 below), so you're standing at the farms when you visit them.
+
+### The walkthrough
+
+The values below fit together: the target fits the per-hectare budget, the milestones add up to the target, the offtake covers the low-yield harvest, and so on. Dates assume you run the demo in November 2026. If you run it later, move every date forward by the same amount, keeping the funding deadline in the future.
+
+**Step 1 — Field agent: create the cooperative** (Cooperatives → New cooperative)
+
+| Field               | Value                           |
+| ------------------- | ------------------------------- |
+| Name                | Zaria Maize Growers Cooperative |
+| Registration number | KD/COOP/2019/0042               |
+| Contact phone       | +2348031234567                  |
+| State               | Kaduna                          |
+| LGA                 | Zaria                           |
+| Ward                | Samaru                          |
+
+**Step 2 — Field agent: enrol three farmers** (Farmers → Enrol farmer). Choose the cooperative above for each, and State and LGA fill in automatically.
+
+| Field         | Farmer 1       | Farmer 2        | Farmer 3        |
+| ------------- | -------------- | --------------- | --------------- |
+| First name    | Amina          | Musa            | Hauwa           |
+| Last name     | Ibrahim        | Bello           | Sani            |
+| Phone         | +2348030000001 | +2348030000002  | +2348030000003  |
+| Gender        | Female         | Male            | Female          |
+| Date of birth | 1985-03-14     | 1979-08-02      | 1990-11-21      |
+| NIN           | 10000000001    | 10000000002     | _(leave empty)_ |
+| BVN           | 22200000001    | _(leave empty)_ | 22200000003     |
+| Ward          | Samaru         | Samaru          | Bomo            |
+
+> Try enrolling a fourth farmer with NIN `10000000001`. It's refused as a duplicate, with a link to Amina's record.
+
+**Step 3 — Field agent: map a farm for each farmer** (open the farmer → Map a farm)
+
+Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total about 3 ha. Tap four corners in order around the square. To test visits from a phone, press **Find me** first and draw the farms **next to each other around your position**. Farms may share edges but not overlap, so make them meet at a corner where you're standing.
+
+| Field       | Farm 1     | Farm 2     | Farm 3     |
+| ----------- | ---------- | ---------- | ---------- |
+| Farm name   | North plot | River plot | East plot  |
+| Main crop   | maize      | maize      | maize      |
+| Land tenure | Owned      | Family     | Leased     |
+| Soil notes  | Sandy loam | Clay loam  | Sandy loam |
+
+> Try drawing a fourth farm on top of an existing one. It's refused as land that's already registered.
+
+**Step 4 — Compliance officer: verify KYC.** Open each of the three farmers and press **Verify**.
+
+**Step 5 — Cycle manager: create the cycle** (Funding cycles → New cycle)
+
+| Field                              | Value                                             |
+| ---------------------------------- | ------------------------------------------------- |
+| Cycle code                         | DEMO-MAIZE-2026-001                               |
+| Crop                               | maize                                             |
+| Season                             | 2026/27 dry                                       |
+| Funded by                          | Investors                                         |
+| Cooperative                        | Zaria Maize Growers Cooperative                   |
+| Target amount (₦)                  | 1500000                                           |
+| Budget per hectare (₦)             | 600000                                            |
+| Yield low / expected / high (t/ha) | 2 / 3 / 4                                         |
+| Price low / expected / high (₦/t)  | 380000 / 450000 / 520000                          |
+| Funding deadline                   | 2026-11-20                                        |
+| Season starts                      | 2026-11-25                                        |
+| Expected harvest                   | 2027-03-15                                        |
+| Notes                              | Irrigated dry-season maize on three family farms. |
+
+> The target can't exceed budget per hectare × mapped hectares. With ₦600,000/ha you need at least 2.5 ha mapped. If your farms are smaller, the readiness checklist tells you the maximum, and you can lower the target to fit (then scale the amounts below to match).
+
+**Step 6 — Cycle manager: add the farms** (Farms tab → Add farms). Tick all three.
+
+**Step 7 — Cycle manager: add milestones** (Milestones tab → Add milestone). They must add up to the target exactly.
+
+| Order | Name                          | Amount (₦) | Planned date | What it pays for                                 |
+| ----- | ----------------------------- | ---------- | ------------ | ------------------------------------------------ |
+| 1     | Land preparation and planting | 600000     | 2026-11-28   | Ploughing, harrowing, certified seed, basal NPK  |
+| 2     | Mid-season inputs             | 540000     | 2027-01-10   | Urea top-dressing, herbicide, irrigation fuel    |
+| 3     | Harvest and logistics         | 360000     | 2027-03-10   | Harvest labour, shelling, bags, haulage to buyer |
+
+**Step 8 — Cycle manager: add the offtake agreement** (Offtake & insurance tab → Add agreement). Upload [`docs/demo/sample-offtake-agreement.pdf`](docs/demo/sample-offtake-agreement.pdf).
+
+| Field                     | Value                             |
+| ------------------------- | --------------------------------- |
+| Buyer                     | Northern Mills Ltd                |
+| Buyer contact             | procurement@northernmills.example |
+| Commodity                 | maize                             |
+| Volume (tonnes)           | 12                                |
+| Price terms               | Market price with a floor         |
+| Floor price per tonne (₦) | 380000                            |
+| Delivery from / until     | 2027-03-15 / 2027-04-15           |
+| Signed on                 | 2026-11-05                        |
+
+> The offtake must cover at least the low-yield harvest: 2 t/ha × your hectares (6 t for 3 ha). 12 t covers up to 6 ha.
+
+**Step 9 — Cycle manager: add the insurance policy** (Add policy). Upload [`docs/demo/sample-insurance-policy.pdf`](docs/demo/sample-insurance-policy.pdf).
+
+| Field           | Value                                   |
+| --------------- | --------------------------------------- |
+| Insurer         | Pula Assurance Nigeria                  |
+| Policy number   | PAN-AYI-2026-0457                       |
+| Cover type      | Area yield                              |
+| Loss payee      | Trustee, on behalf of the cycle funders |
+| Sum insured (₦) | 1500000                                 |
+| Premium (₦)     | 45000                                   |
+| Cover starts    | 2026-11-25                              |
+| Cover ends      | 2027-03-31                              |
+
+**Step 10 — Cycle manager: submit.** On the Overview tab, every readiness check should now be green. Press **Submit for approval**.
+
+**Step 11 — Compliance officer: review.** Open the cycle. To see the return path, first press **Return with note** ("Please confirm the cooperative chairman's signature"). Then sign in as the cycle manager, submit again, and sign back in as compliance to **Approve**. The cycle is now _Open for funding_.
+
+**Step 12 — Trustee: record deposits** (Funding tab → Record deposit)
+
+| Funder       | Type     | Amount (₦) | Bank reference | Received on |
+| ------------ | -------- | ---------- | -------------- | ----------- |
+| Adaeze Okoro | Investor | 900000     | TRX-DEMO-001   | today       |
+| Chidi Nwosu  | Investor | 600000     | TRX-DEMO-002   | today       |
+
+> Try recording ₦1 more, or reusing `TRX-DEMO-001`: both are refused. After the second deposit the cycle is _Funded_.
+
+**Step 13 — Cycle manager: request verification.** Milestones tab → milestone 1 → **Request field verification**.
+
+**Step 14 — Field agent: visit each farm** (Field visits → Visit). Use the phone, standing at the farms, or press **Simulate GPS at this farm** for farms you mapped somewhere you can't go. That button appears only on the development server (`npm run dev` / `dev:phone`) and places a ±5 m fix at the farm's centre.
+
+| Field          | Value                                                              |
+| -------------- | ------------------------------------------------------------------ |
+| Check in       | Start GPS and wait for "Precise fix", or Simulate GPS at this farm |
+| Crop condition | Good                                                               |
+| Checklist      | Tick all four                                                      |
+| Photos         | Take one of the ground or crop                                     |
+| Notes          | Land ploughed and harrowed; seed and NPK delivered.                |
+
+> To see a release being blocked, submit one visit with **Failed** as the crop condition (or from a laptop, where the GPS isn't precise enough). The milestone shows _Blocked_. A passing revisit unblocks it.
+
+**Step 15 — Cycle manager: instruct the release.** Once all three farms have passed, milestone 1 → **Instruct release**. Add three payees that total ₦600,000:
+
+| Payee type       | Payee name              | Bank and account       | Purpose                       | Amount (₦) |
+| ---------------- | ----------------------- | ---------------------- | ----------------------------- | ---------- |
+| Input vendor     | Zaria Agro Inputs Ltd   | Access Bank 0123456789 | Certified seed and NPK        | 450000     |
+| Service provider | Samaru Tractor Hire     | GTBank 0234567891      | Ploughing and harrowing, 3 ha | 90000      |
+| Cash to farmers  | Cooperative labour fund | Zenith Bank 0345678912 | Planting labour allowance     | 60000      |
+
+> Cash to farmers is capped at 20% of a milestone (₦120,000 here). Try ₦150,000 cash to see it refused.
+
+**Step 16 — Trustee: confirm payments.** Milestones tab → **Confirm payment** for each payee, with references `PAY-DEMO-001`, `PAY-DEMO-002` and `PAY-DEMO-003`. After the third, milestone 1 is _Released_ and the cycle is _In progress_.
+
+**Step 17 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Repeat steps 13–16 for milestones 2 and 3.
 
 ## Tests
 

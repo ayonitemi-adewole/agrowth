@@ -2,6 +2,7 @@ import { MapPinned, ShieldCheck, Sprout, Wallet } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
+import { DemoSignIn } from '../components/DemoSignIn';
 import { Logo } from '../components/Layout';
 import { Alert, Button, Field, Input } from '../components/ui';
 import { errorMessage } from '../lib/errors';
@@ -167,6 +168,8 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
               </form>
             )}
           </div>
+
+          {!isSignUp && <DemoSignIn />}
 
           <p className="mt-8 text-sm text-zinc-500">
             {isSignUp ? 'Already have an account? ' : 'New to Agrowth? '}

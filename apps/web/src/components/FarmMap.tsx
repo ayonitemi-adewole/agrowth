@@ -28,6 +28,8 @@ interface Props {
   onMapClick?: (point: LonLat) => void;
   /** The device's GPS position, drawn with its accuracy circle. */
   position?: { lon: number; lat: number; accuracy: number } | null;
+  /** Fly here whenever it changes (e.g. "Find me"). */
+  focus?: { lon: number; lat: number } | null;
   className?: string;
 }
 
@@ -37,6 +39,7 @@ export function FarmMap({
   drawing,
   onMapClick,
   position,
+  focus,
   className,
 }: Props) {
   return (
@@ -98,7 +101,7 @@ export function FarmMap({
         </>
       )}
       {onMapClick && <ClickHandler onClick={onMapClick} />}
-      <FitTo farms={farms} drawing={drawing} />
+      <FitTo farms={farms} drawing={drawing} focus={focus} />
     </MapContainer>
   );
 }
@@ -133,7 +136,15 @@ function ClickHandler({ onClick }: { onClick: (p: LonLat) => void }) {
 }
 
 /** Zooms to the farms once they load (and to the first drawn corner). */
-function FitTo({ farms, drawing }: { farms: Farm[]; drawing?: LonLat[] }) {
+function FitTo({
+  farms,
+  drawing,
+  focus,
+}: {
+  farms: Farm[];
+  drawing?: LonLat[];
+  focus?: { lon: number; lat: number } | null;
+}) {
   const map = useMap();
   const farmKey = farms.map((f) => f.id).join(',');
   const firstPoint = drawing?.[0];
@@ -149,6 +160,10 @@ function FitTo({ farms, drawing }: { farms: Farm[]; drawing?: LonLat[] }) {
     if (firstPoint && farms.length === 0) map.setView([firstPoint[1], firstPoint[0]], 17);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, firstPoint?.[0], firstPoint?.[1]]);
+
+  useEffect(() => {
+    if (focus) map.flyTo([focus.lat, focus.lon], 18, { duration: 0.8 });
+  }, [map, focus]);
 
   return null;
 }

@@ -17,6 +17,7 @@ import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { can, ROLE_LABELS } from '../lib/roles';
 import type { Role } from '../lib/types';
+import { DemoSwitcher } from './DemoSignIn';
 import { Avatar, cx } from './ui';
 
 export function Logo({ inverted = false }: { inverted?: boolean }) {
@@ -125,6 +126,7 @@ export function Layout() {
           );
         })}
       </nav>
+      <DemoSwitcher />
       <div className="mt-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
         <Avatar
           name={profile?.full_name || profile?.email || ''}

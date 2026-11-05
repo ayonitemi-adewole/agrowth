@@ -1,4 +1,4 @@
-import { Crosshair, Trash2, Undo2 } from 'lucide-react';
+import { Crosshair, LocateFixed, Trash2, Undo2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { FarmMap } from '../components/FarmMap';
@@ -39,6 +39,7 @@ export function MapFarmPage() {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; clashes: OverlappingFarm[] } | null>(null);
+  const [me, setMe] = useState<{ lon: number; lat: number; accuracy: number } | null>(null);
 
   const data = useAsync(async () => {
     const [farmer, farms] = await Promise.all([
@@ -71,6 +72,30 @@ export function MapFarmPage() {
         }
         setPoints((p) => [...p, [longitude, latitude]]);
         setGps({ busy: false, message: `Corner added (±${Math.round(accuracy)} m).` });
+      },
+      (err) => setGps({ busy: false, message: `Could not get your location: ${err.message}` }),
+      { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
+    );
+  };
+
+  /** Centre the map on this device, e.g. to trace a farm around where you are. */
+  const findMe = () => {
+    if (!navigator.geolocation) {
+      setGps({ busy: false, message: 'This device cannot share its location.' });
+      return;
+    }
+    setGps({ busy: true, message: null });
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMe({
+          lon: pos.coords.longitude,
+          lat: pos.coords.latitude,
+          accuracy: pos.coords.accuracy,
+        });
+        setGps({
+          busy: false,
+          message: `Showing your position (±${Math.round(pos.coords.accuracy)} m). Tap the corners around it.`,
+        });
       },
       (err) => setGps({ busy: false, message: `Could not get your location: ${err.message}` }),
       { enableHighAccuracy: true, timeout: 20_000, maximumAge: 0 },
@@ -126,9 +151,14 @@ export function MapFarmPage() {
             farms={data.data.farms}
             drawing={points}
             onMapClick={(p) => setPoints((prev) => [...prev, p])}
-            className="h-[28rem] w-full rounded-xl border border-zinc-200"
+            position={me}
+            focus={me}
+            className="h-[28rem] w-full rounded-2xl ring-1 ring-zinc-950/5"
           />
           <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" onClick={findMe} disabled={gps.busy}>
+              <LocateFixed className="size-4" aria-hidden /> Find me
+            </Button>
             <Button type="button" onClick={addGpsPoint} busy={gps.busy}>
               <Crosshair className="size-4" aria-hidden /> Add corner at my location
             </Button>

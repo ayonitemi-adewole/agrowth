@@ -1,7 +1,11 @@
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-});
+// `npm run dev:phone` serves over HTTPS on your network, so a phone on the same Wi-Fi
+// can open the app and share precise GPS (browsers only allow that on secure pages).
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), tailwindcss(), ...(mode === 'phone' ? [basicSsl()] : [])],
+  server: mode === 'phone' ? { host: true } : undefined,
+}));

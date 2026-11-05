@@ -230,4 +230,26 @@ describe('ledger', () => {
       }
     });
   });
+
+  // Deferred triggers fire at commit, after the posting RPC has returned. Before PostgreSQL 18
+  // (Supabase runs 17) they run as the signed-in user, who can't use the private schema, so
+  // they and the private functions they call must run as their owner. PGlite is PostgreSQL 18,
+  // which hides the failure, so check the property directly.
+  it('runs deferred ledger checks as their owner', async () => {
+    const { rows } = await db.query<{ fn: string; definer: boolean }>(
+      `with trigger_fns as (
+         select p.oid, p.prosecdef, p.prosrc
+           from pg_trigger t join pg_proc p on p.oid = t.tgfoid
+          where t.tgdeferrable and not t.tgisinternal
+       )
+       select oid::regprocedure::text as fn, prosecdef as definer from trigger_fns
+       union
+       select q.oid::regprocedure::text, q.prosecdef
+         from trigger_fns f
+         join pg_proc q on q.pronamespace = 'private'::regnamespace
+                       and f.prosrc like '%private.' || q.proname || '(%'`,
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows.filter((r) => !r.definer).map((r) => r.fn)).toEqual([]);
+  });
 });

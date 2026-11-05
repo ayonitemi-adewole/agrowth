@@ -1,4 +1,4 @@
-import { Camera, CheckCircle2, Crosshair, ImagePlus, X, XCircle } from 'lucide-react';
+import { Camera, CheckCircle2, Crosshair, FlaskConical, ImagePlus, X, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { FarmMap } from '../components/FarmMap';
@@ -73,6 +73,7 @@ export function FieldVisitPage() {
   const [fix, setFix] = useState<Fix | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [watching, setWatching] = useState(false);
+  const [simulated, setSimulated] = useState(false);
   const watchId = useRef<number | null>(null);
 
   const startGps = () => {
@@ -106,6 +107,17 @@ export function FieldVisitPage() {
     },
     [],
   );
+
+  // Development server only: pretend to stand at the farm's centre with a precise fix, for
+  // testing farms mapped somewhere you can't go. A production build has no such button.
+  const simulateAtFarm = (centre: { lon: number; lat: number }) => {
+    if (watchId.current !== null) navigator.geolocation.clearWatch(watchId.current);
+    watchId.current = null;
+    setGpsError(null);
+    setWatching(true);
+    setSimulated(true);
+    setFix({ ...centre, accuracy: 5, at: new Date().toISOString() });
+  };
 
   const [checks, setChecks] = useState<boolean[]>(CHECKLIST.map(() => false));
   const [condition, setCondition] = useState<CropCondition | null>(null);
@@ -215,9 +227,21 @@ export function FieldVisitPage() {
               description="Stand inside the farm and wait for a precise fix."
             />
             {!watching ? (
-              <Button onClick={startGps}>
-                <Crosshair aria-hidden /> Start GPS
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={startGps}>
+                  <Crosshair aria-hidden /> Start GPS
+                </Button>
+                {import.meta.env.DEV && (
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      simulateAtFarm({ lon: farm.centroid_lon, lat: farm.centroid_lat })
+                    }
+                  >
+                    <FlaskConical aria-hidden /> Simulate GPS at this farm
+                  </Button>
+                )}
+              </div>
             ) : fix ? (
               <div
                 className={cx(
@@ -226,8 +250,12 @@ export function FieldVisitPage() {
                 )}
               >
                 <p className="font-medium">
-                  {precise ? 'Precise fix' : 'Waiting for a better signal'} · ±
-                  {Math.round(fix.accuracy)} m
+                  {import.meta.env.DEV && simulated
+                    ? 'Simulated fix (demo)'
+                    : precise
+                      ? 'Precise fix'
+                      : 'Waiting for a better signal'}{' '}
+                  · ±{Math.round(fix.accuracy)} m
                 </p>
                 <p className="mt-0.5 text-xs opacity-80">
                   {precise
