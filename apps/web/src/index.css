@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+
+body {
+  @apply bg-stone-50 text-stone-900 antialiased;
+}
+
+/* Keep Leaflet's controls under our menus. */
+.leaflet-container {
+  z-index: 0;
+}

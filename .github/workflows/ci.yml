@@ -10,23 +10,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  api:
+  check:
     runs-on: ubuntu-latest
-    services:
-      db:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: agrowth
-          POSTGRES_PASSWORD: agrowth
-          POSTGRES_DB: agrowth_test
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd "pg_isready -U agrowth"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgres://agrowth:agrowth@localhost:5432/agrowth_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,5 +22,6 @@ jobs:
       - run: npm run format:check
       - run: npm run lint
       - run: npm run build
+      # Database tests run the real migrations on in-memory PostgreSQL + PostGIS (PGlite),
+      # so no database service is needed.
       - run: npm test
-      - run: npm run test:e2e

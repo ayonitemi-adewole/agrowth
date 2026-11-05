@@ -5,15 +5,16 @@
   "description": "Agrowth 2.0 — verifiable agricultural finance platform (Investor and Government editions)",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "supabase"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:e2e": "npm run test:e2e --workspaces --if-present",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "dev": "npm run dev -w @agrowth/web"
   },
   "devDependencies": {
     "prettier": "^3.9.10"

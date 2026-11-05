@@ -1,0 +1,18 @@
+{
+  "name": "@agrowth/database",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "Agrowth database: Supabase migrations and the tests that prove their rules",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@electric-sql/pglite-postgis": "0.2.15",
+    "@types/node": "^22.20.5",
+    "typescript": "~5.9.3",
+    "vitest": "^5.1.0"
+  }
+}
