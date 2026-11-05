@@ -8,6 +8,7 @@ import { validateEnv } from './config/env.validation';
 import { buildTypeOrmOptions } from './database/typeorm.options';
 import { HealthModule } from './health/health.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { RegistryModule } from './registry/registry.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UsersModule,
     LedgerModule,
+    RegistryModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
