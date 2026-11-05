@@ -59,7 +59,7 @@ export function FarmerDetailPage() {
 
   return (
     <>
-      <Link to="/farmers" className="mb-2 inline-block text-sm text-stone-500 hover:text-stone-800">
+      <Link to="/farmers" className="mb-2 inline-block text-sm text-zinc-500 hover:text-zinc-800">
         ← Farmers
       </Link>
       <PageHeader
@@ -85,7 +85,7 @@ export function FarmerDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="space-y-4 lg:col-span-1">
           <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-stone-900">Details</h2>
+            <h2 className="font-semibold text-zinc-900">Details</h2>
             <KycBadge status={f.kyc_status} />
           </div>
           <dl className="space-y-3 text-sm">
@@ -107,8 +107,8 @@ export function FarmerDetailPage() {
           </dl>
 
           {can.reviewKyc(profile?.role) && (
-            <div className="space-y-2 border-t border-stone-200 pt-4">
-              <p className="text-sm font-medium text-stone-700">KYC decision</p>
+            <div className="space-y-2 border-t border-zinc-200 pt-4">
+              <p className="text-sm font-medium text-zinc-700">KYC decision</p>
               <div className="flex flex-wrap gap-2">
                 {f.kyc_status !== 'verified' && (
                   <Button busy={kycBusy === 'verified'} onClick={() => setKyc('verified')}>
@@ -141,9 +141,9 @@ export function FarmerDetailPage() {
 
         <div className="space-y-4 lg:col-span-2">
           <div className="flex items-baseline justify-between">
-            <h2 className="font-semibold text-stone-900">Farms</h2>
+            <h2 className="font-semibold text-zinc-900">Farms</h2>
             {farms.data && farms.data.length > 0 && (
-              <span className="text-sm text-stone-600">
+              <span className="text-sm text-zinc-600">
                 {farms.data.length} farm{farms.data.length === 1 ? '' : 's'} ·{' '}
                 {formatHectares(totalHa)}
               </span>
@@ -158,13 +158,11 @@ export function FarmerDetailPage() {
           ) : (
             <>
               <FarmMap farms={farms.data} />
-              <ul className="divide-y divide-stone-100 rounded-xl border border-stone-200 bg-white text-sm">
+              <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white text-sm">
                 {farms.data!.map((farm) => (
                   <li key={farm.id} className="flex flex-wrap justify-between gap-2 px-4 py-3">
-                    <span className="font-medium text-stone-900">
-                      {farm.name ?? 'Unnamed farm'}
-                    </span>
-                    <span className="text-stone-600">
+                    <span className="font-medium text-zinc-900">{farm.name ?? 'Unnamed farm'}</span>
+                    <span className="text-zinc-600">
                       {formatHectares(farm.area_hectares)}
                       {farm.primary_crop && ` · ${farm.primary_crop}`} ·{' '}
                       {titleCase(farm.tenure_type)} tenure
@@ -183,8 +181,8 @@ export function FarmerDetailPage() {
 function Item({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="text-stone-500">{label}</dt>
-      <dd className="text-right text-stone-900">{children}</dd>
+      <dt className="text-zinc-500">{label}</dt>
+      <dd className="text-right text-zinc-900">{children}</dd>
     </div>
   );
 }

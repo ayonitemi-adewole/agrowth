@@ -10,6 +10,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   programme_manager: 'Programme manager',
   vendor: 'Vendor',
   offtaker: 'Offtaker',
+  trustee: 'Trustee',
 };
 
 export const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[];
@@ -20,19 +21,28 @@ export const ALL_ROLES = Object.keys(ROLE_LABELS) as Role[];
  */
 const has = (role: Role | undefined, allowed: Role[]) => !!role && allowed.includes(role);
 
+const REGISTRY_READERS: Role[] = [
+  'admin',
+  'cycle_manager',
+  'field_agent',
+  'compliance_officer',
+  'auditor',
+  'programme_manager',
+];
+
 export const can = {
-  readRegistry: (r?: Role) =>
-    has(r, [
-      'admin',
-      'cycle_manager',
-      'field_agent',
-      'compliance_officer',
-      'auditor',
-      'programme_manager',
-    ]),
+  /** Anyone working the platform (not investors, vendors or offtakers, whose portals come later). */
+  useStaffApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  readRegistry: (r?: Role) => has(r, REGISTRY_READERS),
   enrol: (r?: Role) => has(r, ['admin', 'field_agent']),
   editCooperatives: (r?: Role) =>
     has(r, ['admin', 'field_agent', 'cycle_manager', 'programme_manager']),
   reviewKyc: (r?: Role) => has(r, ['admin', 'compliance_officer']),
   manageUsers: (r?: Role) => has(r, ['admin']),
+  readCycles: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  manageCycles: (r?: Role) => has(r, ['admin', 'cycle_manager', 'programme_manager']),
+  reviewCycles: (r?: Role) => has(r, ['admin', 'compliance_officer']),
+  actAsTrustee: (r?: Role) => has(r, ['trustee']),
+  doFieldVisits: (r?: Role) => has(r, ['admin', 'field_agent']),
+  readLedger: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
 };

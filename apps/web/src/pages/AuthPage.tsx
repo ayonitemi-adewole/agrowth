@@ -1,9 +1,28 @@
+import { MapPinned, ShieldCheck, Sprout, Wallet } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { Logo } from '../components/Layout';
-import { Alert, Button, Card, Field, Input } from '../components/ui';
+import { Alert, Button, Field, Input } from '../components/ui';
 import { errorMessage } from '../lib/errors';
+
+const PRINCIPLES = [
+  {
+    icon: ShieldCheck,
+    title: 'Trustee custody',
+    text: 'Funds sit with a licensed trustee, never the platform.',
+  },
+  {
+    icon: MapPinned,
+    title: 'Verified farms',
+    text: 'Every farm is mapped and visited before money moves.',
+  },
+  {
+    icon: Wallet,
+    title: 'Staged, in-kind release',
+    text: 'Paid to input vendors, milestone by milestone.',
+  },
+];
 
 export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const { session, signIn, signUp } = useAuth();
@@ -17,12 +36,14 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
   if (session) return <Navigate to="/" replace />;
 
+  const isSignUp = mode === 'sign-up';
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      if (mode === 'sign-in') {
+      if (!isSignUp) {
         await signIn(email.trim(), password);
       } else {
         const { needsConfirmation } = await signUp({
@@ -40,96 +61,123 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
     }
   };
 
-  const isSignUp = mode === 'sign-up';
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4 py-10">
-      <div className="w-full max-w-sm space-y-6">
-        <div className="flex justify-center">
-          <Logo />
+    <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+      {/* Brand panel */}
+      <div className="relative hidden overflow-hidden bg-brand-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div
+          className="pointer-events-none absolute -top-32 -right-32 size-[32rem] rounded-full bg-brand-500/20 blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-40 -left-20 size-[28rem] rounded-full bg-brand-300/10 blur-3xl"
+          aria-hidden
+        />
+        <Logo inverted />
+        <div className="relative max-w-md">
+          <Sprout className="mb-6 size-10 text-brand-300" aria-hidden />
+          <h2 className="text-3xl leading-tight font-semibold tracking-tight">
+            Farm finance you can verify, from wallet to field to buyer.
+          </h2>
+          <ul className="mt-10 space-y-5">
+            {PRINCIPLES.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="flex gap-4">
+                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/10 text-brand-300">
+                  <Icon className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <p className="font-medium">{title}</p>
+                  <p className="text-sm text-brand-100/70">{text}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-        <Card>
-          <h1 className="mb-1 text-lg font-semibold text-stone-900">
-            {isSignUp ? 'Create an account' : 'Sign in'}
+        <p className="relative text-xs text-brand-200/50">Agrowth 2.0</p>
+      </div>
+
+      {/* Form */}
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+        <div className="w-full max-w-sm">
+          <div className="mb-10 lg:hidden">
+            <Logo />
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+            {isSignUp ? 'Create your account' : 'Welcome back'}
           </h1>
-          <p className="mb-5 text-sm text-stone-600">
+          <p className="mt-2 text-sm text-zinc-500">
             {isSignUp
-              ? 'Staff accounts are activated by an admin after you sign up.'
-              : 'Use the email and password for your Agrowth account.'}
+              ? 'Staff accounts are given a role by an admin after sign-up.'
+              : 'Sign in to your Agrowth workspace.'}
           </p>
 
-          {confirmSent ? (
-            <Alert tone="success">
-              Check your email for a confirmation link, then come back and sign in.
-            </Alert>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
-              {isSignUp && (
-                <>
-                  <Field label="Full name">
-                    <Input
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      minLength={2}
-                      autoComplete="name"
-                    />
-                  </Field>
-                  <Field label="Phone (optional)">
-                    <Input
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      pattern="\+?[0-9]{10,15}"
-                      title="10–15 digits, optionally starting with +"
-                      placeholder="+2348012345678"
-                      autoComplete="tel"
-                    />
-                  </Field>
-                </>
-              )}
-              <Field label="Email">
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
-              </Field>
-              <Field label="Password" hint={isSignUp ? 'At least 10 characters' : undefined}>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={isSignUp ? 10 : undefined}
-                  autoComplete={isSignUp ? 'new-password' : 'current-password'}
-                />
-              </Field>
-              {error && <Alert>{error}</Alert>}
-              <Button type="submit" busy={busy} className="w-full">
-                {isSignUp ? 'Create account' : 'Sign in'}
-              </Button>
-            </form>
-          )}
-        </Card>
-        <p className="text-center text-sm text-stone-600">
-          {isSignUp ? (
-            <>
-              Already have an account?{' '}
-              <Link to="/sign-in" className="font-medium text-green-800 hover:underline">
-                Sign in
-              </Link>
-            </>
-          ) : (
-            <>
-              New here?{' '}
-              <Link to="/sign-up" className="font-medium text-green-800 hover:underline">
-                Create an account
-              </Link>
-            </>
-          )}
-        </p>
+          <div className="mt-8">
+            {confirmSent ? (
+              <Alert tone="success" title="Check your email">
+                We've sent a confirmation link. Open it, then come back and sign in.
+              </Alert>
+            ) : (
+              <form onSubmit={submit} className="space-y-5">
+                {isSignUp && (
+                  <>
+                    <Field label="Full name">
+                      <Input
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        minLength={2}
+                        autoComplete="name"
+                      />
+                    </Field>
+                    <Field label="Phone" hint="Optional">
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        pattern="\+?[0-9]{10,15}"
+                        title="10–15 digits, optionally starting with +"
+                        placeholder="+2348012345678"
+                        autoComplete="tel"
+                      />
+                    </Field>
+                  </>
+                )}
+                <Field label="Email">
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </Field>
+                <Field label="Password" hint={isSignUp ? 'At least 10 characters' : undefined}>
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    minLength={isSignUp ? 10 : undefined}
+                    autoComplete={isSignUp ? 'new-password' : 'current-password'}
+                  />
+                </Field>
+                {error && <Alert>{error}</Alert>}
+                <Button type="submit" busy={busy} className="w-full">
+                  {isSignUp ? 'Create account' : 'Sign in'}
+                </Button>
+              </form>
+            )}
+          </div>
+
+          <p className="mt-8 text-sm text-zinc-500">
+            {isSignUp ? 'Already have an account? ' : 'New to Agrowth? '}
+            <Link
+              to={isSignUp ? '/sign-in' : '/sign-up'}
+              className="font-medium text-brand-700 hover:text-brand-800"
+            >
+              {isSignUp ? 'Sign in' : 'Create an account'}
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

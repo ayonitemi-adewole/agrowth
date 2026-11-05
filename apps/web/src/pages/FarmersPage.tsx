@@ -130,15 +130,15 @@ export function FarmersPage() {
         <>
           <Table head={['Name', 'Phone', 'Cooperative', 'Location', 'KYC']}>
             {farmers.data!.items.map((f) => (
-              <tr key={f.id} className="hover:bg-stone-50">
-                <td className="px-4 py-3 font-medium text-stone-900">
+              <tr key={f.id} className="hover:bg-zinc-50">
+                <td className="px-4 py-3 font-medium text-zinc-900">
                   <Link to={`/farmers/${f.id}`} className="hover:underline">
                     {f.full_name}
                   </Link>
                 </td>
-                <td className="px-4 py-3 text-stone-600">{f.phone}</td>
-                <td className="px-4 py-3 text-stone-600">{f.cooperatives?.name ?? '—'}</td>
-                <td className="px-4 py-3 text-stone-600">
+                <td className="px-4 py-3 text-zinc-600">{f.phone}</td>
+                <td className="px-4 py-3 text-zinc-600">{f.cooperatives?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-zinc-600">
                   {f.lga}, {f.state}
                 </td>
                 <td className="px-4 py-3">
@@ -147,7 +147,7 @@ export function FarmersPage() {
               </tr>
             ))}
           </Table>
-          <div className="mt-4 flex items-center justify-between text-sm text-stone-600">
+          <div className="mt-4 flex items-center justify-between text-sm text-zinc-600">
             <span>
               {total.toLocaleString()} farmer{total === 1 ? '' : 's'}
             </span>

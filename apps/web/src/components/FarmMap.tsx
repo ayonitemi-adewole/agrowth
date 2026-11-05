@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css';
 import { latLngBounds, type LatLngExpression } from 'leaflet';
 import { useEffect } from 'react';
 import {
+  Circle,
   CircleMarker,
   LayersControl,
   MapContainer,
@@ -25,15 +26,24 @@ interface Props {
   /** When set, the map is in drawing mode and shows these corners. */
   drawing?: LonLat[];
   onMapClick?: (point: LonLat) => void;
+  /** The device's GPS position, drawn with its accuracy circle. */
+  position?: { lon: number; lat: number; accuracy: number } | null;
   className?: string;
 }
 
-export function FarmMap({ farms = [], highlightId, drawing, onMapClick, className }: Props) {
+export function FarmMap({
+  farms = [],
+  highlightId,
+  drawing,
+  onMapClick,
+  position,
+  className,
+}: Props) {
   return (
     <MapContainer
       center={NIGERIA_CENTRE}
       zoom={6}
-      className={className ?? 'h-96 w-full rounded-xl border border-stone-200'}
+      className={className ?? 'h-96 w-full rounded-2xl ring-1 ring-zinc-950/5'}
       scrollWheelZoom
     >
       <LayersControl position="topright">
@@ -58,7 +68,7 @@ export function FarmMap({ farms = [], highlightId, drawing, onMapClick, classNam
           key={farm.id}
           positions={ringToLatLngs(farm.boundary)}
           pathOptions={{
-            color: farm.id === highlightId ? '#15803d' : '#78716c',
+            color: farm.id === highlightId ? '#16a34a' : '#52525b',
             weight: farm.id === highlightId ? 3 : 2,
             fillOpacity: 0.2,
           }}
@@ -71,6 +81,22 @@ export function FarmMap({ farms = [], highlightId, drawing, onMapClick, classNam
       ))}
 
       {drawing && <DrawingLayer points={drawing} />}
+      {position && (
+        <>
+          <Circle
+            center={[position.lat, position.lon]}
+            radius={position.accuracy}
+            pathOptions={{ color: '#0ea5e9', weight: 1, fillOpacity: 0.12 }}
+          />
+          <CircleMarker
+            center={[position.lat, position.lon]}
+            radius={7}
+            pathOptions={{ color: '#fff', fillColor: '#0284c7', fillOpacity: 1, weight: 3 }}
+          >
+            <Tooltip>You are here (±{Math.round(position.accuracy)} m)</Tooltip>
+          </CircleMarker>
+        </>
+      )}
       {onMapClick && <ClickHandler onClick={onMapClick} />}
       <FitTo farms={farms} drawing={drawing} />
     </MapContainer>

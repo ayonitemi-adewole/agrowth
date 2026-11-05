@@ -81,16 +81,16 @@ export function CooperativesPage() {
       ) : (
         <Table head={['Name', 'Registration no.', 'State', 'LGA', 'Members']}>
           {list.data!.map((c) => (
-            <tr key={c.id} className="hover:bg-stone-50">
-              <td className="px-4 py-3 font-medium text-stone-900">
+            <tr key={c.id} className="hover:bg-zinc-50">
+              <td className="px-4 py-3 font-medium text-zinc-900">
                 <Link to={`/farmers?cooperative=${c.id}`} className="hover:underline">
                   {c.name}
                 </Link>
               </td>
-              <td className="px-4 py-3 text-stone-600">{c.registration_number ?? '—'}</td>
-              <td className="px-4 py-3 text-stone-600">{c.state}</td>
-              <td className="px-4 py-3 text-stone-600">{c.lga}</td>
-              <td className="px-4 py-3 text-stone-600 tabular-nums">{c.farmers[0]?.count ?? 0}</td>
+              <td className="px-4 py-3 text-zinc-600">{c.registration_number ?? '—'}</td>
+              <td className="px-4 py-3 text-zinc-600">{c.state}</td>
+              <td className="px-4 py-3 text-zinc-600">{c.lga}</td>
+              <td className="px-4 py-3 text-zinc-600 tabular-nums">{c.farmers[0]?.count ?? 0}</td>
             </tr>
           ))}
         </Table>

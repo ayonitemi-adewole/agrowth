@@ -1,0 +1,91 @@
+import { useState } from 'react';
+import { Link, useParams } from 'react-router';
+import { CycleStatusBadge } from '../../components/StatusBadges';
+import { Alert, EmptyState, PageHeader, Skeleton, Tabs } from '../../components/ui';
+import { FUNDING_SOURCE } from '../../lib/cycles';
+import { errorMessage } from '../../lib/errors';
+import { titleCase } from '../../lib/format';
+import { ContractsTab } from './ContractsTab';
+import { FarmsTab } from './FarmsTab';
+import { FundingTab } from './FundingTab';
+import { HistoryTab } from './HistoryTab';
+import { MilestonesTab } from './MilestonesTab';
+import { OverviewTab } from './OverviewTab';
+import { useCycleData } from './useCycleData';
+
+type Tab = 'overview' | 'farms' | 'milestones' | 'contracts' | 'funding' | 'history';
+
+export function CycleDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const state = useCycleData(id!);
+  const [tab, setTab] = useState<Tab>('overview');
+
+  if (state.loading && !state.data) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-72" />
+        <Skeleton className="h-64 rounded-2xl" />
+      </div>
+    );
+  }
+  if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
+  const data = state.data;
+  if (!data)
+    return (
+      <EmptyState title="Cycle not found">It may not exist, or you don't have access.</EmptyState>
+    );
+
+  const { cycle } = data;
+  const props = { data, reload: state.reload };
+
+  return (
+    <>
+      <PageHeader
+        eyebrow={
+          <Link to="/cycles" className="hover:text-zinc-800">
+            ← Funding cycles
+          </Link>
+        }
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {titleCase(cycle.crop)} · {cycle.season}
+            <CycleStatusBadge status={cycle.status} />
+          </span>
+        }
+        description={
+          <>
+            <span className="font-mono">{cycle.code}</span> · {FUNDING_SOURCE[cycle.funding_source]}
+          </>
+        }
+      />
+
+      <Tabs
+        value={tab}
+        onChange={setTab}
+        tabs={[
+          { id: 'overview', label: 'Overview' },
+          { id: 'farms', label: 'Farms', count: data.farms.length },
+          { id: 'milestones', label: 'Milestones', count: data.milestones.length },
+          {
+            id: 'contracts',
+            label: 'Offtake & insurance',
+            count: data.offtake.length + data.insurance.length,
+          },
+          { id: 'funding', label: 'Funding', count: data.contributions.length },
+          { id: 'history', label: 'History', count: data.events.length },
+        ]}
+      />
+
+      <div key={tab} className="animate-fade-in">
+        {tab === 'overview' && <OverviewTab {...props} goTo={setTab} />}
+        {tab === 'farms' && <FarmsTab {...props} />}
+        {tab === 'milestones' && <MilestonesTab {...props} />}
+        {tab === 'contracts' && <ContractsTab {...props} />}
+        {tab === 'funding' && <FundingTab {...props} />}
+        {tab === 'history' && <HistoryTab {...props} />}
+      </div>
+    </>
+  );
+}
+
+export type { TabProps } from './useCycleData';

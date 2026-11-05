@@ -77,10 +77,10 @@ export function UsersPage() {
             const self = u.id === me?.id;
             return (
               <tr key={u.id}>
-                <td className="px-4 py-3 font-medium text-stone-900">
+                <td className="px-4 py-3 font-medium text-zinc-900">
                   {u.full_name || '—'} {self && <Badge>You</Badge>}
                 </td>
-                <td className="px-4 py-3 text-stone-600">{u.email}</td>
+                <td className="px-4 py-3 text-zinc-600">{u.email}</td>
                 <td className="px-4 py-3">
                   <Select
                     value={u.role}
@@ -103,7 +103,7 @@ export function UsersPage() {
                     <Badge tone="red">Deactivated</Badge>
                   )}
                 </td>
-                <td className="px-4 py-3 text-stone-600">{formatDate(u.created_at)}</td>
+                <td className="px-4 py-3 text-zinc-600">{formatDate(u.created_at)}</td>
                 <td className="px-4 py-3 text-right">
                   {!self && (
                     <Button

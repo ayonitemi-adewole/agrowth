@@ -111,7 +111,7 @@ export function MapFarmPage() {
     <>
       <Link
         to={`/farmers/${farmerId}`}
-        className="mb-2 inline-block text-sm text-stone-500 hover:text-stone-800"
+        className="mb-2 inline-block text-sm text-zinc-500 hover:text-zinc-800"
       >
         ← {data.data.farmer.full_name}
       </Link>
@@ -126,7 +126,7 @@ export function MapFarmPage() {
             farms={data.data.farms}
             drawing={points}
             onMapClick={(p) => setPoints((prev) => [...prev, p])}
-            className="h-[28rem] w-full rounded-xl border border-stone-200"
+            className="h-[28rem] w-full rounded-xl border border-zinc-200"
           />
           <div className="flex flex-wrap gap-2">
             <Button type="button" onClick={addGpsPoint} busy={gps.busy}>
@@ -149,18 +149,18 @@ export function MapFarmPage() {
               <Trash2 className="size-4" aria-hidden /> Clear
             </Button>
           </div>
-          {gps.message && <p className="text-sm text-stone-600">{gps.message}</p>}
+          {gps.message && <p className="text-sm text-zinc-600">{gps.message}</p>}
         </div>
 
         <Card>
           <form onSubmit={submit} className="space-y-4">
-            <div className="rounded-lg bg-stone-50 p-3 text-sm">
-              <p className="text-stone-600">
+            <div className="rounded-lg bg-zinc-50 p-3 text-sm">
+              <p className="text-zinc-600">
                 {points.length} corner{points.length === 1 ? '' : 's'}
                 {points.length >= 3 && ` · about ${formatHectares(area)}`}
               </p>
               {points.length < 3 && (
-                <p className="text-xs text-stone-500">At least 3 corners are needed.</p>
+                <p className="text-xs text-zinc-500">At least 3 corners are needed.</p>
               )}
               {crossing && (
                 <p className="mt-1 text-xs text-red-700">

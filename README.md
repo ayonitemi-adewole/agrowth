@@ -21,16 +21,18 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is in progress.
-
-| Area                                                                                    | State   |
-| --------------------------------------------------------------------------------------- | ------- |
-| Accounts and roles: sign-up, admin assigns staff roles, deactivation                    | Done    |
-| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                 | Done    |
-| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check | Done    |
-| Ledger: double-entry, append-only, balanced, no money moving between cycles             | Done    |
-| Cycle builder, offtake contracts                                                        | Next    |
-| Disbursement engine                                                                     | Planned |
+Phase 1 (core platform)Phase 1 (core platform) is feature-complete: a demo cycle can run from draft to released funds. Next is Phase 2 (investor and government editions, vouchers, offl| Area                                                                                            | State |
+| ----------------------------------------------------------------------------------------------- | ----- |
+| Accounts and roles: sign-up, admin assigns staff roles, deactivation                            | Done  |
+| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                         | Done  |
+| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check         | Done  |
+| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents | Done  |
+| Approval: readiness checklist, compliance review, separation of duties                          | Done  |
+| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled   | Done  |
+| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release | Done  |
+| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments             | Done  |
+| Ledger: double-entry, append-only, balanced, no money moving between cycles                     | Done  |
+| Harvest, settlement waterfall, statements                                                       | Next  |
 
 ## Getting started
 
@@ -83,6 +85,34 @@ Reload the app. From then on, use the **Users** page to give other staff their r
 
 > **Email confirmation:** by default Supabase emails a confirmation link on sign-up. For quick local testing you can turn it off in **Authentication → Sign In / Providers → Email → Confirm email**. Turn it back on before real users join.
 
+## Running a demo cycle
+
+The Phase 1 gate is "a demo cycle runs". You need several accounts, because the platform separates duties on purpose: whoever builds a cycle can't approve it, and only the trustee can confirm money. Sign up each one (a different email each), then give them roles on the **Users** page.
+
+| Account            | Role                 | Does                                                        | Email
+| ------------------ | -------------------- | ----------------------------------------------------------- |
+| You                | Admin                | Assigns roles                                               | agrowth.farmlands@gmail.com
+| Field agent        | `field_agent`        | Enrols farmers, maps farms, records verification visits     | damola@agent.test
+| Compliance officer | `compliance_officer` | Verifies farmer KYC, approves cycles                        | comply@officer.test
+| Cycle manager      | `cycle_manager`      | Builds the cycle, requests verification, instructs releases | tolu@manager.test
+| Trustee            | `trustee`            | Confirms deposits and payments, refunds                     | bank@trustee.test
+
+Then:
+
+1. **Field agent:** create a cooperative, enrol two or three farmers, map a farm for each.
+2. **Compliance officer:** open each farmer and **Verify** their KYC.
+3. **Cycle manager:** on **Funding cycles**, create a cycle. Add the farms, then milestones that add up to the target. Upload a signed offtake agreement and an insurance policy. When the readiness checklist is all green, **Submit for approval**.
+4. **Compliance officer:** open the cycle and **Approve** it.
+5. **Trustee:** **Record deposit** until the target is reached. The cycle becomes _Funded_.
+6. **Cycle manager:** on **Milestones**, **Request field verification** for milestone 1.
+7. **Field agent:** on **Field visits**, visit each farm. On a phone, standing inside the farm, the GPS check-in must be within 20 m. Add the checklist and a photo.
+8. **Cycle manager:** once every farm has passed, **Instruct release** to vendors (at most 20% as cash to farmers).
+9. **Trustee:** **Confirm payment** for each payee. The milestone is _Released_ and the **Ledger** shows every naira.
+h to farmers).
+9. **Trustee:** **Confirm payment** for each payee. The milestone is *Released* and the **Ledger** shows every naira.
+
+> Tip: field visits check your real GPS position against the mapped boundary. To try it at a desk, map a small farm around where you are sitting.
+
 ## Tests
 
 ```bash
@@ -91,8 +121,8 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers refused, overlapping farms refused, the ledger can't be edited or unbalanced, and so on. No database server needed.
-- **Web tests** (`apps/web`) — map and error helpers.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Web tests** (`apps/web`) — money, map and error helpers.
 
 ## Repository layout
 
@@ -100,12 +130,12 @@ This runs:
 apps/
   web/                 React + TypeScript app
     src/
-      pages/           One file per screen
+      pages/           One file per screen (pages/cycle/ holds the cycle detail tabs)
       components/      Layout, map, buttons, inputs
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, cycles and ledger
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
 docs/                  Concept and design documents
@@ -134,3 +164,7 @@ npx supabase db push
 - **Farm area is computed by the database** from the mapped boundary; invalid polygons are rejected.
 - **Boundaries are locked while a cycle is live**, from approval through harvest.
 - **Roles come from the database, never the browser.** Sign-up always creates an investor; only an admin can grant staff roles, and nobody can change their own.
+- **Offtake first, insured downside, verified farmers.** A cycle can't be submitted, or approved, until a signed buyer covers at least the low-yield harvest, insurance covers the budget for the whole season, and every farmer has passed KYC.
+- **Separation of duties.** The cycle's own manager can never approve it. Only the trustee confirms deposits, payments and refunds.
+- **Money follows verification.** A milestone is released only after every farm passes a field visit (GPS inside the boundary, checklist, photo), in order, and at most 20% may go to farmers as cash. The trustee can't pay out more than it holds for that cycle.
+- **Evidence is permanent.** Cycle history and field visits are append-only, and uploaded documents can't be replaced or deleted.

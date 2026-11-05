@@ -9,7 +9,8 @@ export type Role =
   | 'investor'
   | 'programme_manager'
   | 'vendor'
-  | 'offtaker';
+  | 'offtaker'
+  | 'trustee';
 
 export type KycStatus = 'pending' | 'verified' | 'rejected';
 export type Gender = 'female' | 'male' | 'other';
@@ -76,4 +77,187 @@ export interface FarmMap {
 export interface Page<T> {
   items: T[];
   total: number;
+}
+
+// ---------- Cycles ----------
+
+export type CycleStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'open_for_funding'
+  | 'funded'
+  | 'in_progress'
+  | 'harvested'
+  | 'settled'
+  | 'cancelled'
+  | 'refunded';
+export type FundingSource = 'investor' | 'programme' | 'blended';
+export type MilestoneStatus =
+  'pending' | 'awaiting_verification' | 'verified' | 'released' | 'blocked';
+export type PriceTerms = 'fixed' | 'floor' | 'formula';
+export type InsuranceCover = 'area_yield' | 'weather_index' | 'multi_peril';
+export type CropCondition = 'good' | 'fair' | 'poor' | 'failed';
+export type PayeeKind = 'input_vendor' | 'service_provider' | 'farmer_cash';
+
+/** Money columns come back from the database as numbers; treat them via lib/money. */
+type Money = number | string;
+
+export interface Cycle {
+  id: string;
+  code: string;
+  crop: string;
+  season: string;
+  status: CycleStatus;
+  funding_source: FundingSource;
+  target_amount_kobo: Money;
+  budget_per_hectare_kobo: Money;
+  yield_low_t_per_ha: number;
+  yield_expected_t_per_ha: number;
+  yield_high_t_per_ha: number;
+  price_low_per_tonne_kobo: Money | null;
+  price_expected_per_tonne_kobo: Money | null;
+  price_high_per_tonne_kobo: Money | null;
+  funding_deadline: string | null;
+  start_date: string | null;
+  expected_harvest_date: string | null;
+  cooperative_id: string | null;
+  manager_id: string;
+  description: string | null;
+  review_note: string | null;
+  submitted_at: string | null;
+  approved_at: string | null;
+  created_at: string;
+}
+
+/** A row of the cycle_summaries view. */
+export interface CycleSummary {
+  id: string;
+  code: string;
+  crop: string;
+  season: string;
+  status: CycleStatus;
+  funding_source: FundingSource;
+  target_amount_kobo: Money;
+  funding_deadline: string | null;
+  start_date: string | null;
+  expected_harvest_date: string | null;
+  cooperative_id: string | null;
+  farm_count: number;
+  hectares: number;
+  milestone_total_kobo: Money;
+  created_at: string;
+}
+
+export interface Milestone {
+  id: string;
+  cycle_id: string;
+  sequence: number;
+  name: string;
+  description: string | null;
+  planned_date: string | null;
+  amount_kobo: Money;
+  status: MilestoneStatus;
+  verification_requested_at: string | null;
+  verified_at: string | null;
+  released_at: string | null;
+}
+
+export interface OfftakeContract {
+  id: string;
+  cycle_id: string;
+  buyer_name: string;
+  buyer_contact: string | null;
+  commodity: string;
+  volume_tonnes: number;
+  price_terms: PriceTerms;
+  price_per_tonne_kobo: Money | null;
+  price_floor_per_tonne_kobo: Money | null;
+  price_formula: string | null;
+  delivery_window_start: string | null;
+  delivery_window_end: string | null;
+  document_path: string | null;
+  signed_on: string | null;
+  status: 'draft' | 'signed' | 'approved' | 'fulfilled' | 'breached';
+}
+
+export interface InsurancePolicy {
+  id: string;
+  cycle_id: string;
+  insurer_name: string;
+  policy_number: string;
+  cover_type: InsuranceCover;
+  sum_insured_kobo: Money;
+  premium_kobo: Money;
+  loss_payee: string;
+  cover_start: string;
+  cover_end: string;
+  document_path: string | null;
+}
+
+export interface ReadinessCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string | null;
+}
+
+export interface CycleEvent {
+  id: string;
+  cycle_id: string;
+  kind: string;
+  message: string;
+  actor_id: string | null;
+  created_at: string;
+}
+
+export interface FundingContribution {
+  id: string;
+  cycle_id: string;
+  funder_name: string;
+  funder_kind: 'investor' | 'programme';
+  amount_kobo: Money;
+  trustee_reference: string;
+  received_on: string;
+  refund_entry_id: string | null;
+  created_at: string;
+}
+
+export interface FieldVisit {
+  id: string;
+  farm_id: string;
+  milestone_id: string;
+  agent_id: string;
+  visited_at: string;
+  gps_accuracy_m: number;
+  distance_from_boundary_m: number;
+  gps_ok: boolean;
+  checklist_passed: boolean;
+  crop_condition: CropCondition;
+  notes: string | null;
+  photo_paths: string[];
+  passed: boolean;
+}
+
+export interface Disbursement {
+  id: string;
+  cycle_id: string;
+  milestone_id: string;
+  payee_kind: PayeeKind;
+  payee_name: string;
+  payee_account: string;
+  purpose: string;
+  amount_kobo: Money;
+  status: 'instructed' | 'executed' | 'cancelled';
+  instructed_at: string;
+  executed_at: string | null;
+  trustee_reference: string | null;
+}
+
+export interface LedgerBalance {
+  account_id: string;
+  code: string;
+  name: string;
+  type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+  cycle_id: string | null;
+  balance_kobo: string;
 }
