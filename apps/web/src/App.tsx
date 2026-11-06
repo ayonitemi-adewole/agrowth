@@ -27,6 +27,15 @@ const LedgerPage = page(() => import('./pages/LedgerPage'), 'LedgerPage');
 const VendorsPage = page(() => import('./pages/VendorsPage'), 'VendorsPage');
 const RedeemPage = page(() => import('./pages/RedeemPage'), 'RedeemPage');
 const VoucherSlipsPage = page(() => import('./pages/VoucherSlipsPage'), 'VoucherSlipsPage');
+const MarketplacePage = page(() => import('./pages/invest/MarketplacePage'), 'MarketplacePage');
+const ListingPage = page(() => import('./pages/invest/ListingPage'), 'ListingPage');
+const PortfolioPage = page(() => import('./pages/invest/PortfolioPage'), 'PortfolioPage');
+const CertificatePage = page(() => import('./pages/invest/CertificatePage'), 'CertificatePage');
+const InvestorProfilePage = page(
+  () => import('./pages/invest/InvestorProfilePage'),
+  'InvestorProfilePage',
+);
+const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
 
 export function App() {
   if (!isConfigured) return <SetupNeeded />;
@@ -47,8 +56,56 @@ export function App() {
                     </RoleGate>
                   }
                 />
+                <Route
+                  path="portfolio/:pledgeId/certificate"
+                  element={
+                    <RoleGate allow={can.invest}>
+                      <CertificatePage />
+                    </RoleGate>
+                  }
+                />
                 <Route element={<Layout />}>
                   <Route index element={<Home />} />
+                  <Route
+                    path="invest"
+                    element={
+                      <RoleGate allow={can.invest}>
+                        <MarketplacePage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="invest/:id"
+                    element={
+                      <RoleGate allow={can.viewListings}>
+                        <ListingPage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="portfolio"
+                    element={
+                      <RoleGate allow={can.invest}>
+                        <PortfolioPage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="profile"
+                    element={
+                      <RoleGate allow={can.invest}>
+                        <InvestorProfilePage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="investors"
+                    element={
+                      <RoleGate allow={can.readInvestors}>
+                        <InvestorsPage />
+                      </RoleGate>
+                    }
+                  />
                   <Route
                     path="vendors"
                     element={
@@ -164,10 +221,11 @@ export function App() {
   );
 }
 
-/** Vendors only use the shop counter; everyone else starts on the overview. */
+/** Staff start on the overview, investors in the marketplace, vendors at the shop counter. */
 function Home() {
   const role = useAuth().profile?.role;
-  return can.useStaffApp(role) ? <OverviewPage /> : <Navigate to="/redeem" replace />;
+  if (can.useStaffApp(role)) return <OverviewPage />;
+  return <Navigate to={can.invest(role) ? '/invest' : '/redeem'} replace />;
 }
 
 function SetupNeeded() {

@@ -30,7 +30,7 @@ export function RequireStaff() {
             <p className="mt-2 text-sm text-zinc-600">
               {profile && !profile.is_active
                 ? 'Contact an Agrowth admin if you think this is a mistake.'
-                : 'Your account exists, but an admin still needs to give you a staff role. The investor portal is coming in a later release.'}
+                : 'Your account exists, but an admin still needs to give it a role.'}
             </p>
             <p className="mt-3 text-xs text-zinc-500">Signed in as {session.user.email}</p>
             <Button variant="secondary" className="mt-5" onClick={signOut}>

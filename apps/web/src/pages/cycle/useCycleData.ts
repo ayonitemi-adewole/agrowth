@@ -9,6 +9,7 @@ import type {
   FundingContribution,
   HarvestDelivery,
   InsurancePolicy,
+  InvestmentPledge,
   KycStatus,
   Milestone,
   OfftakeContract,
@@ -27,6 +28,9 @@ export type RedemptionRow = VoucherRedemption & {
   vendors: Pick<Vendor, 'name' | 'bank_name' | 'account_number' | 'account_name' | 'status'>;
 };
 
+/** Investor names are only readable by compliance, the trustee, admins and auditors. */
+export type PledgeRow = InvestmentPledge & { investor_profiles: { legal_name: string } | null };
+
 export interface CycleData {
   cycle: Cycle;
   farms: CycleFarm[];
@@ -34,6 +38,7 @@ export interface CycleData {
   offtake: OfftakeContract[];
   insurance: InsurancePolicy[];
   contributions: FundingContribution[];
+  pledges: PledgeRow[];
   raisedKobo: number;
   events: CycleEvent[];
   disbursements: Disbursement[];
@@ -77,6 +82,7 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     settlement,
     vouchers,
     redemptions,
+    pledges,
   ] = await Promise.all([
     supabase.from('cycle_farms').select('farm_id').eq('cycle_id', id),
     supabase.from('milestones').select('*').eq('cycle_id', id).order('sequence'),
@@ -113,6 +119,11 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
       .select('*, vendors(name, bank_name, account_number, account_name, status)')
       .eq('cycle_id', id)
       .order('redeemed_at', { ascending: false }),
+    supabase
+      .from('investment_pledges')
+      .select('*, investor_profiles(legal_name)')
+      .eq('cycle_id', id)
+      .order('pledged_at', { ascending: false }),
   ]);
 
   const farmIds = must(farmLinks).map((f: { farm_id: string }) => f.farm_id);
@@ -162,6 +173,7 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     offtake: must(offtake) as OfftakeContract[],
     insurance: must(insurance) as InsurancePolicy[],
     contributions: must(contributions) as FundingContribution[],
+    pledges: must(pledges) as PledgeRow[],
     raisedKobo: (must(funding) as { raised_kobo: number } | null)?.raised_kobo ?? 0,
     events: eventRows,
     disbursements: must(disbursements) as Disbursement[],

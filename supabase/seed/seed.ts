@@ -14,6 +14,7 @@ import { fieldPhoto, type FieldStage } from './field-photo.ts';
 import {
   COOPERATIVES,
   CYCLES,
+  INVESTORS,
   STAFF,
   UNASSIGNED_REJECTED,
   VENDORS,
@@ -24,6 +25,18 @@ import {
   type Stage,
   type StaffKey,
 } from './portfolio.ts';
+
+/** A placeholder ID document for demo investors' KYC, clearly marked as a sample. */
+function sampleId(name: string): Uint8Array {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <rect width="640" height="400" rx="24" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="4"/>
+  <rect x="40" y="120" width="160" height="200" rx="12" fill="#d4d4d8"/>
+  <text x="40" y="80" font-family="sans-serif" font-size="28" font-weight="700" fill="#27272a">SAMPLE ID: DEMO ONLY</text>
+  <text x="230" y="170" font-family="sans-serif" font-size="26" fill="#18181b">${name}</text>
+  <text x="230" y="215" font-family="sans-serif" font-size="18" fill="#52525b">Not a real identity document</text>
+</svg>`;
+  return new TextEncoder().encode(svg);
+}
 
 /** How many milestones have been paid out by each stage. */
 const RELEASED: Partial<Record<Stage, number>> = { in_progress: 1, harvested: 3, settled: 3 };
@@ -201,6 +214,54 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     }
   }
 
+  // Investors ---------------------------------------------------------------------------------
+  log('Onboarding investors');
+  const investorIds = new Map<string, string>();
+  for (const [i, inv] of INVESTORS.entries()) {
+    const id = await api.ensureUser({
+      email: inv.email,
+      password: opts.password,
+      fullName: inv.fullName,
+      role: 'investor',
+    });
+    investorIds.set(inv.fullName, id);
+    const investor = api.as(id);
+    const idPath = `${id}/national-id.svg`;
+    await investor.upload('investor-documents', idPath, sampleId(inv.fullName), 'image/svg+xml');
+    await investor.rpc('submit_investor_kyc', {
+      p_legal_name: inv.fullName,
+      p_declared_class: inv.declared,
+      p_nin: String(70_000_000_000 + i),
+      p_bvn: String(22_100_000_000 + i),
+      p_annual_income_kobo: kobo(inv.income),
+      p_other_crowdfunding_kobo: kobo(inv.elsewhere),
+      p_id_document_path: idPath,
+      p_bank_name: inv.bank,
+      p_account_number: inv.account,
+      p_account_name: inv.fullName,
+    });
+    if (inv.verified) {
+      await compliance.rpc('review_investor_kyc', {
+        p_user_id: id,
+        p_approve: true,
+        p_classification: inv.declared,
+        p_note: null,
+      });
+    }
+  }
+  // Past investments are made as the story happened, so no cooling-off holds them up here;
+  // it is switched back on once the portfolio is built.
+  const [settings] = await as('admin').select('investor_settings', 'cooling_off_hours', {
+    id: true,
+  });
+  await api.adminUpdate('investor_settings', { id: true }, { cooling_off_hours: 0 });
+  const [{ disclosure_version: disclosureVersion }] = await as('admin').select(
+    'investor_settings',
+    'disclosure_version',
+    { id: true },
+  );
+  const cycleIds = new Map<string, string>();
+
   // Which farmers go into which cycle: each cycle takes the next ones from its cooperative.
   const taken: Record<CoopKey, number> = { zaria: 0, kura: 0, makurdi: 0, ikara: 0 };
   const placement = new Map<string, { cycle: string; position: number }>();
@@ -341,6 +402,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     });
     const cycleId = cycle.id as string;
     cycles.push({ code, stage: spec.stage });
+    cycleIds.set(spec.key, cycleId);
 
     await manager.insert(
       'cycle_farms',
@@ -463,14 +525,46 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         )
       : spec.funders.map((f) => floorTo(target * f[1], 10_000));
     for (const [i, [name, , received]] of spec.funders.entries()) {
-      await trustee.rpc('record_funding', {
+      const reference = `DEP-${code}-${String(i + 1).padStart(2, '0')}`;
+      const investorId = investorIds.get(name);
+      if (!investorId) {
+        await trustee.rpc('record_funding', {
+          p_cycle_id: cycleId,
+          p_funder_name: name,
+          p_funder_kind: spec.funderKind ?? 'investor',
+          p_amount_kobo: kobo(deposits[i]),
+          p_trustee_reference: reference,
+          p_received_on: day(received),
+        });
+        continue;
+      }
+      // A portal investor: pledge, pay, and the trustee confirms against the pledge.
+      const pledge = await api.as(investorId).rpc<{ id: string }>('pledge_investment', {
         p_cycle_id: cycleId,
-        p_funder_name: name,
-        p_funder_kind: spec.funderKind ?? 'investor',
         p_amount_kobo: kobo(deposits[i]),
-        p_trustee_reference: `DEP-${code}-${String(i + 1).padStart(2, '0')}`,
-        p_received_on: day(received),
+        p_disclosure_version: disclosureVersion,
       });
+      const contributionId = await trustee.rpc<string>('confirm_pledge_payment', {
+        p_pledge_id: pledge.id,
+        p_trustee_reference: reference,
+        p_received_on: day(0),
+      });
+      // Then give the investment the dates of the story: pledged three days before paying.
+      await api.adminUpdate(
+        'funding_contributions',
+        { id: contributionId },
+        { received_on: day(received) },
+      );
+      await api.adminUpdate(
+        'investment_pledges',
+        { id: pledge.id },
+        {
+          pledged_at: date(received - 3).toISOString(),
+          disclosure_acknowledged_at: date(received - 3).toISOString(),
+          cooling_off_ends_at: date(received - 1).toISOString(),
+          pay_by: day(received + 4),
+        },
+      );
     }
     if (!fullyFunded) continue;
 
@@ -713,9 +807,28 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     await restoreDates();
   }
 
+  // Investments still in progress -------------------------------------------------------------
+  await api.adminUpdate(
+    'investor_settings',
+    { id: true },
+    { cooling_off_hours: settings.cooling_off_hours },
+  );
+  for (const inv of INVESTORS) {
+    if (!inv.pendingPledge) continue;
+    log(`${inv.fullName} pledges to ${inv.pendingPledge.cycle}`);
+    await api.as(investorIds.get(inv.fullName)!).rpc('pledge_investment', {
+      p_cycle_id: cycleIds.get(inv.pendingPledge.cycle),
+      p_amount_kobo: kobo(inv.pendingPledge.amount),
+      p_disclosure_version: disclosureVersion,
+    });
+  }
+
   log('Done');
   return {
-    accounts: STAFF.map((s) => ({ role: s.role, email: s.email, fullName: s.fullName })),
+    accounts: [
+      ...STAFF.map((s) => ({ role: s.role, email: s.email, fullName: s.fullName })),
+      ...INVESTORS.map((i) => ({ role: 'investor', email: i.email, fullName: i.fullName })),
+    ],
     cycles,
     farmers: farmerCount,
   };

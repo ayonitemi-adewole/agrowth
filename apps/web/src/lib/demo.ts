@@ -28,7 +28,7 @@ export function passwordFor(role: Role, env: Env): string {
 }
 
 export function parseDemoAccounts(value: string, env: Env = {}): DemoAccount[] {
-  return value
+  const accounts: DemoAccount[] = value
     .split(',')
     .map((pair) => pair.trim())
     .filter(Boolean)
@@ -39,6 +39,12 @@ export function parseDemoAccounts(value: string, env: Env = {}): DemoAccount[] {
       if (!password) return [];
       return [{ role: role as Role, label: ROLE_LABELS[role as Role], email, password }];
     });
+  // Several accounts with one role (e.g. investors) are told apart by their email.
+  return accounts.map((a) =>
+    accounts.filter((b) => b.role === a.role).length > 1
+      ? { ...a, label: `${a.label} (${a.email.split('@')[0]})` }
+      : a,
+  );
 }
 
 /**

@@ -186,6 +186,41 @@ describe('demo seed', () => {
     expect(BigInt(open.raised)).toBeLessThan(BigInt(open.target));
   });
 
+  it('runs portal investors through KYC, pledges and payouts, with cooling-off back on', async () => {
+    const { rows } = await db.query<{
+      email: string;
+      kyc: string;
+      status: string;
+      payouts: number;
+      paid_before_pledge: boolean;
+    }>(
+      `select pr.email, ip.kyc_status::text as kyc, p.status::text as status,
+              (select count(*)::int from public.settlement_payouts sp
+                where sp.contribution_id = p.contribution_id and sp.status = 'executed') as payouts,
+              fc.received_on < p.pledged_at::date as paid_before_pledge
+         from public.investor_profiles ip
+         join public.profiles pr on pr.id = ip.user_id
+         left join public.investment_pledges p on p.investor_id = ip.user_id
+         left join public.funding_contributions fc on fc.id = p.contribution_id
+        order by pr.email, p.pledged_at`,
+    );
+    const by = (email: string) => rows.filter((r) => r.email === email);
+    // Adaeze: the settled maize cycle (paid out) and the one in progress.
+    expect(by('investor@agrowth.test').map((r) => [r.status, r.payouts])).toEqual([
+      ['paid', 1],
+      ['paid', 0],
+    ]);
+    expect(by('investor.retail@agrowth.test').map((r) => r.status)).toEqual(['pending']);
+    expect(by('investor.new@agrowth.test')).toMatchObject([{ kyc: 'pending', status: null }]);
+    expect(rows.some((r) => r.paid_before_pledge)).toBe(false);
+
+    const settings = await one<{ h: number }>(
+      `select cooling_off_hours as h from public.investor_settings`,
+    );
+    expect(settings.h).toBe(48);
+    expect(result.accounts.filter((a) => a.role === 'investor')).toHaveLength(3);
+  });
+
   it('gives finished cycles their real, past planned dates', async () => {
     const { rows } = await db.query<{ n: number }>(
       `select count(*)::int as n from public.cycles

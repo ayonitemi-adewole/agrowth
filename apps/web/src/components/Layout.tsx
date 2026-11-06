@@ -1,5 +1,9 @@
 import {
+  BadgeCheck,
   BookOpenCheck,
+  BriefcaseBusiness,
+  Landmark,
+  TrendingUp,
   Store,
   TicketCheck,
   ClipboardCheck,
@@ -49,6 +53,14 @@ interface NavItem {
 const SECTIONS: { title?: string; items: NavItem[] }[] = [
   { items: [{ to: '/', label: 'Overview', icon: Home, show: can.useStaffApp }] },
   {
+    title: 'Invest',
+    items: [
+      { to: '/invest', label: 'Marketplace', icon: TrendingUp, show: can.invest },
+      { to: '/portfolio', label: 'My investments', icon: BriefcaseBusiness, show: can.invest },
+      { to: '/profile', label: 'Profile and KYC', icon: BadgeCheck, show: can.invest },
+    ],
+  },
+  {
     title: 'Shop counter',
     items: [
       { to: '/redeem', label: 'Redeem vouchers', icon: TicketCheck, show: can.redeemVouchers },
@@ -72,6 +84,7 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
   {
     title: 'Oversight',
     items: [
+      { to: '/investors', label: 'Investors', icon: Landmark, show: can.readInvestors },
       { to: '/ledger', label: 'Ledger', icon: BookOpenCheck, show: can.readLedger },
       { to: '/users', label: 'Users', icon: Users, show: can.manageUsers },
     ],

@@ -421,3 +421,193 @@ export interface VoucherCheck {
   unusable_reason?: string | null;
   redemption_id?: string;
 }
+
+// ---------- Investor Edition ----------
+
+export type InvestorClass = 'retail' | 'high_net_worth' | 'institutional';
+export type PledgeStatus = 'pending' | 'paid' | 'withdrawn' | 'lapsed';
+
+export interface InvestorProfile {
+  user_id: string;
+  legal_name: string;
+  declared_class: InvestorClass;
+  classification: InvestorClass | null;
+  kyc_status: KycStatus;
+  annual_income_kobo: Money;
+  other_crowdfunding_kobo: Money;
+  id_document_path: string;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  submitted_at: string;
+  reviewed_at: string | null;
+  review_note: string | null;
+}
+
+export interface InvestorSettings {
+  retail_cap_bps: number;
+  cooling_off_hours: number;
+  payment_window_days: number;
+  min_pledge_kobo: Money;
+  escrow_bank_name: string;
+  escrow_account_name: string;
+  escrow_account_number: string;
+  risk_disclosure: string;
+  disclosure_version: number;
+  updated_at: string;
+}
+
+/** Where an investor stands against their 12-month limit (amounts in kobo). */
+export interface InvestmentCap {
+  kyc_status: KycStatus | null;
+  classification: InvestorClass | null;
+  capped: boolean;
+  cap_kobo: string | null;
+  used_here_kobo: string;
+  used_elsewhere_kobo: string;
+  remaining_kobo: string | null;
+}
+
+/** A cycle as investors see it in the marketplace. Amounts in kobo, as strings. */
+export interface Listing {
+  id: string;
+  code: string;
+  crop: string;
+  season: string;
+  status: CycleStatus;
+  funding_source: FundingSource;
+  description: string | null;
+  target_kobo: string;
+  raised_kobo: string;
+  reserved_kobo: string;
+  funders: number;
+  funding_deadline: string | null;
+  start_date: string | null;
+  expected_harvest_date: string | null;
+  farm_count: number;
+  hectares: number;
+  yield_low: number;
+  yield_expected: number;
+  yield_high: number;
+  price_low_kobo: string | null;
+  price_expected_kobo: string | null;
+  price_high_kobo: string | null;
+  management_fee_bps: number;
+  funder_profit_share_bps: number;
+  cooperative: { name: string; state: string; lga: string } | null;
+  sum_insured_kobo: string;
+  insurers: string[];
+  offtakers: string[];
+  offtake_volume_t: number;
+  offtake_price_terms: PriceTerms[];
+  offtake_floor_kobo: string | null;
+}
+
+export interface MyPledge {
+  id: string;
+  reference: string;
+  cycle_id: string;
+  amount_kobo: string;
+  status: PledgeStatus;
+  pledged_at: string;
+  cooling_off_ends_at: string;
+  pay_by: string;
+  disclosure_version: number;
+  disclosure_acknowledged_at: string;
+  received_on: string | null;
+  trustee_reference: string | null;
+  refunded: boolean;
+  refunded_at: string | null;
+  payouts: {
+    amount_kobo: string;
+    capital_kobo: string;
+    status: 'instructed' | 'executed' | 'cancelled';
+    paid_at: string | null;
+    created_at: string;
+  }[];
+}
+
+/** One cycle in full, as an investor sees it (investor_listing). */
+export interface ListingDetail extends Listing {
+  farms: Pick<
+    FarmMap,
+    'id' | 'name' | 'area_hectares' | 'primary_crop' | 'boundary' | 'centroid_lon' | 'centroid_lat'
+  >[];
+  milestones: {
+    id: string;
+    sequence: number;
+    name: string;
+    description: string | null;
+    planned_date: string | null;
+    amount_kobo: string;
+    status: MilestoneStatus;
+    verified_at: string | null;
+    released_at: string | null;
+    released: Partial<Record<PayeeKind, string>>;
+  }[];
+  offtake: {
+    buyer_name: string;
+    commodity: string;
+    volume_tonnes: number;
+    price_terms: PriceTerms;
+    price_kobo: string | null;
+    floor_kobo: string | null;
+    formula: string | null;
+    delivery_window_start: string | null;
+    delivery_window_end: string | null;
+    signed_on: string | null;
+    status: OfftakeContract['status'];
+  }[];
+  insurance: {
+    insurer_name: string;
+    cover_type: InsuranceCover;
+    sum_insured_kobo: string;
+    loss_payee: string;
+    cover_start: string;
+    cover_end: string;
+  }[];
+  visits: {
+    milestone_id: string;
+    farm_id: string;
+    visited_at: string;
+    passed: boolean;
+    gps_ok: boolean;
+    crop_condition: CropCondition;
+    photo_paths: string[];
+  }[];
+  harvest: { accepted_kg: number; rejected_kg: number; deliveries: number };
+  events: { kind: string; message: string; created_at: string }[];
+  my_pledges: MyPledge[];
+}
+
+export interface MyInvestments {
+  cap: InvestmentCap;
+  escrow: { bank_name: string; account_name: string; account_number: string };
+  pledges: (MyPledge & { cycle: Listing })[];
+}
+
+/** What pledge_investment returns: the pledge and how to pay it. */
+export interface PledgeReceipt {
+  id: string;
+  reference: string;
+  amount_kobo: string;
+  pay_by: string;
+  cooling_off_ends_at: string;
+  escrow_bank_name: string;
+  escrow_account_name: string;
+  escrow_account_number: string;
+}
+
+/** A pledge row as staff see it on a cycle's Funding tab. */
+export interface InvestmentPledge {
+  id: string;
+  reference: string;
+  cycle_id: string;
+  investor_id: string;
+  amount_kobo: Money;
+  status: PledgeStatus;
+  pledged_at: string;
+  cooling_off_ends_at: string;
+  pay_by: string;
+  contribution_id: string | null;
+}

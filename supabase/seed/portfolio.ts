@@ -100,6 +100,60 @@ const vendor = (
   ...extra,
 });
 
+/**
+ * Investor accounts in the Investor Edition portal. A cycle funder whose name matches one of
+ * these invests through the portal (KYC, pledge, trustee-confirmed payment) instead of being
+ * keyed in by the trustee, so their statement and payouts trace back to them.
+ */
+export interface InvestorSpec {
+  fullName: string;
+  email: string;
+  declared: 'retail' | 'high_net_worth' | 'institutional';
+  income: number;
+  /** Crowdfunding elsewhere in the last 12 months. */
+  elsewhere: number;
+  bank: string;
+  account: string;
+  /** False leaves the KYC in compliance's review queue. */
+  verified: boolean;
+  /** A pledge made when the seed finishes, still in cooling-off: cycle key and amount. */
+  pendingPledge?: { cycle: string; amount: number };
+}
+
+export const INVESTORS: InvestorSpec[] = [
+  {
+    fullName: 'Adaeze Okoro',
+    email: 'investor@agrowth.test',
+    declared: 'high_net_worth',
+    income: 180_000_000,
+    elsewhere: 4_000_000,
+    bank: 'Access Bank',
+    account: '0691234570',
+    verified: true,
+  },
+  {
+    fullName: 'Funmilayo Adeleke',
+    email: 'investor.retail@agrowth.test',
+    declared: 'retail',
+    income: 18_000_000,
+    elsewhere: 300_000,
+    bank: 'GTBank',
+    account: '0123456781',
+    verified: true,
+    pendingPledge: { cycle: 'soy-open', amount: 750_000 },
+  },
+  {
+    fullName: 'Emeka Obi',
+    email: 'investor.new@agrowth.test',
+    declared: 'high_net_worth',
+    income: 95_000_000,
+    elsewhere: 0,
+    bank: 'Zenith Bank',
+    account: '2081234567',
+    verified: false,
+  },
+];
+
 /** Agro-dealers where farmers redeem input vouchers. */
 export const VENDORS: VendorSpec[] = [
   vendor(
