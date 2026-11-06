@@ -15,7 +15,14 @@ export interface StaffSpec {
 }
 
 export type StaffKey =
-  'admin' | 'agentNorth' | 'agentBenue' | 'compliance' | 'manager' | 'trustee' | 'auditor';
+  | 'admin'
+  | 'agentNorth'
+  | 'agentBenue'
+  | 'compliance'
+  | 'manager'
+  | 'trustee'
+  | 'auditor'
+  | 'vendor';
 
 export const STAFF: StaffSpec[] = [
   { key: 'admin', role: 'admin', fullName: 'Ngozi Adeyemi', email: 'admin@agrowth.test' },
@@ -45,6 +52,113 @@ export const STAFF: StaffSpec[] = [
   },
   { key: 'trustee', role: 'trustee', fullName: 'Kemi Adebayo', email: 'trustee@agrowth.test' },
   { key: 'auditor', role: 'auditor', fullName: 'Ibrahim Musa', email: 'auditor@agrowth.test' },
+  // Counter staff at Zaria Agro Inputs, who redeem farmers' input vouchers.
+  { key: 'vendor', role: 'vendor', fullName: 'Bala Sule', email: 'vendor@agrowth.test' },
+];
+
+export interface VendorSpec {
+  name: string;
+  kind: 'agro_dealer' | 'service_provider';
+  registrationNumber: string;
+  phone: string;
+  email: string;
+  state: string;
+  lga: string;
+  address: string;
+  bank: string;
+  account: string;
+  /** Who registers it. Compliance approves it unless it's `pending`. */
+  registeredBy: StaffKey;
+  pending?: boolean;
+  /** The vendor whose counter the demo vendor account works at. */
+  counter?: boolean;
+}
+
+const vendor = (
+  name: string,
+  registrationNumber: string,
+  n: number,
+  state: string,
+  lga: string,
+  address: string,
+  bank: string,
+  account: string,
+  registeredBy: StaffKey,
+  extra: Partial<VendorSpec> = {},
+): VendorSpec => ({
+  name,
+  kind: 'agro_dealer',
+  registrationNumber,
+  phone: `+23480355501${String(n).padStart(2, '0')}`,
+  email: `sales@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`,
+  state,
+  lga,
+  address,
+  bank,
+  account,
+  registeredBy,
+  ...extra,
+});
+
+/** Agro-dealers where farmers redeem input vouchers. */
+export const VENDORS: VendorSpec[] = [
+  vendor(
+    'Zaria Agro Inputs Ltd',
+    'RC-1458823',
+    1,
+    'Kaduna',
+    'Zaria',
+    '14 Sokoto Road, Zaria',
+    'Access Bank',
+    '0123456789',
+    'agentNorth',
+    { counter: true },
+  ),
+  vendor(
+    'Samaru Farm Supplies',
+    'RC-2290417',
+    2,
+    'Kaduna',
+    'Zaria',
+    'Samaru Market, Zaria',
+    'GTBank',
+    '0234567812',
+    'agentNorth',
+  ),
+  vendor(
+    'Kura Agro Centre',
+    'RC-1873360',
+    3,
+    'Kano',
+    'Kura',
+    'Kura Motor Park Road',
+    'Jaiz Bank',
+    '0012398765',
+    'manager',
+  ),
+  vendor(
+    'Benue Agro Dealers Ltd',
+    'RC-1655092',
+    4,
+    'Benue',
+    'Makurdi',
+    '22 Old Otukpo Road, Makurdi',
+    'Fidelity Bank',
+    '5012398760',
+    'agentBenue',
+  ),
+  vendor(
+    'Ikara Farm Centre',
+    'RC-3012784',
+    5,
+    'Kaduna',
+    'Ikara',
+    'Ikara Central Market',
+    'First Bank',
+    '3023498761',
+    'agentNorth',
+    { pending: true },
+  ),
 ];
 
 export type CoopKey = 'zaria' | 'kura' | 'makurdi' | 'ikara';
@@ -234,6 +348,8 @@ export interface CycleSpec {
   };
   /** Return the first submission with this note before approving. */
   returnedWith?: string;
+  /** Pay the first milestone's input line as farmers' input vouchers instead of to a vendor. */
+  voucherInputs?: boolean;
   /** For draft cycles: what's still missing. */
   withoutInsurance?: boolean;
   /** Farmers (by position in the cycle) whose KYC is still pending. */
@@ -755,6 +871,7 @@ export const CYCLES: CycleSpec[] = [
     buyer: BUYERS.maize,
     insurer: SAVANNA,
     milestones: maizeMilestones([-8, 4, 100]),
+    voucherInputs: true,
     funders: [
       ['Kestrel Agri Fund I', 0.5, -41],
       ['Adaeze Okoro', 0.25, -33],

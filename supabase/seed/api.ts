@@ -11,7 +11,13 @@
 export type Row = Record<string, unknown>;
 
 export type Role =
-  'admin' | 'cycle_manager' | 'field_agent' | 'compliance_officer' | 'auditor' | 'trustee';
+  | 'admin'
+  | 'cycle_manager'
+  | 'field_agent'
+  | 'compliance_officer'
+  | 'auditor'
+  | 'trustee'
+  | 'vendor';
 
 /** A signed-in user. */
 export interface Session {

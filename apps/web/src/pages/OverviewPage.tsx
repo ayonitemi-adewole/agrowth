@@ -9,6 +9,7 @@ import {
   Scale,
   ShieldCheck,
   Sprout,
+  Store,
   UserCheck,
   UsersRound,
   Wheat,
@@ -233,6 +234,17 @@ async function loadTodo(role: Role | undefined): Promise<Todo[]> {
       'Settlement payouts to make',
       supabase.from('settlement_payouts').select('cycle_id').eq('status', 'instructed'),
       'settlement',
+      '/cycles?stage=active',
+    );
+    add(
+      Store,
+      'Agro-dealer redemptions to pay',
+      supabase
+        .from('voucher_redemptions')
+        .select('cycle_id')
+        .is('paid_at', null)
+        .is('voided_at', null),
+      'vouchers',
       '/cycles?stage=active',
     );
     add(

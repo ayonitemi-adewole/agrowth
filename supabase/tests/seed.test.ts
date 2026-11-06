@@ -225,4 +225,25 @@ describe('demo seed', () => {
     );
     expect(hidden).toHaveLength(0);
   });
+
+  it('pays one release as input vouchers redeemed at an approved agro-dealer', async () => {
+    const vouchers = await db.query<{ status: string; redeemed: string; value: string }>(
+      `select status::text, redeemed_kobo::text as redeemed, value_kobo::text as value
+         from public.vouchers`,
+    );
+    expect(vouchers.rows).toHaveLength(5);
+    const statuses = vouchers.rows.map((v) => v.status).sort();
+    expect(statuses).toEqual(['active', 'active', 'redeemed', 'redeemed', 'redeemed']);
+    expect(vouchers.rows.filter((v) => v.redeemed === '0')).toHaveLength(1);
+
+    const unpaid = await one<{ n: number }>(
+      `select count(*)::int as n from public.voucher_redemptions where paid_at is null`,
+    );
+    expect(unpaid.n).toBe(1);
+    const vendors = await db.query<{ status: string; linked: boolean }>(
+      `select status::text, user_id is not null as linked from public.vendors`,
+    );
+    expect(vendors.rows.filter((v) => v.status === 'pending')).toHaveLength(1);
+    expect(vendors.rows.filter((v) => v.linked)).toHaveLength(1);
+  });
 });

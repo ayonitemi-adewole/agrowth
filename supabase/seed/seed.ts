@@ -16,6 +16,7 @@ import {
   CYCLES,
   STAFF,
   UNASSIGNED_REJECTED,
+  VENDORS,
   type CoopKey,
   type CoopSpec,
   type CycleSpec,
@@ -91,6 +92,8 @@ interface Farm {
   farmName: string;
   hectares: number;
   centre: [lon: number, lat: number];
+  /** The farmer's phone; a vendor needs its last four digits to redeem a voucher. */
+  phone: string;
 }
 
 const FARM_NAMES = [
@@ -174,6 +177,30 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   const compliance = as('compliance');
   const trustee = as('trustee');
 
+  // Vendors ---------------------------------------------------------------------------------
+  log('Registering agro-dealers');
+  for (const v of VENDORS) {
+    const [row] = await as(v.registeredBy).insert('vendors', {
+      name: v.name,
+      kind: v.kind,
+      registration_number: v.registrationNumber,
+      contact_phone: v.phone,
+      contact_email: v.email,
+      state: v.state,
+      lga: v.lga,
+      address: v.address,
+      bank_name: v.bank,
+      account_number: v.account,
+      account_name: v.name,
+    });
+    if (!v.pending) {
+      await compliance.rpc('set_vendor_status', { p_vendor_id: row.id, p_status: 'approved' });
+    }
+    if (v.counter) {
+      await as('admin').rpc('link_vendor_account', { p_vendor_id: row.id, p_user_id: ids.vendor });
+    }
+  }
+
   // Which farmers go into which cycle: each cycle takes the next ones from its cooperative.
   const taken: Record<CoopKey, number> = { zaria: 0, kura: 0, makurdi: 0, ikara: 0 };
   const placement = new Map<string, { cycle: string; position: number }>();
@@ -230,10 +257,11 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     gender: 'female' | 'male',
   ): Promise<Farm> {
     const n = identity++;
+    const phone = `+234803${String(2_100_000 + n * 7_919).padStart(7, '0')}`;
     const farmerId = await agent.rpc<string>('register_farmer', {
       p_first_name: first,
       p_last_name: last,
-      p_phone: `+234803${String(2_100_000 + n * 7_919).padStart(7, '0')}`,
+      p_phone: phone,
       p_state: coop.state,
       p_lga: coop.lga,
       // Most farmers have both identifiers; some have only one.
@@ -262,6 +290,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       farmName,
       hectares: Number(farm.area_hectares),
       centre: boundary.centre,
+      phone,
     };
   }
 
@@ -499,21 +528,64 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       );
       await manager.rpc('instruct_milestone_release', {
         p_milestone_id: milestoneIds[m],
-        p_lines: payees.map((p, i) => ({
-          payee_kind: p.kind,
-          payee_name: p.name,
-          payee_account: p.account,
-          purpose: p.purpose,
-          amount_kobo: String(kobo(parts[i])),
-        })),
+        p_lines: payees.map((p, i) => {
+          // Inputs can reach farmers as vouchers they redeem at an approved agro-dealer.
+          const voucher = spec.voucherInputs && m === 0 && p.kind === 'input_vendor';
+          return {
+            payee_kind: voucher ? 'input_voucher' : p.kind,
+            payee_name: voucher ? 'Farmers (input vouchers)' : p.name,
+            payee_account: voucher ? 'Redeemable at approved agro-dealers' : p.account,
+            purpose: p.purpose,
+            amount_kobo: String(kobo(parts[i])),
+          };
+        }),
       });
-      const lines = await trustee.select('disbursements', 'id, amount_kobo', {
+      const lines = await trustee.select('disbursements', 'id, payee_kind', {
         milestone_id: milestoneIds[m],
       });
       for (const [i, line] of lines.entries()) {
-        await trustee.rpc('confirm_disbursement', {
-          p_disbursement_id: line.id,
-          p_trustee_reference: `PAY-${code}-M${m + 1}-${String(i + 1).padStart(2, '0')}`,
+        if (line.payee_kind === 'input_voucher') {
+          await trustee.rpc('issue_vouchers', { p_disbursement_id: line.id });
+        } else {
+          await trustee.rpc('confirm_disbursement', {
+            p_disbursement_id: line.id,
+            p_trustee_reference: `PAY-${code}-M${m + 1}-${String(i + 1).padStart(2, '0')}`,
+          });
+        }
+      }
+    };
+
+    /**
+     * Farmers take their vouchers to the agro-dealer's counter: most are used in full, one in
+     * part, one not yet. The trustee has paid the dealer for all but the latest redemption.
+     */
+    const redeemVouchers = async () => {
+      const vouchers = await trustee.select('vouchers', 'code, farm_id, value_kobo', {
+        milestone_id: milestoneIds[0],
+      });
+      const counter = as('vendor');
+      for (const [i, farm] of farms.entries()) {
+        const v = vouchers.find((x) => x.farm_id === farm.farmId);
+        if (!v || i === farms.length - 1) continue;
+        const value = Number(v.value_kobo);
+        const amount = i === farms.length - 2 ? roundTo(value * 0.6, 100_00) : value;
+        const bags = Math.max(1, Math.round(amount / 100 / 45_000));
+        const result = await counter.rpc<{ ok?: boolean; message?: string }>('redeem_voucher', {
+          p_code: v.code,
+          p_phone_last4: farm.phone.slice(-4),
+          p_amount_kobo: amount,
+          p_items: `${bags} bags NPK 15-15-15, ${Math.max(1, Math.round(farm.hectares * 25))} kg certified maize seed`,
+        });
+        if (result.ok === false) throw new Error(`Redeeming ${v.code}: ${result.message}`);
+      }
+      const redemptions = await trustee.select('voucher_redemptions', 'id, redeemed_at', {
+        cycle_id: cycleId,
+      });
+      redemptions.sort((a, b) => String(a.redeemed_at).localeCompare(String(b.redeemed_at)));
+      for (const [i, r] of redemptions.slice(0, -1).entries()) {
+        await trustee.rpc('confirm_redemption_payment', {
+          p_redemption_id: r.id,
+          p_trustee_reference: `VEN-${code}-${String(i + 1).padStart(2, '0')}`,
         });
       }
     };
@@ -523,6 +595,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       await requestVerification(m);
       for (const farm of farms) await visit(farm, m, true);
       await release(m);
+      if (m === 0 && spec.voucherInputs) await redeemVouchers();
     }
 
     if (spec.stage === 'in_progress') {

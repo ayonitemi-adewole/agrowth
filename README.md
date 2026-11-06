@@ -97,16 +97,16 @@ For showing Agrowth to customers, one command fills a Supabase project with a li
 - 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected
 - 8 funding cycles, one at every stage:
 
-| Stage             | Cycle                        | What it shows                                                              |
-| ----------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram |
-| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%   |
-| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live              |
-| In progress       | Zaria maize, dry season      | A release blocked because one visit checked in 340 m outside the farm      |
-| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                       |
-| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                             |
-| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                               |
-| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                            |
+| Stage             | Cycle                        | What it shows                                                                                       |
+| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
+| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram                          |
+| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%                            |
+| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live                                       |
+| In progress       | Zaria maize, dry season      | Inputs paid as vouchers redeemed at an agro-dealer; a release blocked by a visit 340 m off the farm |
+| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                                                |
+| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                                                      |
+| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                                                        |
+| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                                                     |
 
 Every record goes through the same database functions and security rules as the app, signed in as the demo user whose job it is. The seed is also a test (`supabase/tests/seed.test.ts`), so it can't drift from the rules.
 
@@ -124,7 +124,7 @@ Every record goes through the same database functions and security rules as the 
    ```
    It asks you to confirm, takes a few minutes, and prints the accounts and the lines to paste into `apps/web/.env.local` for one-click sign-in.
 
-The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test` and `admin@agrowth.test`.
+The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
 
 Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npx supabase db reset --linked`, then `npm run seed:demo`.
 
@@ -134,13 +134,13 @@ The field visit photos are labelled illustrations with the visit's GPS stamp, no
 
 To give prospects a link they can open themselves, deploy the web app against the demo project. The repo includes a `vercel.json`, so on [Vercel](https://vercel.com): **Add New → Project**, import this repository, and set these environment variables:
 
-| Variable                        | Value                                                                                                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                   |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                |
-| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                   |
-| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                              |
-| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test` |
+| Variable                        | Value                                                                                                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                                              |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                                           |
+| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                                              |
+| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                                                         |
+| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test` |
 
 `VITE_DEMO_MODE=true` makes a production build keep the role buttons and **Simulate GPS at this farm**, lead the sign-in page with "Explore the demo", hide self sign-up, and show a "sample portfolio" banner. A build without it contains no demo accounts or passwords.
 
