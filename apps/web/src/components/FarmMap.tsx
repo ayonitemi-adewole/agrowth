@@ -23,11 +23,17 @@ const NIGERIA_CENTRE: LatLngExpression = [9.08, 8.68];
 interface Props {
   farms?: Farm[];
   highlightId?: string;
+  /** Farms drawn in the highlight colour, e.g. those in a live cycle. */
+  highlightIds?: ReadonlySet<string>;
   /** When set, the map is in drawing mode and shows these corners. */
   drawing?: LonLat[];
   onMapClick?: (point: LonLat) => void;
-  /** The device's GPS position, drawn with its accuracy circle. */
+  /** A GPS position (the device's, or a recorded check-in), drawn with its accuracy circle. */
   position?: { lon: number; lat: number; accuracy: number } | null;
+  /** Tooltip for the position. */
+  positionLabel?: string;
+  /** Include the position when zooming to the farms, so a check-in off the farm stays in view. */
+  fitPosition?: boolean;
   /** Fly here whenever it changes (e.g. "Find me"). */
   focus?: { lon: number; lat: number } | null;
   className?: string;
@@ -36,12 +42,16 @@ interface Props {
 export function FarmMap({
   farms = [],
   highlightId,
+  highlightIds,
   drawing,
   onMapClick,
   position,
+  positionLabel,
+  fitPosition = false,
   focus,
   className,
 }: Props) {
+  const lit = (id: string) => id === highlightId || !!highlightIds?.has(id);
   return (
     <MapContainer
       center={NIGERIA_CENTRE}
@@ -71,8 +81,8 @@ export function FarmMap({
           key={farm.id}
           positions={ringToLatLngs(farm.boundary)}
           pathOptions={{
-            color: farm.id === highlightId ? '#16a34a' : '#52525b',
-            weight: farm.id === highlightId ? 3 : 2,
+            color: lit(farm.id) ? '#16a34a' : '#52525b',
+            weight: lit(farm.id) ? 3 : 2,
             fillOpacity: 0.2,
           }}
         >
@@ -96,12 +106,19 @@ export function FarmMap({
             radius={7}
             pathOptions={{ color: '#fff', fillColor: '#0284c7', fillOpacity: 1, weight: 3 }}
           >
-            <Tooltip>You are here (±{Math.round(position.accuracy)} m)</Tooltip>
+            <Tooltip>
+              {positionLabel ?? 'You are here'} (±{Math.round(position.accuracy)} m)
+            </Tooltip>
           </CircleMarker>
         </>
       )}
       {onMapClick && <ClickHandler onClick={onMapClick} />}
-      <FitTo farms={farms} drawing={drawing} focus={focus} />
+      <FitTo
+        farms={farms}
+        drawing={drawing}
+        focus={focus}
+        extra={fitPosition && position ? [position.lat, position.lon] : undefined}
+      />
     </MapContainer>
   );
 }
@@ -140,10 +157,12 @@ function FitTo({
   farms,
   drawing,
   focus,
+  extra,
 }: {
   farms: Farm[];
   drawing?: LonLat[];
   focus?: { lon: number; lat: number } | null;
+  extra?: [lat: number, lon: number];
 }) {
   const map = useMap();
   const farmKey = farms.map((f) => f.id).join(',');
@@ -152,6 +171,7 @@ function FitTo({
   useEffect(() => {
     if (farms.length === 0) return;
     const bounds = latLngBounds(farms.flatMap((f) => ringToLatLngs(f.boundary)));
+    if (extra) bounds.extend(extra);
     map.fitBounds(bounds, { padding: [24, 24], maxZoom: 17 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, farmKey]);

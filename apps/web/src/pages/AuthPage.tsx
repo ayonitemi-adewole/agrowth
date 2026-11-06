@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthProvider';
 import { DemoSignIn } from '../components/DemoSignIn';
 import { Logo } from '../components/Layout';
 import { Alert, Button, Field, Input } from '../components/ui';
+import { demo } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
 
 const PRINCIPLES = [
@@ -37,6 +38,9 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
   if (session) return <Navigate to="/" replace />;
 
+  // A hosted demo leads with the role picker; nobody signs up there.
+  const showcase = demo.hosted && demo.accounts.length > 0;
+  if (showcase && mode === 'sign-up') return <Navigate to="/sign-in" replace />;
   const isSignUp = mode === 'sign-up';
 
   const submit = async (e: FormEvent) => {
@@ -103,16 +107,34 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
           <div className="mb-10 lg:hidden">
             <Logo />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
-            {isSignUp ? 'Create your account' : 'Welcome back'}
-          </h1>
-          <p className="mt-2 text-sm text-zinc-500">
-            {isSignUp
-              ? 'Staff accounts are given a role by an admin after sign-up.'
-              : 'Sign in to your Agrowth workspace.'}
-          </p>
+          {showcase ? (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+                Explore the demo
+              </h1>
+              <p className="mt-2 text-sm text-zinc-500">
+                Sign in as anyone on the team. Each role sees and does only what its job allows, and
+                the database enforces it. The data is a sample portfolio.
+              </p>
+              <div className="mt-8">
+                <DemoSignIn detailed />
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold tracking-tight text-zinc-950">
+                {isSignUp ? 'Create your account' : 'Welcome back'}
+              </h1>
+              <p className="mt-2 text-sm text-zinc-500">
+                {isSignUp
+                  ? 'Staff accounts are given a role by an admin after sign-up.'
+                  : 'Sign in to your Agrowth workspace.'}
+              </p>
+            </>
+          )}
 
-          <div className="mt-8">
+          {/* In a hosted demo the role buttons replace the form. */}
+          <div className={showcase ? 'hidden' : 'mt-8'}>
             {confirmSent ? (
               <Alert tone="success" title="Check your email">
                 We've sent a confirmation link. Open it, then come back and sign in.
@@ -169,9 +191,9 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
             )}
           </div>
 
-          {!isSignUp && <DemoSignIn />}
+          {!isSignUp && !showcase && <DemoSignIn />}
 
-          <p className="mt-8 text-sm text-zinc-500">
+          <p className={showcase ? 'hidden' : 'mt-8 text-sm text-zinc-500'}>
             {isSignUp ? 'Already have an account? ' : 'New to Agrowth? '}
             <Link
               to={isSignUp ? '/sign-in' : '/sign-up'}

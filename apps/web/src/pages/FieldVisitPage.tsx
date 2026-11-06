@@ -14,6 +14,7 @@ import {
   cx,
 } from '../components/ui';
 import { uploadFile } from '../lib/cycles';
+import { demo } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
 import { formatHectares } from '../lib/format';
 import { supabase } from '../lib/supabase';
@@ -231,7 +232,7 @@ export function FieldVisitPage() {
                 <Button onClick={startGps}>
                   <Crosshair aria-hidden /> Start GPS
                 </Button>
-                {import.meta.env.DEV && (
+                {demo.enabled && (
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -250,7 +251,7 @@ export function FieldVisitPage() {
                 )}
               >
                 <p className="font-medium">
-                  {import.meta.env.DEV && simulated
+                  {demo.enabled && simulated
                     ? 'Simulated fix (demo)'
                     : precise
                       ? 'Precise fix'

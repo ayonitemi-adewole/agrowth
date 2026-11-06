@@ -9,8 +9,8 @@ import type { Role } from './types';
  *                                          (VITE_<ROLE>_DEMO_PASSWORD, e.g. VITE_TRUSTEE_DEMO_PASSWORD)
  *   VITE_DEMO_ACCOUNTS=admin:you@example.com,field_agent:agent@example.com,...
  *
- * An account with no password (shared or its own) gets no button. Buttons appear only on the
- * development server (npm run dev / dev:phone), never in a production build.
+ * An account with no password (shared or its own) gets no button. Buttons appear on the
+ * development server (npm run dev / dev:phone) and in hosted demo builds (see below) only.
  */
 export interface DemoAccount {
   role: Role;
@@ -41,9 +41,21 @@ export function parseDemoAccounts(value: string, env: Env = {}): DemoAccount[] {
     });
 }
 
-// Development server only: a production build never contains demo accounts or passwords.
+/**
+ * A hosted demo is a production build made with VITE_DEMO_MODE=true, pointed at a Supabase
+ * project that holds only demo data. It keeps the demo sign-in buttons and simulated GPS,
+ * shows a "sample data" banner and hides self sign-up. Any other production build contains
+ * no demo accounts or passwords.
+ */
+const hosted = import.meta.env.VITE_DEMO_MODE === 'true';
+const enabled = import.meta.env.DEV || hosted;
+
 export const demo = {
-  accounts: import.meta.env.DEV
+  /** A public demo deployment (not the development server). */
+  hosted,
+  /** Demo conveniences such as simulated GPS are available. */
+  enabled,
+  accounts: enabled
     ? parseDemoAccounts(
         (import.meta.env.VITE_DEMO_ACCOUNTS as string | undefined) ?? '',
         import.meta.env as unknown as Env,

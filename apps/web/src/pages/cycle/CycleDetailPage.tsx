@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { CycleStatusBadge } from '../../components/StatusBadges';
 import { Alert, EmptyState, PageHeader, Skeleton, Tabs } from '../../components/ui';
 import { FUNDING_SOURCE } from '../../lib/cycles';
@@ -16,21 +15,28 @@ import { SettlementTab } from './SettlementTab';
 import { useCycleData } from './useCycleData';
 import { VouchersTab } from './VouchersTab';
 
-type Tab =
-  | 'overview'
-  | 'farms'
-  | 'milestones'
-  | 'contracts'
-  | 'funding'
-  | 'vouchers'
-  | 'harvest'
-  | 'settlement'
-  | 'history';
+const TABS = [
+  'overview',
+  'farms',
+  'milestones',
+  'contracts',
+  'funding',
+  'vouchers',
+  'harvest',
+  'settlement',
+  'history',
+] as const;
+type Tab = (typeof TABS)[number];
 
 export function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const state = useCycleData(id!);
-  const [tab, setTab] = useState<Tab>('overview');
+  // The open tab lives in the URL (?tab=milestones), so it survives a reload and can be linked to.
+  const [params, setParams] = useSearchParams();
+  const fromUrl = params.get('tab') as Tab | null;
+  const tab: Tab = fromUrl && TABS.includes(fromUrl) ? fromUrl : 'overview';
+  const setTab = (t: Tab) =>
+    setParams(t === 'overview' ? {} : { tab: t }, { replace: true, preventScrollReset: true });
 
   if (state.loading && !state.data) {
     return (

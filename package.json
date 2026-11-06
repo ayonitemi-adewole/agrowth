@@ -2,7 +2,7 @@
   "name": "agrowth",
   "version": "2.0.0-alpha.0",
   "private": true,
-  "description": "Agrowth 2.0 — verifiable agricultural finance platform (Investor and Government editions)",
+  "description": "Agrowth 2.0 \u2014 verifiable agricultural finance platform (Investor and Government editions)",
   "workspaces": [
     "apps/*",
     "packages/*",
@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "npm run dev -w @agrowth/web",
-    "dev:phone": "npm run dev:phone -w @agrowth/web"
+    "dev:phone": "npm run dev:phone -w @agrowth/web",
+    "seed:demo": "npm run seed:demo -w @agrowth/database --"
   },
   "devDependencies": {
     "prettier": "^3.9.10"

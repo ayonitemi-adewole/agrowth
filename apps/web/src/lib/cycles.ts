@@ -94,6 +94,14 @@ export async function uploadFile(bucket: string, folder: string, file: File): Pr
   return path;
 }
 
+/** Short-lived links to private files, in the same order as `paths`. */
+export async function signedUrls(bucket: string, paths: string[]): Promise<string[]> {
+  if (paths.length === 0) return [];
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, 600);
+  if (error) throw error;
+  return data.map((d) => d.signedUrl ?? '');
+}
+
 /** Opens a private file in a new tab via a short-lived signed link. */
 export async function openFile(bucket: string, path: string): Promise<void> {
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60);
