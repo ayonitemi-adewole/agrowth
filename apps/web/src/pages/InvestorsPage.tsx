@@ -1,5 +1,5 @@
 import { FileText, Landmark } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { useToast } from '../components/Toast';
 import {
@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  cx,
   EmptyState,
   Field,
   Input,
@@ -14,7 +15,6 @@ import {
   Modal,
   PageHeader,
   SectionTitle,
-  Select,
   Spinner,
   Table,
   Tabs,
@@ -24,7 +24,7 @@ import { formatBps, openFile } from '../lib/cycles';
 import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { INVESTOR_CLASS } from '../lib/investing';
-import { formatNaira, nairaInput, parseNaira } from '../lib/money';
+import { formatNaira, nairaInput, parseNaira, toKobo } from '../lib/money';
 import { can } from '../lib/roles';
 import { supabase } from '../lib/supabase';
 import type { InvestorClass, InvestorProfile, InvestorSettings } from '../lib/types';
@@ -70,6 +70,7 @@ export function InvestorsPage() {
       ) : (
         <InvestorTable
           investors={tab === 'review' ? pending : investors}
+          capBps={settings.retail_cap_bps}
           canReview={can.reviewInvestors(role)}
           onChange={state.reload}
           empty={tab === 'review' ? 'No investors are waiting for review.' : 'No investors yet.'}
@@ -81,11 +82,13 @@ export function InvestorsPage() {
 
 function InvestorTable({
   investors,
+  capBps,
   canReview,
   onChange,
   empty,
 }: {
   investors: InvestorProfile[];
+  capBps: number;
   canReview: boolean;
   onChange: () => void;
   empty: string;
@@ -134,7 +137,7 @@ function InvestorTable({
                 <FileText aria-hidden /> ID
               </Button>
               {canReview && i.kyc_status === 'pending' && (
-                <ReviewButton investor={i} onDone={onChange} />
+                <ReviewButton investor={i} capBps={capBps} onDone={onChange} />
               )}
             </div>
           </td>
@@ -144,13 +147,41 @@ function InvestorTable({
   );
 }
 
-function ReviewButton({ investor, onDone }: { investor: InvestorProfile; onDone: () => void }) {
+const CLASS_EFFECT: Record<InvestorClass, string> = {
+  retail: 'Limited to a share of declared income each year',
+  high_net_worth: 'No limit. Needs evidence of income or net worth',
+  institutional: 'No limit. Needs evidence of a registered fund or company',
+};
+
+function ReviewButton({
+  investor,
+  capBps,
+  onDone,
+}: {
+  investor: InvestorProfile;
+  capBps: number;
+  onDone: () => void;
+}) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [classification, setClassification] = useState<InvestorClass>(investor.declared_class);
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const start = () => {
+    setClassification(investor.declared_class);
+    setNote('');
+    setError(null);
+    setOpen(true);
+  };
+  const viewId = () =>
+    openFile('investor-documents', investor.id_document_path).catch((err) =>
+      setError(errorMessage(err)),
+    );
+  const retailCap = (toKobo(investor.annual_income_kobo) * BigInt(capBps)) / 10_000n;
+  const nameMismatch =
+    investor.account_name.trim().toLowerCase() !== investor.legal_name.trim().toLowerCase();
 
   const review = async (approve: boolean) => {
     setBusy(approve ? 'approve' : 'reject');
@@ -173,42 +204,135 @@ function ReviewButton({ investor, onDone }: { investor: InvestorProfile; onDone:
 
   return (
     <>
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button size="sm" onClick={start}>
         Review
       </Button>
       <Modal
         open={open}
         onClose={() => setOpen(false)}
+        wide
         title={`Review ${investor.legal_name}`}
-        description="Check the ID document against the name, NIN and BVN before verifying."
+        description={`Submitted ${formatDate(investor.submitted_at)}. Check the ID document shows this name, and that the payout account is in the same name.`}
       >
-        <div className="space-y-4">
-          <Field
-            label="Classification"
-            hint={`Declared ${INVESTOR_CLASS[investor.declared_class].toLowerCase()}. Only confirm high-net-worth or institutional with evidence; otherwise classify as retail.`}
-          >
-            <Select
-              value={classification}
-              onChange={(e) => setClassification(e.target.value as InvestorClass)}
-            >
-              {(Object.keys(INVESTOR_CLASS) as InvestorClass[]).map((c) => (
-                <option key={c} value={c}>
-                  {INVESTOR_CLASS[c]}
-                </option>
+        <div className="space-y-6">
+          <div className="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-950/5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm font-medium text-zinc-900">What the investor submitted</p>
+              <Button size="sm" variant="secondary" onClick={viewId}>
+                <FileText aria-hidden /> Open ID document
+              </Button>
+            </div>
+            <dl className="grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+              {(
+                [
+                  ['Legal name', investor.legal_name],
+                  ['Declared type', INVESTOR_CLASS[investor.declared_class]],
+                  ['Net annual income', formatNaira(investor.annual_income_kobo)],
+                  [
+                    'Crowdfunding elsewhere (12 months)',
+                    formatNaira(investor.other_crowdfunding_kobo),
+                  ],
+                  [
+                    'Payout account',
+                    <>
+                      {investor.bank_name} ·{' '}
+                      <span className="font-mono">{investor.account_number}</span>
+                      <span className="block text-zinc-600">{investor.account_name}</span>
+                    </>,
+                  ],
+                  ['NIN and BVN', 'Received; stored only as fingerprints'],
+                ] as [string, ReactNode][]
+              ).map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-xs text-zinc-500">{label}</dt>
+                  <dd className="mt-0.5 font-medium break-words text-zinc-900">{value}</dd>
+                </div>
               ))}
-            </Select>
+            </dl>
+            {nameMismatch && (
+              <div className="mt-3">
+                <Alert tone="warning">
+                  The account name differs from the legal name. Payouts must go to the investor's
+                  own account.
+                </Alert>
+              </div>
+            )}
+          </div>
+
+          <fieldset>
+            <legend className="mb-2 text-sm font-medium text-zinc-800">
+              Classify as (if verifying)
+            </legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(Object.keys(INVESTOR_CLASS) as InvestorClass[]).map((c) => (
+                <label
+                  key={c}
+                  className={cx(
+                    'flex cursor-pointer flex-col rounded-xl p-3 ring-1 transition',
+                    classification === c
+                      ? 'bg-brand-50 ring-2 ring-brand-600'
+                      : 'bg-white ring-zinc-950/10 hover:bg-zinc-50',
+                  )}
+                >
+                  <span className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="radio"
+                      name={`class-${investor.user_id}`}
+                      value={c}
+                      checked={classification === c}
+                      onChange={() => setClassification(c)}
+                      className="size-4 text-brand-600"
+                    />
+                    <span className="text-sm font-medium text-zinc-900">{INVESTOR_CLASS[c]}</span>
+                    {c === investor.declared_class && <Badge>Declared</Badge>}
+                  </span>
+                  <span className="mt-1.5 text-xs text-zinc-500">
+                    {c === 'retail'
+                      ? `Up to ${formatNaira(retailCap, { compact: true })} a year (${formatBps(capBps)} of income)`
+                      : CLASS_EFFECT[c]}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <Field
+            label="Note to the investor"
+            hint="Needed to reject, so they know what to fix. Optional when verifying."
+          >
+            <Textarea
+              rows={3}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. The ID photo is unreadable; please upload a clearer scan."
+            />
           </Field>
-          <Field label="Note" hint="Required to reject: the investor sees it.">
-            <Textarea rows={3} value={note} onChange={(e) => setNote(e.target.value)} />
-          </Field>
+
           {error && <Alert>{error}</Alert>}
-          <div className="flex justify-end gap-2">
-            <Button variant="danger" busy={busy === 'reject'} onClick={() => review(false)}>
-              Reject
+
+          <div className="flex flex-col-reverse gap-2 border-t border-zinc-950/5 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
             </Button>
-            <Button busy={busy === 'approve'} onClick={() => review(true)}>
-              Verify
-            </Button>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row">
+              <Button
+                variant="secondary"
+                className="text-red-700"
+                busy={busy === 'reject'}
+                disabled={busy !== null || !note.trim()}
+                title={note.trim() ? undefined : 'Add a note to reject'}
+                onClick={() => review(false)}
+              >
+                Reject
+              </Button>
+              <Button
+                busy={busy === 'approve'}
+                disabled={busy !== null}
+                onClick={() => review(true)}
+              >
+                Verify as {INVESTOR_CLASS[classification].toLowerCase()}
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
