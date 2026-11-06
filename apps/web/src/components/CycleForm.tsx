@@ -4,7 +4,7 @@ import { FUNDING_SOURCE, isoDate } from '../lib/cycles';
 import { errorMessage } from '../lib/errors';
 import { nairaInput, parseNaira } from '../lib/money';
 import { supabase } from '../lib/supabase';
-import type { Cooperative, Cycle, FundingSource } from '../lib/types';
+import type { Cooperative, Cycle, FundingSource, Programme } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
 import { useToast } from './Toast';
 import { Alert, Button, Field, Input, Select, Textarea } from './ui';
@@ -30,6 +30,7 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
     season: cycle?.season ?? '',
     funding_source: (cycle?.funding_source ?? 'investor') as FundingSource,
     cooperative_id: cycle?.cooperative_id ?? '',
+    programme_id: cycle?.programme_id ?? '',
     target: nairaInput(cycle?.target_amount_kobo),
     budget_per_ha: nairaInput(cycle?.budget_per_hectare_kobo),
     yield_low: cycle?.yield_low_t_per_ha?.toString() ?? '',
@@ -54,6 +55,17 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
     const { data, error } = await supabase.from('cooperatives').select('id, name').order('name');
     if (error) throw error;
     return data as Pick<Cooperative, 'id' | 'name'>[];
+  }, []);
+
+  // Programmes a cycle can join: active ones, plus drafts being set up (and the current one).
+  const programmes = useAsync(async () => {
+    const { data, error } = await supabase
+      .from('programmes')
+      .select('id, code, name, status')
+      .neq('status', 'closed')
+      .order('code');
+    if (error) throw error;
+    return data as Pick<Programme, 'id' | 'code' | 'name' | 'status'>[];
   }, []);
 
   const submit = async (e: FormEvent) => {
@@ -86,6 +98,7 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
         season: form.season.trim(),
         funding_source: form.funding_source,
         cooperative_id: form.cooperative_id || null,
+        programme_id: form.funding_source === 'investor' ? null : form.programme_id || null,
         target_amount_kobo: money('Target amount', form.target, true),
         budget_per_hectare_kobo: money('Budget per hectare', form.budget_per_ha, true),
         yield_low_t_per_ha: num(form.yield_low),
@@ -187,6 +200,23 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
               ))}
             </Select>
           </Field>
+          {form.funding_source !== 'investor' && (
+            <Field
+              label="Programme"
+              hint="The cycle must meet the programme's rules before it can be submitted"
+              className="sm:col-span-2"
+            >
+              <Select value={form.programme_id} onChange={set('programme_id')}>
+                <option value="">Not part of a programme</option>
+                {programmes.data?.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.code} · {p.name}
+                    {p.status === 'draft' ? ' (draft)' : ''}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
         </div>
       </Group>
 

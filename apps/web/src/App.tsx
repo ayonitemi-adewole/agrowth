@@ -36,6 +36,11 @@ const InvestorProfilePage = page(
   'InvestorProfilePage',
 );
 const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
+const ProgrammesPage = page(() => import('./pages/programme/ProgrammesPage'), 'ProgrammesPage');
+const ProgrammeDetailPage = page(
+  () => import('./pages/programme/ProgrammeDetailPage'),
+  'ProgrammeDetailPage',
+);
 
 export function App() {
   if (!isConfigured) return <SetupNeeded />;
@@ -95,6 +100,22 @@ export function App() {
                     element={
                       <RoleGate allow={can.invest}>
                         <InvestorProfilePage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="programmes"
+                    element={
+                      <RoleGate allow={can.readProgrammes}>
+                        <ProgrammesPage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="programmes/:id"
+                    element={
+                      <RoleGate allow={can.readProgrammes}>
+                        <ProgrammeDetailPage />
                       </RoleGate>
                     }
                   />

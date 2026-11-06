@@ -43,6 +43,10 @@ export const can = {
   readInvestors: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
   reviewInvestors: (r?: Role) => has(r, ['admin', 'compliance_officer']),
   editInvestorSettings: (r?: Role) => has(r, ['admin']),
+  /** Government Edition programme dashboards. */
+  readProgrammes: (r?: Role) =>
+    has(r, ['admin', 'programme_manager', 'cycle_manager', 'compliance_officer', 'auditor']),
+  manageProgrammes: (r?: Role) => has(r, ['admin', 'programme_manager']),
   readVendors: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
   editVendors: (r?: Role) => has(r, ['admin', 'field_agent', 'cycle_manager', 'programme_manager']),
   reviewVendors: (r?: Role) => has(r, ['admin', 'compliance_officer']),

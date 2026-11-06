@@ -15,6 +15,7 @@ import {
   COOPERATIVES,
   CYCLES,
   INVESTORS,
+  PROGRAMMES,
   STAFF,
   UNASSIGNED_REJECTED,
   VENDORS,
@@ -214,6 +215,33 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     }
   }
 
+  // Programmes --------------------------------------------------------------------------------
+  log('Designing government programmes');
+  const programmeIds = new Map<string, string>();
+  const pm = as('programmeManager');
+  for (const p of PROGRAMMES) {
+    const [row] = await pm.insert('programmes', {
+      code: p.code,
+      name: p.name,
+      sponsor: p.sponsor,
+      description: p.description,
+      kind: p.kind,
+      budget_kobo: kobo(p.budget),
+      commodities: p.commodities,
+      target_states: p.states,
+      target_lgas: p.lgas,
+      max_hectares_per_farmer: p.maxHectares,
+      require_cooperative: true,
+      input_package: p.inputPackage,
+      max_budget_per_ha_kobo: kobo(p.packagePerHa),
+      repayment_bps: Math.round(p.repaymentPct * 100),
+      starts_on: day(p.starts),
+      ends_on: day(p.ends),
+    });
+    await pm.rpc('activate_programme', { p_programme_id: row.id });
+    programmeIds.set(p.key, row.id as string);
+  }
+
   // Investors ---------------------------------------------------------------------------------
   log('Onboarding investors');
   const investorIds = new Map<string, string>();
@@ -266,6 +294,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   const taken: Record<CoopKey, number> = { zaria: 0, kura: 0, makurdi: 0, ikara: 0 };
   const placement = new Map<string, { cycle: string; position: number }>();
   for (const c of CYCLES) {
+    if (c.sameFarmsAs) continue;
     for (let p = 0; p < c.farmers; p++) {
       placement.set(`${c.coop}:${taken[c.coop]++}`, { cycle: c.key, position: p });
     }
@@ -355,6 +384,11 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     };
   }
 
+  // A past season on the same farms as a later cycle.
+  for (const c of CYCLES) {
+    if (c.sameFarmsAs) farmsByCycle.set(c.key, farmsByCycle.get(c.sameFarmsAs)!);
+  }
+
   // Cycles ----------------------------------------------------------------------------------
   const codeCounts = new Map<string, number>();
   const cycles: SeedResult['cycles'] = [];
@@ -398,6 +432,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       expected_harvest_date: plan(spec.harvest),
       management_fee_bps: Math.round(spec.feePct * 100),
       funder_profit_share_bps: Math.round(spec.funderSharePct * 100),
+      ...(spec.programme ? { programme_id: programmeIds.get(spec.programme) } : {}),
       description: spec.description,
     });
     const cycleId = cycle.id as string;
@@ -731,8 +766,9 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         return id;
       };
 
-      for (const farm of farms) {
-        const total = Math.round(farm.hectares * h.yieldPerHa * 1000 * between(0.9, 1.1));
+      for (const [position, farm] of farms.entries()) {
+        const share = h.shortfall?.position === position ? h.shortfall.share : between(0.9, 1.1);
+        const total = Math.round(farm.hectares * h.yieldPerHa * 1000 * share);
         // One truck carries about 3.5 t.
         const trucks = Math.max(1, Math.ceil(total / 3500));
         const loads = split(total, Array<number>(trucks).fill(1 / trucks), 10);

@@ -20,6 +20,7 @@ export type StaffKey =
   | 'agentBenue'
   | 'compliance'
   | 'manager'
+  | 'programmeManager'
   | 'trustee'
   | 'auditor'
   | 'vendor';
@@ -49,6 +50,12 @@ export const STAFF: StaffSpec[] = [
     role: 'compliance_officer',
     fullName: 'Fatima Bello',
     email: 'compliance@agrowth.test',
+  },
+  {
+    key: 'programmeManager',
+    role: 'programme_manager',
+    fullName: 'Hadiza Abdullahi',
+    email: 'programme@agrowth.test',
   },
   { key: 'trustee', role: 'trustee', fullName: 'Kemi Adebayo', email: 'trustee@agrowth.test' },
   { key: 'auditor', role: 'auditor', fullName: 'Ibrahim Musa', email: 'auditor@agrowth.test' },
@@ -99,6 +106,49 @@ const vendor = (
   registeredBy,
   ...extra,
 });
+
+/** Government Edition programmes. Dates are days from the day the seed runs. */
+export interface ProgrammeSpec {
+  key: string;
+  code: string;
+  name: string;
+  sponsor: string;
+  description: string;
+  kind: 'input_loan' | 'grant';
+  budget: number;
+  commodities: string[];
+  states: string[];
+  lgas: string[];
+  maxHectares: number | null;
+  inputPackage: string;
+  packagePerHa: number;
+  repaymentPct: number;
+  starts: number;
+  ends: number;
+}
+
+export const PROGRAMMES: ProgrammeSpec[] = [
+  {
+    key: 'kano-wheat',
+    code: 'KN-WHEAT-ICP',
+    name: 'Kano Dry-Season Wheat Input Credit',
+    sponsor: 'Kano State Ministry of Agriculture (sample programme)',
+    description:
+      'Input credit for irrigated dry-season wheat. Farmers repay the inputs in grain through the contracted mill; any surplus is theirs.',
+    kind: 'input_loan',
+    budget: 60_000_000,
+    commodities: ['wheat'],
+    states: ['Kano'],
+    lgas: ['Kura', 'Garun Mallam', 'Bunkure'],
+    maxHectares: 5,
+    inputPackage:
+      'Per hectare: 120 kg heat-tolerant seed, 4 bags NPK 20-10-10, 2 bags urea, herbicide, ploughing and irrigation pumping.',
+    packagePerHa: 1_100_000,
+    repaymentPct: 100,
+    starts: -400,
+    ends: 400,
+  },
+];
 
 /**
  * Investor accounts in the Investor Edition portal. A cycle funder whose name matches one of
@@ -389,7 +439,13 @@ export interface CycleSpec {
   funders: [string, number, number][];
   funderKind?: 'investor' | 'programme';
   /** For harvested and settled cycles. */
+  /** The programme (by key) the cycle belongs to. */
+  programme?: string;
+  /** Last season's cycle on the same farms as this one (by key), instead of new farmers. */
+  sameFarmsAs?: string;
   harvestResult?: {
+    /** A farm (by position) that delivered only this share of the yield. */
+    shortfall?: { position: number; share: number };
     yieldPerHa: number;
     pricePerTonne: number;
     deliveryDays: [first: number, last: number];
@@ -933,7 +989,44 @@ export const CYCLES: CycleSpec[] = [
     ],
   },
   {
+    key: 'wheat-programme-settled',
+    stage: 'settled',
+    coop: 'kura',
+    farmers: 0,
+    sameFarmsAs: 'wheat-programme-funded',
+    programme: 'kano-wheat',
+    crop: 'wheat',
+    cropCode: 'WHEAT',
+    fundingSource: 'programme',
+    funderKind: 'programme',
+    budgetPerHa: 1_100_000,
+    yields: [2.5, 3.5, 4.5],
+    prices: [520_000, 620_000, 720_000],
+    feePct: 1,
+    funderSharePct: 0,
+    deadline: -366,
+    start: -356,
+    harvest: -231,
+    description:
+      'Last dry season, the same four farms under the state wheat programme. Three farms beat the estimate; one lost much of its crop to a failed pump and is being followed up.',
+    buyer: BUYERS.wheat,
+    insurer: SHIELD,
+    milestones: wheatMilestones([-363, -310, -240]),
+    funders: [
+      ['Kano Dry-Season Wheat Input Credit', 0.8, -380],
+      ['Kura LGA Counterpart Fund', 0.2, -370],
+    ],
+    harvestResult: {
+      yieldPerHa: 3.6,
+      pricePerTonne: 640_000,
+      deliveryDays: [-228, -220],
+      receiptDay: -205,
+      shortfall: { position: 2, share: 0.35 },
+    },
+  },
+  {
     key: 'wheat-programme-funded',
+    programme: 'kano-wheat',
     stage: 'funded',
     coop: 'kura',
     farmers: 4,
@@ -955,7 +1048,7 @@ export const CYCLES: CycleSpec[] = [
     insurer: SHIELD,
     milestones: wheatMilestones([2, 55, 125]),
     funders: [
-      ['Northern Wheat Input Credit Programme', 0.8, -21],
+      ['Kano Dry-Season Wheat Input Credit', 0.8, -21],
       ['Kura LGA Counterpart Fund', 0.2, -6],
     ],
   },

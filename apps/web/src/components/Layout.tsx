@@ -3,6 +3,7 @@ import {
   BookOpenCheck,
   BriefcaseBusiness,
   Landmark,
+  LandPlot,
   TrendingUp,
   Store,
   TicketCheck,
@@ -78,6 +79,7 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
     title: 'Cycles',
     items: [
       { to: '/cycles', label: 'Funding cycles', icon: Wheat, show: can.readCycles },
+      { to: '/programmes', label: 'Programmes', icon: LandPlot, show: can.readProgrammes },
       { to: '/field', label: 'Field visits', icon: ClipboardCheck, show: can.doFieldVisits },
     ],
   },

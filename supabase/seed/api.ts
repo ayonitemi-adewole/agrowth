@@ -13,6 +13,7 @@ export type Row = Record<string, unknown>;
 export type Role =
   | 'admin'
   | 'cycle_manager'
+  | 'programme_manager'
   | 'field_agent'
   | 'compliance_officer'
   | 'auditor'

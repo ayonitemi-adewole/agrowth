@@ -138,7 +138,7 @@ describe('demo seed', () => {
     const settled = await db.query<{ id: string }>(
       `select id from public.cycles where status = 'settled'`,
     );
-    expect(settled.rows).toHaveLength(2);
+    expect(settled.rows).toHaveLength(3);
     for (const { id } of settled.rows) {
       const cash = await one<{ b: string }>(
         `select coalesce(sum(balance_kobo::bigint), 0)::text as b from public.ledger_balances
@@ -219,6 +219,40 @@ describe('demo seed', () => {
     );
     expect(settings.h).toBe(48);
     expect(result.accounts.filter((a) => a.role === 'investor')).toHaveLength(3);
+  });
+
+  it('runs the wheat programme over two seasons, with repayment and a farm to follow up', async () => {
+    const [{ id: pm }] = (
+      await db.query<{ id: string }>(
+        `select id from public.profiles where email = 'programme@agrowth.test'`,
+      )
+    ).rows;
+    const [{ id: programme }] = (
+      await db.query<{ id: string }>(`select id from public.programmes where code = 'KN-WHEAT-ICP'`)
+    ).rows;
+    const d = await asUser(db, pm, async (tx) => {
+      const { rows } = await tx.query<{
+        d: {
+          programme: { status: string };
+          totals: {
+            farmers: number;
+            due_kobo: string;
+            recovered_kobo: string;
+            under_delivered: number;
+          };
+          cycles: { status: string }[];
+          under_delivered: { farmer_name: string }[];
+        };
+      }>(`select public.programme_dashboard($1) as d`, [programme]);
+      return rows[0].d;
+    });
+    expect(d.programme.status).toBe('active');
+    expect(d.cycles.map((c) => c.status).sort()).toEqual(['funded', 'settled']);
+    expect(d.totals.farmers).toBe(4);
+    expect(BigInt(d.totals.due_kobo)).toBeGreaterThan(0n);
+    expect(d.totals.recovered_kobo).toBe(d.totals.due_kobo);
+    expect(d.totals.under_delivered).toBe(1);
+    expect(d.under_delivered).toHaveLength(1);
   });
 
   it('gives finished cycles their real, past planned dates', async () => {

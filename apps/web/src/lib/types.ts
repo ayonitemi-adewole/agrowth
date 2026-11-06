@@ -129,6 +129,7 @@ export interface Cycle {
   /** Settlement terms, in basis points (100 = 1%). */
   management_fee_bps: number;
   funder_profit_share_bps: number;
+  programme_id: string | null;
   harvest_completed_at: string | null;
   settlement_started_at: string | null;
   settled_at: string | null;
@@ -610,4 +611,128 @@ export interface InvestmentPledge {
   cooling_off_ends_at: string;
   pay_by: string;
   contribution_id: string | null;
+}
+
+// ---------- Government Edition ----------
+
+export type ProgrammeKind = 'input_loan' | 'grant';
+export type ProgrammeStatus = 'draft' | 'active' | 'closed';
+export type RepaymentMode = 'produce' | 'cash' | 'either';
+
+export interface Programme {
+  id: string;
+  code: string;
+  name: string;
+  sponsor: string;
+  description: string | null;
+  kind: ProgrammeKind;
+  status: ProgrammeStatus;
+  budget_kobo: Money;
+  commodities: string[];
+  target_states: string[];
+  target_lgas: string[];
+  max_hectares_per_farmer: number | null;
+  require_cooperative: boolean;
+  input_package: string | null;
+  max_budget_per_ha_kobo: Money | null;
+  repayment_bps: number;
+  repayment_mode: RepaymentMode;
+  starts_on: string;
+  ends_on: string;
+  activated_at: string | null;
+  closed_at: string | null;
+}
+
+/** Totals for a programme or one slice of it. Amounts in kobo, as strings. */
+export interface ProgrammeFigures {
+  farmers: number;
+  women: number;
+  farms: number;
+  hectares: number;
+  committed_kobo: string;
+  inputs_kobo: string;
+  cash_kobo: string;
+  delivered_kg: number;
+  harvested_hectares: number;
+  due_kobo: string;
+  recovered_kobo: string;
+  under_delivered: number;
+}
+
+export type ProgrammeSummary = ProgrammeFigures &
+  Pick<
+    Programme,
+    'id' | 'code' | 'name' | 'sponsor' | 'kind' | 'status' | 'commodities' | 'target_states'
+  > & {
+    budget_kobo: string;
+    starts_on: string;
+    ends_on: string;
+    cycles: number;
+    committed_kobo: string;
+  };
+
+export interface ProgrammeDashboard {
+  programme: Programme;
+  totals: ProgrammeFigures;
+  budget_committed_kobo: string;
+  by_state: (ProgrammeFigures & { key: string })[];
+  by_lga: (ProgrammeFigures & { key: string })[];
+  by_ward: (ProgrammeFigures & { key: string })[];
+  by_commodity: (ProgrammeFigures & { key: string })[];
+  by_cooperative: (ProgrammeFigures & { key: string })[];
+  cycles: {
+    id: string;
+    code: string;
+    crop: string;
+    season: string;
+    status: CycleStatus;
+    funding_source: FundingSource;
+    target_kobo: string;
+    programme_kobo: string;
+  }[];
+  under_delivered: {
+    farmer_id: string;
+    farmer_name: string;
+    cooperative: string;
+    lga: string;
+    ward: string;
+    cycle_id: string;
+    cycle_code: string;
+    hectares: number;
+    delivered_kg: number;
+    low_kg: number;
+  }[];
+  agents: {
+    agent_id: string;
+    name: string;
+    visits: number;
+    passed: number;
+    gps_failed: number;
+    farms: number;
+    avg_days_to_visit: number | null;
+  }[];
+  visits_outstanding: number;
+}
+
+/** One beneficiary farm, for the audit export. */
+export interface ProgrammeBeneficiary {
+  cycle_code: string;
+  crop: string;
+  cycle_status: CycleStatus;
+  farmer_id: string;
+  farmer_name: string;
+  gender: Gender | null;
+  state: string;
+  lga: string;
+  ward: string;
+  cooperative: string;
+  hectares: number;
+  committed_kobo: number;
+  inputs_kobo: number;
+  cash_kobo: number;
+  delivered_kg: number;
+  low_kg: number;
+  season_over: boolean;
+  due_kobo: number;
+  recovered_kobo: number;
 }

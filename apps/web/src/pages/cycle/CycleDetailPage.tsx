@@ -34,7 +34,8 @@ export function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const state = useCycleData(id!);
   // The trustee doesn't see the farmer registry, so it gets no Farms tab.
-  const seesFarms = can.readRegistry(useAuth().profile?.role);
+  const role = useAuth().profile?.role;
+  const seesFarms = can.readRegistry(role);
   // The open tab lives in the URL (?tab=milestones), so it survives a reload and can be linked to.
   const [params, setParams] = useSearchParams();
   const fromUrl = params.get('tab') as Tab | null;
@@ -80,6 +81,17 @@ export function CycleDetailPage() {
         description={
           <>
             <span className="font-mono">{cycle.code}</span> · {FUNDING_SOURCE[cycle.funding_source]}
+            {cycle.programme_id && can.readProgrammes(role) && (
+              <>
+                {' · '}
+                <Link
+                  to={`/programmes/${cycle.programme_id}`}
+                  className="font-medium text-brand-700 hover:underline"
+                >
+                  View programme
+                </Link>
+              </>
+            )}
           </>
         }
       />
