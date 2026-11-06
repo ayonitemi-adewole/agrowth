@@ -38,8 +38,22 @@ const ROLE_HINT: Partial<Record<Role, string>> = {
   auditor: 'Reads the ledger',
 };
 
-/** One-click sign-in buttons for the demo accounts listed in .env.local. */
-export function DemoSignIn() {
+/** What each role does, for visitors to a hosted demo. */
+const ROLE_DETAIL: Partial<Record<Role, string>> = {
+  admin: 'Manages users and their roles',
+  field_agent: 'Enrols farmers, maps farms, records GPS-checked visits',
+  compliance_officer: 'Reviews KYC and approves cycles',
+  cycle_manager: 'Builds cycles and instructs staged releases',
+  programme_manager: 'Runs government programme cycles',
+  trustee: 'Confirms deposits, payments and payouts',
+  auditor: 'Read-only view of every record and the ledger',
+};
+
+/**
+ * One-click sign-in buttons for the demo accounts listed in .env.local. `detailed` is the
+ * hosted demo's version: one role per row, with what that role does.
+ */
+export function DemoSignIn({ detailed = false }: { detailed?: boolean }) {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,13 +72,15 @@ export function DemoSignIn() {
   };
 
   return (
-    <div className="mt-8">
-      <div className="mb-3 flex items-center gap-3 text-xs font-medium text-zinc-400">
-        <span className="h-px flex-1 bg-zinc-200" />
-        Demo accounts
-        <span className="h-px flex-1 bg-zinc-200" />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
+    <div className={detailed ? undefined : 'mt-8'}>
+      {!detailed && (
+        <div className="mb-3 flex items-center gap-3 text-xs font-medium text-zinc-400">
+          <span className="h-px flex-1 bg-zinc-200" />
+          Demo accounts
+          <span className="h-px flex-1 bg-zinc-200" />
+        </div>
+      )}
+      <div className={cx('grid gap-2', !detailed && 'grid-cols-2')}>
         {demo.accounts.map((a) => {
           const Icon = ROLE_ICON[a.role] ?? UserRound;
           return (
@@ -88,8 +104,8 @@ export function DemoSignIn() {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-medium text-zinc-900">{a.label}</span>
-                <span className="block truncate text-xs text-zinc-500">
-                  {ROLE_HINT[a.role] ?? a.email}
+                <span className={cx('block text-xs text-zinc-500', !detailed && 'truncate')}>
+                  {(detailed ? ROLE_DETAIL[a.role] : ROLE_HINT[a.role]) ?? a.email}
                 </span>
               </span>
             </button>

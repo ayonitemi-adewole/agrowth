@@ -32,8 +32,9 @@ import { formatDate } from '../../lib/format';
 import { formatNaira, nairaInput, parseNaira, toKobo } from '../../lib/money';
 import { can } from '../../lib/roles';
 import { supabase } from '../../lib/supabase';
-import type { Disbursement, Milestone, PayeeKind } from '../../lib/types';
+import type { Disbursement, FieldVisit, Milestone, PayeeKind } from '../../lib/types';
 import type { TabProps } from './useCycleData';
+import { VisitEvidence } from './VisitEvidence';
 
 export function MilestonesTab({ data, reload }: TabProps) {
   const role = useAuth().profile?.role;
@@ -240,6 +241,7 @@ function MilestoneCard({
 /** Each farm's latest visit for this milestone. */
 function Verification({ milestone: m, data }: { milestone: Milestone; data: TabProps['data'] }) {
   const role = useAuth().profile?.role;
+  const [shown, setShown] = useState<FieldVisit | null>(null);
   const rows = data.farms.map((farm) => {
     const latest = data.visits.find(
       (v) =>
@@ -281,6 +283,11 @@ function Verification({ milestone: m, data }: { milestone: Milestone; data: TabP
                     : failReason(latest)}
               </p>
             </div>
+            {latest && (
+              <Button variant="ghost" size="sm" onClick={() => setShown(latest)}>
+                Evidence
+              </Button>
+            )}
             {canVisit && (!latest || !latest.passed) && (
               <Link to={`/field/visit?milestone=${m.id}&farm=${farm.id}`}>
                 <Button variant="secondary" size="sm">
@@ -291,6 +298,13 @@ function Verification({ milestone: m, data }: { milestone: Milestone; data: TabP
           </li>
         ))}
       </ul>
+      <VisitEvidence
+        visit={shown}
+        farm={data.farms.find((f) => f.id === shown?.farm_id)}
+        milestone={m}
+        history={data.visits.filter((v) => v.milestone_id === m.id && v.farm_id === shown?.farm_id)}
+        onClose={() => setShown(null)}
+      />
     </div>
   );
 }

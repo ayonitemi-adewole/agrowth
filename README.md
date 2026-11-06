@@ -88,9 +88,65 @@ Reload the app. From then on, use the **Users** page to give other staff their r
 
 > **Email confirmation:** by default Supabase emails a confirmation link on sign-up. For quick local testing you can turn it off in **Authentication → Sign In / Providers → Email → Confirm email**. Turn it back on before real users join.
 
+## The demo portfolio (one command)
+
+For showing Agrowth to customers, one command fills a Supabase project with a lived-in portfolio, so every screen has something real on it:
+
+- 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected
+- 8 funding cycles, one at every stage:
+
+| Stage             | Cycle                        | What it shows                                                              |
+| ----------------- | ---------------------------- | -------------------------------------------------------------------------- |
+| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram |
+| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%   |
+| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live              |
+| In progress       | Zaria maize, dry season      | A release blocked because one visit checked in 340 m outside the farm      |
+| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                       |
+| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                             |
+| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                               |
+| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                            |
+
+Every record goes through the same database functions and security rules as the app, signed in as the demo user whose job it is. The seed is also a test (`supabase/tests/seed.test.ts`), so it can't drift from the rules.
+
+**Use a separate Supabase project for this.** The demo accounts share one password, and the records are permanent: the ledger and history are append-only, so only a database reset removes them.
+
+1. Create a new Supabase project (see [Getting started](#getting-started)), link it and push the migrations:
+   ```bash
+   npx supabase link --project-ref YOUR_DEMO_PROJECT_ID
+   npx supabase db push
+   ```
+2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), plus a password for the demo accounts. The file is git-ignored; never commit the secret key.
+3. Run:
+   ```bash
+   npm run seed:demo
+   ```
+   It asks you to confirm, takes a few minutes, and prints the accounts and the lines to paste into `apps/web/.env.local` for one-click sign-in.
+
+The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test` and `admin@agrowth.test`.
+
+Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npx supabase db reset --linked`, then `npm run seed:demo`.
+
+The field visit photos are labelled illustrations with the visit's GPS stamp, not real photographs.
+
+### A hosted demo link
+
+To give prospects a link they can open themselves, deploy the web app against the demo project. The repo includes a `vercel.json`, so on [Vercel](https://vercel.com): **Add New → Project**, import this repository, and set these environment variables:
+
+| Variable                        | Value                                                                                                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                   |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                |
+| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                   |
+| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                              |
+| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test` |
+
+`VITE_DEMO_MODE=true` makes a production build keep the role buttons and **Simulate GPS at this farm**, lead the sign-in page with "Explore the demo", hide self sign-up, and show a "sample portfolio" banner. A build without it contains no demo accounts or passwords.
+
+Leave the admin account out of a public demo: an admin can change other accounts' roles. Visitors share one environment and see each other's changes; reset and re-seed before an important meeting.
+
 ## Running a demo cycle
 
-The Phase 1 gate is "a demo cycle runs". You need several accounts, because the platform separates duties on purpose: whoever builds a cycle can't approve it, and only the trustee can confirm money. Sign up each one, then give them roles on the **Users** page.
+This walks one cycle through its whole life by hand, on an empty project. (For a ready-made portfolio, use the [demo seed](#the-demo-portfolio-one-command) instead.) You need several accounts, because the platform separates duties on purpose: whoever builds a cycle can't approve it, and only the trustee can confirm money. Sign up each one, then give them roles on the **Users** page.
 
 | Account            | Role                 | Does                                                        | Email                       |
 | ------------------ | -------------------- | ----------------------------------------------------------- | --------------------------- |
@@ -323,6 +379,7 @@ npm test
 This runs:
 
 - **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
 - **Web tests** (`apps/web`) — money, map and error helpers.
 
 ## Repository layout
@@ -337,6 +394,7 @@ apps/
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
   migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement
+  seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
 docs/                  Concept and design documents

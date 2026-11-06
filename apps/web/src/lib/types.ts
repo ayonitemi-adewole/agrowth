@@ -234,6 +234,9 @@ export interface FieldVisit {
   milestone_id: string;
   agent_id: string;
   visited_at: string;
+  /** Where the agent checked in. */
+  lon: number;
+  lat: number;
   gps_accuracy_m: number;
   distance_from_boundary_m: number;
   gps_ok: boolean;

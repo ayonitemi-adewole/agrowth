@@ -1,6 +1,6 @@
-import { CalendarDays, MapPinned, Plus, Wheat } from 'lucide-react';
+import { CalendarDays, MapPin, MapPinned, Plus, Wheat } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { CycleForm } from '../components/CycleForm';
 import { CycleStatusBadge } from '../components/StatusBadges';
@@ -16,7 +16,7 @@ import {
 } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { formatDate, formatHectares, titleCase } from '../lib/format';
-import { formatNaira, ratio } from '../lib/money';
+import { formatNaira, ratio, toKobo } from '../lib/money';
 import { can } from '../lib/roles';
 import { supabase } from '../lib/supabase';
 import type { CycleStatus, CycleSummary } from '../lib/types';
@@ -34,20 +34,47 @@ const FILTERS: Record<Filter, CycleStatus[] | null> = {
 
 export function CyclesPage() {
   const { profile } = useAuth();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [params, setParams] = useSearchParams();
+  const fromUrl = params.get('stage') as Filter | null;
+  const filter: Filter = fromUrl && fromUrl in FILTERS ? fromUrl : 'all';
+  const setFilter = (f: Filter) => setParams(f === 'all' ? {} : { stage: f }, { replace: true });
   const [creating, setCreating] = useState(false);
 
   const data = useAsync(async () => {
-    const [cycles, funding] = await Promise.all([
+    const [cycles, funding, released, returned, coops] = await Promise.all([
       supabase.from('cycle_summaries').select('*').order('created_at', { ascending: false }),
       supabase.from('cycle_funding').select('cycle_id, raised_kobo'),
+      supabase.from('disbursements').select('cycle_id, amount_kobo').eq('status', 'executed'),
+      supabase
+        .from('settlement_payouts')
+        .select('cycle_id, amount_kobo')
+        .eq('kind', 'funder')
+        .eq('status', 'executed'),
+      // The trustee can't read the registry; cards then just leave the place out.
+      supabase.from('cooperatives').select('id, name, lga, state'),
     ]);
     if (cycles.error) throw cycles.error;
     if (funding.error) throw funding.error;
+    if (released.error) throw released.error;
+    if (returned.error) throw returned.error;
+    const sum = (rows: { cycle_id: string; amount_kobo: string | number }[]) => {
+      const m = new Map<string, bigint>();
+      for (const r of rows) m.set(r.cycle_id, (m.get(r.cycle_id) ?? 0n) + toKobo(r.amount_kobo));
+      return m;
+    };
     const raised = new Map(
-      funding.data.map((f) => [f.cycle_id as string, f.raised_kobo as number]),
+      funding.data.map((f) => [f.cycle_id as string, toKobo(f.raised_kobo as string)]),
     );
-    return (cycles.data as CycleSummary[]).map((c) => ({ ...c, raised: raised.get(c.id) ?? 0 }));
+    const releasedBy = sum(released.data);
+    const returnedBy = sum(returned.data);
+    const place = new Map((coops.data ?? []).map((c) => [c.id as string, `${c.lga}, ${c.state}`]));
+    return (cycles.data as CycleSummary[]).map((c) => ({
+      ...c,
+      raised: raised.get(c.id) ?? 0n,
+      released: releasedBy.get(c.id) ?? 0n,
+      returned: returnedBy.get(c.id) ?? 0n,
+      place: c.cooperative_id ? place.get(c.cooperative_id) : undefined,
+    }));
   }, []);
 
   const all = data.data ?? [];
@@ -124,17 +151,12 @@ export function CyclesPage() {
                 <CycleStatusBadge status={c.status} />
               </div>
 
-              <div className="mt-5">
-                <div className="flex items-baseline justify-between text-sm">
-                  <span className="font-semibold text-zinc-900 tabular-nums">
-                    {formatNaira(c.raised, { compact: true })}
-                  </span>
-                  <span className="text-zinc-500">
-                    of {formatNaira(c.target_amount_kobo, { compact: true })}
-                  </span>
-                </div>
-                <Progress value={ratio(c.raised, c.target_amount_kobo)} className="mt-2" />
-              </div>
+              {c.place && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-zinc-500">
+                  <MapPin className="size-3.5" aria-hidden /> {c.place}
+                </p>
+              )}
+              <CardMetric cycle={c} />
 
               <div className="mt-5 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-zinc-950/5 pt-4 text-xs text-zinc-500">
                 <span className="flex items-center gap-1.5">
@@ -164,4 +186,57 @@ export function CyclesPage() {
       </Modal>
     </>
   );
+}
+
+type CardCycle = CycleSummary & { raised: bigint; released: bigint; returned: bigint };
+
+/** The one number that matters at this stage of the cycle. */
+function CardMetric({ cycle: c }: { cycle: CardCycle }) {
+  const target = toKobo(c.target_amount_kobo);
+  const line = (value: bigint, label: string, of?: bigint) => (
+    <div className="mt-5">
+      <div className="flex items-baseline justify-between text-sm">
+        <span className="font-semibold text-zinc-900 tabular-nums">
+          {formatNaira(value, { compact: true })}
+          <span className="ml-1.5 font-normal text-zinc-500">{label}</span>
+        </span>
+        {of !== undefined && (
+          <span className="text-zinc-500">of {formatNaira(of, { compact: true })}</span>
+        )}
+      </div>
+      {of !== undefined && <Progress value={ratio(value, of)} className="mt-2" />}
+    </div>
+  );
+
+  switch (c.status) {
+    case 'draft':
+    case 'pending_approval':
+      return line(target, 'target');
+    case 'open_for_funding':
+    case 'funded':
+      return line(c.raised, 'raised', target);
+    case 'in_progress':
+    case 'harvested':
+      return line(c.released, 'released to farms', target);
+    case 'settled': {
+      const raised = c.raised > 0n ? c.raised : target;
+      const pct = Number(((c.returned - raised) * 10000n) / raised) / 100;
+      return (
+        <div className="mt-5 flex items-baseline justify-between text-sm">
+          <span className="font-semibold text-zinc-900 tabular-nums">
+            {formatNaira(c.returned, { compact: true })}
+            <span className="ml-1.5 font-normal text-zinc-500">paid to funders</span>
+          </span>
+          <span
+            className={`font-semibold tabular-nums ${pct < 0 ? 'text-red-700' : 'text-brand-700'}`}
+          >
+            {pct < 0 ? '−' : '+'}
+            {Math.abs(pct).toFixed(1)}%
+          </span>
+        </div>
+      );
+    }
+    default:
+      return line(c.raised, 'refunded');
+  }
 }
