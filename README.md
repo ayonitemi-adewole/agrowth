@@ -112,13 +112,13 @@ Every record goes through the same database functions and security rules as the 
 
 **Use a separate Supabase project for this.** The demo accounts share one password, and the records are permanent: the ledger and history are append-only, so only a database reset removes them.
 
-1. Create a new Supabase project (see [Getting started](#getting-started)), link it and push the migrations:
+1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
+2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
+3. Create the tables, rules and functions:
    ```bash
-   npx supabase link --project-ref YOUR_DEMO_PROJECT_ID
-   npx supabase db push
+   npm run demo:push
    ```
-2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), plus a password for the demo accounts. The file is git-ignored; never commit the secret key.
-3. Run:
+4. Run:
    ```bash
    npm run seed:demo
    ```
@@ -126,7 +126,7 @@ Every record goes through the same database functions and security rules as the 
 
 The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
 
-Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npx supabase db reset --linked`, then `npm run seed:demo`.
+Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npm run demo:reset` (it asks you to type `reset`), then `npm run seed:demo`. After adding a migration, `npm run demo:push` applies it to the demo project. These commands only ever touch the demo project; never use `--linked` or `--remote` on their own for the demo, because they point at your development project.
 
 The field visit photos are labelled illustrations with the visit's GPS stamp, not real photographs.
 

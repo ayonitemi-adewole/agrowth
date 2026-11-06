@@ -16,7 +16,9 @@
     "format:check": "prettier --check .",
     "dev": "npm run dev -w @agrowth/web",
     "dev:phone": "npm run dev:phone -w @agrowth/web",
-    "seed:demo": "npm run seed:demo -w @agrowth/database --"
+    "seed:demo": "npm run seed:demo -w @agrowth/database --",
+    "demo:push": "npm run demo:push -w @agrowth/database --",
+    "demo:reset": "npm run demo:reset -w @agrowth/database --"
   },
   "devDependencies": {
     "prettier": "^3.9.10"
