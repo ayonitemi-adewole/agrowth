@@ -1,9 +1,11 @@
 import { Link, useParams, useSearchParams } from 'react-router';
+import { useAuth } from '../../auth/AuthProvider';
 import { CycleStatusBadge } from '../../components/StatusBadges';
 import { Alert, EmptyState, PageHeader, Skeleton, Tabs } from '../../components/ui';
 import { FUNDING_SOURCE } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { titleCase } from '../../lib/format';
+import { can } from '../../lib/roles';
 import { ContractsTab } from './ContractsTab';
 import { FarmsTab } from './FarmsTab';
 import { FundingTab } from './FundingTab';
@@ -31,6 +33,8 @@ type Tab = (typeof TABS)[number];
 export function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const state = useCycleData(id!);
+  // The trustee doesn't see the farmer registry, so it gets no Farms tab.
+  const seesFarms = can.readRegistry(useAuth().profile?.role);
   // The open tab lives in the URL (?tab=milestones), so it survives a reload and can be linked to.
   const [params, setParams] = useSearchParams();
   const fromUrl = params.get('tab') as Tab | null;
@@ -85,7 +89,9 @@ export function CycleDetailPage() {
         onChange={setTab}
         tabs={[
           { id: 'overview', label: 'Overview' },
-          { id: 'farms', label: 'Farms', count: data.farms.length },
+          ...(seesFarms
+            ? [{ id: 'farms' as const, label: 'Farms', count: data.farms.length }]
+            : []),
           { id: 'milestones', label: 'Milestones', count: data.milestones.length },
           {
             id: 'contracts',

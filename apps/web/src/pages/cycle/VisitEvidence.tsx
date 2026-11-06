@@ -1,4 +1,5 @@
 import { BadgeCheck, ImageOff, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { FarmMap } from '../../components/FarmMap';
 import { Badge, DescriptionList, Modal, Skeleton } from '../../components/ui';
 import { signedUrls } from '../../lib/cycles';
@@ -52,6 +53,13 @@ function Evidence({
   history: FieldVisit[];
 }) {
   const photos = useAsync(() => signedUrls('field-photos', v.photo_paths), [v.id]);
+  // The dialog opens after this renders. A map created while it's still hidden has no size and
+  // draws nothing, so the map waits one frame, until the dialog is on screen.
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setOnScreen(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const inside = Number(v.distance_from_boundary_m) === 0;
   const earlier = history.filter((h) => h.id !== v.id);
 
@@ -90,14 +98,18 @@ function Evidence({
             </div>
           )}
         </div>
-        <FarmMap
-          farms={[farm]}
-          highlightId={farm.id}
-          position={{ lon: v.lon, lat: v.lat, accuracy: Number(v.gps_accuracy_m) }}
-          positionLabel="Check-in"
-          fitPosition
-          className="aspect-[4/3] w-full rounded-xl ring-1 ring-zinc-950/5"
-        />
+        {onScreen ? (
+          <FarmMap
+            farms={[farm]}
+            highlightId={farm.id}
+            position={{ lon: v.lon, lat: v.lat, accuracy: Number(v.gps_accuracy_m) }}
+            positionLabel="Check-in"
+            fitPosition
+            className="aspect-[4/3] w-full rounded-xl ring-1 ring-zinc-950/5"
+          />
+        ) : (
+          <Skeleton className="aspect-[4/3] rounded-xl" />
+        )}
       </div>
       {photos.data && photos.data.length > 1 && (
         <p className="text-xs text-zinc-500">

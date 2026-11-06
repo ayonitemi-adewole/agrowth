@@ -482,7 +482,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     const visit = async (farm: Farm, m: number, pass: boolean) => {
       const milestoneId = milestoneIds[m];
       const accuracy = 3 + Math.floor(rand() * 6);
-      // A failed visit: the agent checked in from the village, about 340 m away.
+      // A failed visit: the agent checked in from the village, about 340 m from the farm's centre.
       const lon = farm.centre[0] + (pass ? (rand() - 0.5) * 0.0001 : 0.0031);
       const lat = farm.centre[1] + (pass ? (rand() - 0.5) * 0.0001 : 0.0004);
       const path = `${milestoneId}/${farm.farmId}/${crypto.randomUUID()}-photo.svg`;

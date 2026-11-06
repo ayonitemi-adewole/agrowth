@@ -97,16 +97,16 @@ For showing Agrowth to customers, one command fills a Supabase project with a li
 - 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected
 - 8 funding cycles, one at every stage:
 
-| Stage             | Cycle                        | What it shows                                                                                       |
-| ----------------- | ---------------------------- | --------------------------------------------------------------------------------------------------- |
-| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram                          |
-| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%                            |
-| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live                                       |
-| In progress       | Zaria maize, dry season      | Inputs paid as vouchers redeemed at an agro-dealer; a release blocked by a visit 340 m off the farm |
-| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                                                |
-| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                                                      |
-| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                                                        |
-| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                                                     |
+| Stage             | Cycle                        | What it shows                                                                                              |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram                                 |
+| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%                                   |
+| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live                                              |
+| In progress       | Zaria maize, dry season      | Inputs paid as vouchers redeemed at an agro-dealer; a release blocked by a check-in 270 m outside the farm |
+| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                                                       |
+| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                                                             |
+| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                                                               |
+| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                                                            |
 
 Every record goes through the same database functions and security rules as the app, signed in as the demo user whose job it is. The seed is also a test (`supabase/tests/seed.test.ts`), so it can't drift from the rules.
 
