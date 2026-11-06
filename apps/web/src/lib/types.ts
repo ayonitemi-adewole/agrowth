@@ -97,7 +97,7 @@ export type MilestoneStatus =
 export type PriceTerms = 'fixed' | 'floor' | 'formula';
 export type InsuranceCover = 'area_yield' | 'weather_index' | 'multi_peril';
 export type CropCondition = 'good' | 'fair' | 'poor' | 'failed';
-export type PayeeKind = 'input_vendor' | 'service_provider' | 'farmer_cash';
+export type PayeeKind = 'input_vendor' | 'service_provider' | 'farmer_cash' | 'input_voucher';
 
 /** Money columns come back from the database as numbers; treat them via lib/money. */
 type Money = number | string;
@@ -341,4 +341,80 @@ export interface LedgerBalance {
   type: 'asset' | 'liability' | 'equity' | 'income' | 'expense';
   cycle_id: string | null;
   balance_kobo: string;
+}
+
+export type VendorKind = 'agro_dealer' | 'service_provider';
+export type VendorStatus = 'pending' | 'approved' | 'suspended';
+
+export interface Vendor {
+  id: string;
+  name: string;
+  kind: VendorKind;
+  registration_number: string | null;
+  contact_phone: string;
+  contact_email: string | null;
+  state: string;
+  lga: string;
+  address: string | null;
+  bank_name: string;
+  account_number: string;
+  account_name: string;
+  status: VendorStatus;
+  status_note: string | null;
+  reviewed_at: string | null;
+  user_id: string | null;
+  registered_by: string;
+  created_at: string;
+}
+
+export type VoucherStatus = 'active' | 'redeemed' | 'closed';
+
+export interface Voucher {
+  id: string;
+  code: string;
+  cycle_id: string;
+  milestone_id: string;
+  disbursement_id: string;
+  farm_id: string;
+  farmer_id: string;
+  purpose: string;
+  value_kobo: Money;
+  redeemed_kobo: Money;
+  status: VoucherStatus;
+  expires_on: string;
+  issued_at: string;
+  closed_at: string | null;
+  close_reason: string | null;
+}
+
+export interface VoucherRedemption {
+  id: string;
+  voucher_id: string;
+  vendor_id: string;
+  cycle_id: string;
+  amount_kobo: Money;
+  items: string;
+  redeemed_at: string;
+  paid_at: string | null;
+  trustee_reference: string | null;
+  voided_at: string | null;
+  void_reason: string | null;
+}
+
+/** What check_voucher and redeem_voucher return at the counter. */
+export interface VoucherCheck {
+  ok: boolean;
+  message?: string;
+  voucher_id?: string;
+  code?: string;
+  farmer?: string;
+  cooperative?: string | null;
+  cycle_code?: string;
+  crop?: string;
+  purpose?: string;
+  value_kobo?: string;
+  remaining_kobo?: string;
+  expires_on?: string;
+  unusable_reason?: string | null;
+  redemption_id?: string;
 }

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
-import { AuthProvider } from './auth/AuthProvider';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireStaff, RoleGate } from './components/Guards';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
@@ -24,6 +24,9 @@ const CycleDetailPage = page(() => import('./pages/cycle/CycleDetailPage'), 'Cyc
 const FieldWorkPage = page(() => import('./pages/FieldWorkPage'), 'FieldWorkPage');
 const FieldVisitPage = page(() => import('./pages/FieldVisitPage'), 'FieldVisitPage');
 const LedgerPage = page(() => import('./pages/LedgerPage'), 'LedgerPage');
+const VendorsPage = page(() => import('./pages/VendorsPage'), 'VendorsPage');
+const RedeemPage = page(() => import('./pages/RedeemPage'), 'RedeemPage');
+const VoucherSlipsPage = page(() => import('./pages/VoucherSlipsPage'), 'VoucherSlipsPage');
 
 export function App() {
   if (!isConfigured) return <SetupNeeded />;
@@ -36,8 +39,32 @@ export function App() {
               <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
               <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
               <Route element={<RequireStaff />}>
+                <Route
+                  path="cycles/:id/vouchers/print"
+                  element={
+                    <RoleGate allow={can.readCycles}>
+                      <VoucherSlipsPage />
+                    </RoleGate>
+                  }
+                />
                 <Route element={<Layout />}>
-                  <Route index element={<OverviewPage />} />
+                  <Route index element={<Home />} />
+                  <Route
+                    path="vendors"
+                    element={
+                      <RoleGate allow={can.readVendors}>
+                        <VendorsPage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="redeem"
+                    element={
+                      <RoleGate allow={can.redeemVouchers}>
+                        <RedeemPage />
+                      </RoleGate>
+                    }
+                  />
                   <Route
                     path="cooperatives"
                     element={
@@ -135,6 +162,12 @@ export function App() {
       </ToastProvider>
     </AuthProvider>
   );
+}
+
+/** Vendors only use the shop counter; everyone else starts on the overview. */
+function Home() {
+  const role = useAuth().profile?.role;
+  return can.useStaffApp(role) ? <OverviewPage /> : <Navigate to="/redeem" replace />;
 }
 
 function SetupNeeded() {

@@ -14,6 +14,7 @@ import { MilestonesTab } from './MilestonesTab';
 import { OverviewTab } from './OverviewTab';
 import { SettlementTab } from './SettlementTab';
 import { useCycleData } from './useCycleData';
+import { VouchersTab } from './VouchersTab';
 
 type Tab =
   | 'overview'
@@ -21,6 +22,7 @@ type Tab =
   | 'milestones'
   | 'contracts'
   | 'funding'
+  | 'vouchers'
   | 'harvest'
   | 'settlement'
   | 'history';
@@ -48,6 +50,8 @@ export function CycleDetailPage() {
   const { cycle } = data;
   const props = { data, reload: state.reload };
   const underway = ['in_progress', 'harvested', 'settled'].includes(cycle.status);
+  const usesVouchers =
+    data.vouchers.length > 0 || data.disbursements.some((d) => d.payee_kind === 'input_voucher');
 
   return (
     <>
@@ -83,6 +87,9 @@ export function CycleDetailPage() {
             count: data.offtake.length + data.insurance.length,
           },
           { id: 'funding', label: 'Funding', count: data.contributions.length },
+          ...(usesVouchers
+            ? [{ id: 'vouchers' as const, label: 'Vouchers', count: data.vouchers.length }]
+            : []),
           ...(underway
             ? [
                 {
@@ -103,6 +110,7 @@ export function CycleDetailPage() {
         {tab === 'milestones' && <MilestonesTab {...props} />}
         {tab === 'contracts' && <ContractsTab {...props} />}
         {tab === 'funding' && <FundingTab {...props} />}
+        {tab === 'vouchers' && <VouchersTab {...props} />}
         {tab === 'harvest' && <HarvestTab {...props} />}
         {tab === 'settlement' && <SettlementTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}

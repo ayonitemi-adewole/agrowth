@@ -15,7 +15,7 @@ export function RequireStaff() {
   if (loading) return <Spinner />;
   if (!session) return <Navigate to="/sign-in" replace state={{ from: location }} />;
 
-  if (!profile || !profile.is_active || !can.useStaffApp(profile.role)) {
+  if (!profile || !profile.is_active || !can.useApp(profile.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-md space-y-6">

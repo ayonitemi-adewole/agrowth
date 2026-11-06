@@ -1,5 +1,7 @@
 import {
   BookOpenCheck,
+  Store,
+  TicketCheck,
   ClipboardCheck,
   Home,
   LogOut,
@@ -44,12 +46,19 @@ interface NavItem {
 }
 
 const SECTIONS: { title?: string; items: NavItem[] }[] = [
-  { items: [{ to: '/', label: 'Overview', icon: Home, show: () => true }] },
+  { items: [{ to: '/', label: 'Overview', icon: Home, show: can.useStaffApp }] },
+  {
+    title: 'Shop counter',
+    items: [
+      { to: '/redeem', label: 'Redeem vouchers', icon: TicketCheck, show: can.redeemVouchers },
+    ],
+  },
   {
     title: 'Registry',
     items: [
       { to: '/cooperatives', label: 'Cooperatives', icon: Warehouse, show: can.readRegistry },
       { to: '/farmers', label: 'Farmers', icon: UsersRound, show: can.readRegistry },
+      { to: '/vendors', label: 'Vendors', icon: Store, show: can.readVendors },
     ],
   },
   {

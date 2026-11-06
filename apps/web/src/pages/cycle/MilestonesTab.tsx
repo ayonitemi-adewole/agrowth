@@ -6,6 +6,7 @@ import {
   Landmark,
   Pencil,
   Plus,
+  Ticket,
   Trash2,
   XCircle,
 } from 'lucide-react';
@@ -26,7 +27,7 @@ import {
   Select,
   Textarea,
 } from '../../components/ui';
-import { PAYEE_KIND } from '../../lib/cycles';
+import { isoDate, PAYEE_KIND } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { formatDate } from '../../lib/format';
 import { formatNaira, nairaInput, parseNaira, toKobo } from '../../lib/money';
@@ -213,17 +214,20 @@ function MilestoneCard({
         </div>
       )}
 
-      {payments.length > 0 && <Payments payments={payments} reload={reload} />}
+      {payments.length > 0 && (
+        <Payments payments={payments} milestone={m} data={data} reload={reload} />
+      )}
 
       <Modal
         open={releasing}
         onClose={() => setReleasing(false)}
         title={`Release milestone ${m.sequence}`}
-        description={`Instruct the trustee to pay ${formatNaira(m.amount_kobo)}, mostly to input vendors and service providers.`}
+        description={`Instruct the trustee to release ${formatNaira(m.amount_kobo)}, mostly as input vouchers or payments to vendors and service providers.`}
         wide
       >
         <ReleaseForm
           milestone={m}
+          farmCount={data.farms.length}
           onDone={(saved) => {
             setReleasing(false);
             if (saved) {
@@ -307,10 +311,21 @@ function failReason(v: TabProps['data']['visits'][number]) {
   return 'Failed';
 }
 
-function Payments({ payments, reload }: { payments: Disbursement[]; reload: () => void }) {
+function Payments({
+  payments,
+  milestone,
+  data,
+  reload,
+}: {
+  payments: Disbursement[];
+  milestone: Milestone;
+  data: TabProps['data'];
+  reload: () => void;
+}) {
   const role = useAuth().profile?.role;
   const toast = useToast();
   const [confirming, setConfirming] = useState<Disbursement | null>(null);
+  const [issuing, setIssuing] = useState<Disbursement | null>(null);
   const [reference, setReference] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -341,15 +356,33 @@ function Payments({ payments, reload }: { payments: Disbursement[]; reload: () =
         {payments.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
             <div className="min-w-0 flex-1">
-              <p className="font-medium text-zinc-900">{p.payee_name}</p>
+              <p className="font-medium text-zinc-900">
+                {p.payee_kind === 'input_voucher' ? 'Input vouchers' : p.payee_name}
+              </p>
               <p className="text-xs text-zinc-500">
-                {PAYEE_KIND[p.payee_kind]} · {p.purpose} · {p.payee_account}
+                {p.payee_kind === 'input_voucher'
+                  ? `${p.purpose} · redeemable at approved agro-dealers`
+                  : `${PAYEE_KIND[p.payee_kind]} · ${p.purpose} · ${p.payee_account}`}
               </p>
             </div>
             <span className="font-medium text-zinc-900 tabular-nums">
               {formatNaira(p.amount_kobo)}
             </span>
-            {p.status === 'executed' ? (
+            {p.payee_kind === 'input_voucher' ? (
+              p.status === 'executed' ? (
+                <Badge tone="green" dot>
+                  {data.vouchers.filter((v) => v.disbursement_id === p.id).length} vouchers issued
+                </Badge>
+              ) : can.actAsTrustee(role) ? (
+                <Button size="sm" onClick={() => setIssuing(p)}>
+                  <Ticket aria-hidden /> Issue vouchers
+                </Button>
+              ) : (
+                <Badge tone="amber" dot>
+                  With trustee
+                </Badge>
+              )
+            ) : p.status === 'executed' ? (
               <Badge tone="green" dot>
                 Paid · {p.trustee_reference}
               </Badge>
@@ -365,6 +398,31 @@ function Payments({ payments, reload }: { payments: Disbursement[]; reload: () =
           </li>
         ))}
       </ul>
+
+      <Modal
+        open={issuing !== null}
+        onClose={() => setIssuing(null)}
+        title="Issue input vouchers"
+        description={
+          issuing
+            ? `Ring-fence ${formatNaira(issuing.amount_kobo)} of this cycle's cash and issue one voucher per farm (${data.farms.length}), split by area. Vendors are paid as farmers redeem them.`
+            : undefined
+        }
+      >
+        {issuing && (
+          <IssueVouchersForm
+            line={issuing}
+            milestone={milestone}
+            onDone={(n) => {
+              setIssuing(null);
+              if (n !== null) {
+                toast.success(`${n} vouchers issued. Print the slips from the Vouchers tab.`);
+                reload();
+              }
+            }}
+          />
+        )}
+      </Modal>
 
       <Modal
         open={confirming !== null}
@@ -397,6 +455,63 @@ function Payments({ payments, reload }: { payments: Disbursement[]; reload: () =
         </form>
       </Modal>
     </div>
+  );
+}
+
+function IssueVouchersForm({
+  line,
+  milestone,
+  onDone,
+}: {
+  line: Disbursement;
+  milestone: Milestone;
+  onDone: (issued: number | null) => void;
+}) {
+  // Same default as the database: 60 days after the planned date, or after today if that's later.
+  const start =
+    milestone.planned_date && milestone.planned_date > isoDate()
+      ? milestone.planned_date
+      : isoDate();
+  const [expires, setExpires] = useState(
+    new Date(Date.parse(start) + 60 * 86_400_000).toISOString().slice(0, 10),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const { data, error } = await supabase.rpc('issue_vouchers', {
+      p_disbursement_id: line.id,
+      p_expires_on: expires,
+    });
+    setBusy(false);
+    if (error) setError(errorMessage(error));
+    else onDone(data as number);
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <Field label="Valid until" hint="Unused value returns to the cycle when vouchers are closed">
+        <Input
+          type="date"
+          min={isoDate(1)}
+          value={expires}
+          onChange={(e) => setExpires(e.target.value)}
+          required
+        />
+      </Field>
+      {error && <Alert>{error}</Alert>}
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" onClick={() => onDone(null)}>
+          Back
+        </Button>
+        <Button type="submit" busy={busy}>
+          Issue vouchers
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -511,11 +626,16 @@ interface Line {
   amount: string;
 }
 
+const VOUCHER_PAYEE = 'Farmers (input vouchers)';
+const VOUCHER_ACCOUNT = 'Redeemable at approved agro-dealers';
+
 function ReleaseForm({
   milestone,
+  farmCount,
   onDone,
 }: {
   milestone: Milestone;
+  farmCount: number;
   onDone: (saved: boolean) => void;
 }) {
   const blank = (amount = ''): Line => ({
@@ -550,8 +670,8 @@ function ReleaseForm({
       p_milestone_id: milestone.id,
       p_lines: lines.map((l, i) => ({
         payee_kind: l.payee_kind,
-        payee_name: l.payee_name,
-        payee_account: l.payee_account,
+        payee_name: l.payee_kind === 'input_voucher' ? VOUCHER_PAYEE : l.payee_name,
+        payee_account: l.payee_kind === 'input_voucher' ? VOUCHER_ACCOUNT : l.payee_account,
         purpose: l.purpose,
         amount_kobo: amounts[i].toString(),
       })),
@@ -578,12 +698,19 @@ function ReleaseForm({
                   </option>
                 ))}
               </Select>
-              <Input
-                placeholder="Payee name"
-                value={l.payee_name}
-                onChange={(e) => update(i, { payee_name: e.target.value })}
-                required
-              />
+              {l.payee_kind === 'input_voucher' ? (
+                <p className="self-center text-xs text-zinc-500">
+                  One voucher per farm ({farmCount}), split by area. Farmers redeem them at approved
+                  agro-dealers, who are paid by the trustee.
+                </p>
+              ) : (
+                <Input
+                  placeholder="Payee name"
+                  value={l.payee_name}
+                  onChange={(e) => update(i, { payee_name: e.target.value })}
+                  required
+                />
+              )}
               <Input
                 placeholder="Amount (₦)"
                 inputMode="decimal"
@@ -593,17 +720,24 @@ function ReleaseForm({
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              {l.payee_kind !== 'input_voucher' && (
+                <Input
+                  placeholder="Bank and account number"
+                  value={l.payee_account}
+                  onChange={(e) => update(i, { payee_account: e.target.value })}
+                  required
+                />
+              )}
               <Input
-                placeholder="Bank and account number"
-                value={l.payee_account}
-                onChange={(e) => update(i, { payee_account: e.target.value })}
-                required
-              />
-              <Input
-                placeholder="Purpose, e.g. seed and fertiliser"
+                placeholder={
+                  l.payee_kind === 'input_voucher'
+                    ? 'What the vouchers are for, e.g. certified seed and NPK'
+                    : 'Purpose, e.g. seed and fertiliser'
+                }
                 value={l.purpose}
                 onChange={(e) => update(i, { purpose: e.target.value })}
                 required
+                className={l.payee_kind === 'input_voucher' ? 'sm:col-span-2' : undefined}
               />
               {lines.length > 1 && (
                 <Button

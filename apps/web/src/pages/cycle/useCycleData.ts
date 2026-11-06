@@ -15,10 +15,17 @@ import type {
   ReadinessCheck,
   SettlementPayout,
   SettlementPreview,
+  Vendor,
+  Voucher,
+  VoucherRedemption,
 } from '../../lib/types';
 import { useAsync } from '../../lib/useAsync';
 
 export type CycleFarm = FarmMap & { farmer_name: string; kyc_status: KycStatus };
+
+export type RedemptionRow = VoucherRedemption & {
+  vendors: Pick<Vendor, 'name' | 'bank_name' | 'account_number' | 'account_name' | 'status'>;
+};
 
 export interface CycleData {
   cycle: Cycle;
@@ -35,6 +42,8 @@ export interface CycleData {
   deliveries: HarvestDelivery[];
   receipts: CycleReceipt[];
   payouts: SettlementPayout[];
+  vouchers: Voucher[];
+  redemptions: RedemptionRow[];
   /** The waterfall as it would run now; null once settlement has run or before the season. */
   settlement: SettlementPreview | null;
   hectares: number;
@@ -66,6 +75,8 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     receipts,
     payouts,
     settlement,
+    vouchers,
+    redemptions,
   ] = await Promise.all([
     supabase.from('cycle_farms').select('farm_id').eq('cycle_id', id),
     supabase.from('milestones').select('*').eq('cycle_id', id).order('sequence'),
@@ -96,6 +107,12 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     ['in_progress', 'harvested'].includes(cycle.status) && !cycle.settlement_started_at
       ? supabase.rpc('settlement_preview', { p_cycle_id: id })
       : Promise.resolve({ data: null, error: null }),
+    supabase.from('vouchers').select('*').eq('cycle_id', id).order('issued_at').order('code'),
+    supabase
+      .from('voucher_redemptions')
+      .select('*, vendors(name, bank_name, account_number, account_name, status)')
+      .eq('cycle_id', id)
+      .order('redeemed_at', { ascending: false }),
   ]);
 
   const farmIds = must(farmLinks).map((f: { farm_id: string }) => f.farm_id);
@@ -154,6 +171,8 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
     receipts: must(receipts) as CycleReceipt[],
     payouts: must(payouts) as SettlementPayout[],
     settlement: must(settlement) as SettlementPreview | null,
+    vouchers: must(vouchers) as Voucher[],
+    redemptions: must(redemptions) as RedemptionRow[],
     hectares: farmRows.reduce((s, f) => s + Number(f.area_hectares), 0),
     people,
   };

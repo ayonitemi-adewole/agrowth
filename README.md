@@ -21,7 +21,7 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Next is Phase 2 (investor and government editions, vouchers, the offline agent app, USSD).
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has started with the vendor network and input vouchers. Still to come: the investor and government editions, the offline agent app, and USSD.
 
 | Area                                                                                                           | State |
 | -------------------------------------------------------------------------------------------------------------- | ----- |
@@ -36,6 +36,8 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Ledger: double-entry, append-only, balanced, no money moving between cycles                                    | Done  |
 | Harvest: weighed and graded deliveries per farm, voids with a reason                                           | Done  |
 | Settlement: offtake and insurance receipts, fee → capital → profit-share waterfall, payouts, funder statements | Done  |
+| Vendors: agro-dealer registry, compliance approval, re-review on bank changes, counter sign-ins                | Done  |
+| Vouchers: issued per farm by area, redeemed by code + phone, vendors paid on redemption, unused value returned | Done  |
 
 ## Getting started
 
@@ -99,6 +101,7 @@ The Phase 1 gate is "a demo cycle runs". You need several accounts, because the 
 | Compliance officer | `compliance_officer` | Verifies farmer KYC, approves cycles                        | comply@officer.test         |
 | Cycle manager      | `cycle_manager`      | Builds the cycle, requests verification, instructs releases | tolu@manager.test           |
 | Trustee            | `trustee`            | Confirms deposits and payments, refunds                     | bank@trustee.test           |
+| Agro-dealer        | `vendor`             | Redeems farmers' input vouchers at the shop counter         | counter@zariaagro.test      |
 
 ### One-click demo sign-in
 
@@ -107,7 +110,7 @@ Add these to `apps/web/.env.local` (never committed) and restart `npm run dev`. 
 ```
 VITE_DEMO_PASSWORD=the password the demo accounts share
 VITE_ADMIN_DEMO_PASSWORD=optional: a different password for the admin account
-VITE_DEMO_ACCOUNTS=admin:agrowth.farmlands@gmail.com,field_agent:damola@agent.test,compliance_officer:comply@officer.test,cycle_manager:tolu@manager.test,trustee:bank@trustee.test
+VITE_DEMO_ACCOUNTS=admin:agrowth.farmlands@gmail.com,field_agent:damola@agent.test,compliance_officer:comply@officer.test,cycle_manager:tolu@manager.test,trustee:bank@trustee.test,vendor:counter@zariaagro.test
 ```
 
 Any role can have its own password the same way: `VITE_<ROLE>_DEMO_PASSWORD`, for example `VITE_TRUSTEE_DEMO_PASSWORD`. Otherwise the shared one is used.
@@ -254,21 +257,55 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 > To see a release being blocked, submit one visit with **Failed** as the crop condition (or from a laptop, where the GPS isn't precise enough). The milestone shows _Blocked_. A passing revisit unblocks it.
 
-**Step 15 — Cycle manager: instruct the release.** Once all three farms have passed, milestone 1 → **Instruct release**. Add three payees that total ₦600,000:
+**Step 15 — Cycle manager: instruct the release.** Once all three farms have passed, milestone 1 → **Instruct release**. Add three lines that total ₦600,000. Seed and fertiliser go out as input vouchers, so farmers pick them up at an approved shop and no cash changes hands:
 
 | Payee type       | Payee name              | Bank and account       | Purpose                       | Amount (₦) |
 | ---------------- | ----------------------- | ---------------------- | ----------------------------- | ---------- |
-| Input vendor     | Zaria Agro Inputs Ltd   | Access Bank 0123456789 | Certified seed and NPK        | 450000     |
+| Input vouchers   | _(none needed)_         | _(none needed)_        | Certified seed and NPK        | 450000     |
 | Service provider | Samaru Tractor Hire     | GTBank 0234567891      | Ploughing and harrowing, 3 ha | 90000      |
 | Cash to farmers  | Cooperative labour fund | Zenith Bank 0345678912 | Planting labour allowance     | 60000      |
 
 > Cash to farmers is capped at 20% of a milestone (₦120,000 here). Try ₦150,000 cash to see it refused.
 
-**Step 16 — Trustee: confirm payments.** Milestones tab → **Confirm payment** for each payee, with references `PAY-DEMO-001`, `PAY-DEMO-002` and `PAY-DEMO-003`. After the third, milestone 1 is _Released_ and the cycle is _In progress_.
+**Step 16 — Trustee: issue the vouchers and confirm payments.** Milestones tab → milestone 1:
 
-**Step 17 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Repeat steps 13–16 for milestones 2 and 3.
+1. **Issue vouchers** on the input-vouchers line and keep the suggested expiry. This ring-fences ₦450,000 of the cycle's cash and issues one voucher per farm, split by farm area (about ₦150,000 each for three 1 ha farms).
+2. **Confirm payment** for the two bank payees, with references `PAY-DEMO-001` and `PAY-DEMO-002`.
 
-**Step 18 — Field agent: record the harvest** (open the cycle → Harvest tab → Record delivery). One row per load, as the offtaker weighs and grades it. The offtake agreement is Northern Mills Ltd for every load.
+Milestone 1 is now _Released_ and the cycle is _In progress_. The cycle has a new **Vouchers** tab.
+
+**Step 17 — Set up the agro-dealer.**
+
+1. Field agent: **Vendors → Register vendor**:
+
+   | Field                    | Value                  |
+   | ------------------------ | ---------------------- |
+   | Business name            | Zaria Agro Inputs Ltd  |
+   | Type                     | Agro-dealer            |
+   | CAC or dealer licence no | RC-1234567             |
+   | Phone                    | +2348035550101         |
+   | State / LGA              | Kaduna / Zaria         |
+   | Shop address             | Samaru Market, Shop 14 |
+   | Bank                     | Access Bank            |
+   | Account number           | 0123456789             |
+   | Account name             | Zaria Agro Inputs Ltd  |
+
+2. Compliance: open the vendor and press **Approve**. Whoever registered a vendor can't approve it.
+3. Sign up `counter@zariaagro.test`. As admin, give it the **Vendor** role on the Users page, then open the vendor and link it under **Counter sign-in**.
+
+> Edit an approved vendor's account number to see it go back to _Awaiting approval_: new bank details always need a fresh review.
+
+**Step 18 — Vendor: redeem the vouchers.** As the cycle manager, open the Vouchers tab and press **Print slips**. In real use a field agent hands each farmer their slip. Then sign in as the agro-dealer → **Redeem vouchers**. For each farmer, enter the code from their slip and the last four digits of their phone (Amina `0001`, Musa `0002`, Hauwa `0003`). Press **Check voucher**, enter "2 bags NPK 15-15-15, 25 kg certified maize seed" and the full amount left on the voucher, then **Redeem**.
+
+> Enter the wrong phone digits: the shop is told only that nothing matches, not which part was wrong. After 5 wrong tries in 15 minutes the counter is locked for 15 minutes. A voucher can also be used in parts, across several visits or shops.
+
+**Step 19 — Trustee: pay the agro-dealer.** Cycle → Vouchers tab → **Pay vendor** for each redemption, with references `VEN-DEMO-001` to `VEN-DEMO-003`. The confirmation shows the vendor's registered account; the trustee pays only that account.
+
+> Any voucher value left unused can be returned to the cycle with **Close** (or **Close expired** once vouchers pass their expiry date). The harvest can't be completed while a voucher is open or a vendor is unpaid.
+
+**Step 20 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Between steps 16 and 19, the voucher money sits in _Cash ring-fenced for input vouchers_. It's still held by the trustee but can't be spent on anything else. Repeat steps 13–16 for milestones 2 and 3 (bank payments only is fine).
+
+**Step 21 — Field agent: record the harvest** (open the cycle → Harvest tab → Record delivery). One row per load, as the offtaker weighs and grades it. The offtake agreement is Northern Mills Ltd for every load.
 
 | Farm       | Weight (kg) | Grade    | Moisture (%) | Waybill     |
 | ---------- | ----------- | -------- | ------------ | ----------- |
@@ -282,9 +319,9 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 The tab now shows 9 t accepted (3 t/ha, the expected yield). The rejected load is kept on record but earns nothing.
 
-**Step 19 — Cycle manager: complete the harvest.** Harvest tab → **Complete harvest**. It's refused while any milestone is unreleased. The cycle is now _Harvested_ and no more loads can be recorded.
+**Step 22 — Cycle manager: complete the harvest.** Harvest tab → **Complete harvest**. It's refused while any milestone is unreleased, any voucher is still open, or any vendor is unpaid. The cycle is now _Harvested_ and no more loads can be recorded.
 
-**Step 20 — Trustee: record the offtaker's payment** (Settlement tab → Record receipt)
+**Step 23 — Trustee: record the offtaker's payment** (Settlement tab → Record receipt)
 
 | Field          | Value                                |
 | -------------- | ------------------------------------ |
@@ -296,7 +333,7 @@ The tab now shows 9 t accepted (3 t/ha, the expected yield). The rejected load i
 
 > An insurer's claim payout is recorded the same way (choose **Insurance payout**). It joins the same waterfall, so funders and farmers see exactly what was recovered.
 
-**Step 21 — Trustee: run the settlement.** The Settlement tab previews the waterfall. Each step is paid in full before the next:
+**Step 24 — Trustee: run the settlement.** The Settlement tab previews the waterfall. Each step is paid in full before the next:
 
 | Step                                          | Amount (₦) |
 | --------------------------------------------- | ---------- |
@@ -310,9 +347,9 @@ Funders are paid in proportion to what they put in: Adaeze Okoro ₦1,353,600 an
 
 > If your cycle was approved before settlement terms existed, its fee is 0% and its funders' share is 30%. The total paid out is the same, but there's no fee line and the screen shows the exact split.
 
-**Step 22 — Trustee: make the payouts.** Settlement tab → **Confirm payment** for each, with references `SET-DEMO-001` to `SET-DEMO-006`. After the last one the cycle is _Settled_.
+**Step 25 — Trustee: make the payouts.** Settlement tab → **Confirm payment** for each, with references `SET-DEMO-001` to `SET-DEMO-006`. After the last one the cycle is _Settled_.
 
-**Step 23 — Check the result.** The **Funder statements** card shows each funder's money in, capital back, return and result. In the Ledger, the trustee's cash, funder capital and farm deployment are all ₦0. The income and expense accounts show where every naira went: ₦4,050,000 harvest proceeds against ₦1,500,000 cost of production, ₦30,000 fee, ₦756,000 funder returns and ₦1,764,000 farmer surplus.
+**Step 26 — Check the result.** The **Funder statements** card shows each funder's money in, capital back, return and result. In the Ledger, the trustee's cash, funder capital and farm deployment are all ₦0. The income and expense accounts show where every naira went: ₦4,050,000 harvest proceeds against ₦1,500,000 cost of production, ₦30,000 fee, ₦756,000 funder returns and ₦1,764,000 farmer surplus.
 
 ## Tests
 
@@ -322,7 +359,7 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Web tests** (`apps/web`) — money, map and error helpers.
 
 ## Repository layout
@@ -336,7 +373,7 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
 docs/                  Concept and design documents
@@ -368,4 +405,5 @@ npx supabase db push
 - **Offtake first, insured downside, verified farmers.** A cycle can't be submitted, or approved, until a signed buyer covers at least the low-yield harvest, insurance covers the budget for the whole season, and every farmer has passed KYC.
 - **Separation of duties.** The cycle's own manager can never approve it. Only the trustee confirms deposits, payments and refunds.
 - **Money follows verification.** A milestone is released only after every farm passes a field visit (GPS inside the boundary, checklist, photo), in order, and at most 20% may go to farmers as cash. The trustee can't pay out more than it holds for that cycle.
+- **Inputs, not cash.** Vouchers are issued per farm and redeemed only at compliance-approved vendors, with the voucher code plus the last four digits of the farmer's phone. The shop never sees the farmer's phone or full name. Five wrong tries in 15 minutes lock that counter out. The trustee ring-fences voucher money when it issues them and pays only the vendor's registered account. New bank details need a fresh approval, and a suspended vendor's payments are held. Unused value returns to the cycle, and the season can't close while any voucher is open.
 - **Evidence is permanent.** Cycle history and field visits are append-only, and uploaded documents can't be replaced or deleted.

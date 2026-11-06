@@ -31,8 +31,17 @@ const REGISTRY_READERS: Role[] = [
 ];
 
 export const can = {
-  /** Anyone working the platform (not investors, vendors or offtakers, whose portals come later). */
+  /** Anyone working the platform (not investors or offtakers, whose portals come later). */
   useStaffApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  /** Who can sign in at all: staff, plus vendors at their shop counter. */
+  useApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee', 'vendor']),
+  readVendors: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  editVendors: (r?: Role) => has(r, ['admin', 'field_agent', 'cycle_manager', 'programme_manager']),
+  reviewVendors: (r?: Role) => has(r, ['admin', 'compliance_officer']),
+  linkVendorAccounts: (r?: Role) => has(r, ['admin']),
+  redeemVouchers: (r?: Role) => has(r, ['vendor']),
+  voidRedemptions: (r?: Role) =>
+    has(r, ['admin', 'cycle_manager', 'programme_manager', 'compliance_officer']),
   readRegistry: (r?: Role) => has(r, REGISTRY_READERS),
   enrol: (r?: Role) => has(r, ['admin', 'field_agent']),
   editCooperatives: (r?: Role) =>
