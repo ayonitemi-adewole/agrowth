@@ -48,7 +48,7 @@ const api = supabaseApi({ url, publishableKey, secretKey });
 if (await isSeeded(api)) {
   console.error(
     'This project already has the demo data. To start again, reset it first:\n' +
-      '  npx supabase db reset --linked\n' +
+      '  npm run demo:reset\n' +
       'then run npm run seed:demo again.',
   );
   process.exit(1);
