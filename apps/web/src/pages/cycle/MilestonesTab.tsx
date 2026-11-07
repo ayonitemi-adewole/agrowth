@@ -369,7 +369,7 @@ function Payments({
       <ul className="divide-y divide-zinc-950/5 rounded-xl ring-1 ring-zinc-950/5">
         {payments.map((p) => (
           <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-56 wrap-break-word">
               <p className="font-medium text-zinc-900">
                 {p.payee_kind === 'input_voucher' ? 'Input vouchers' : p.payee_name}
               </p>
