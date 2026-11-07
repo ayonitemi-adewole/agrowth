@@ -88,7 +88,7 @@ export function DemoSignIn({ detailed = false }: { detailed?: boolean }) {
           <span className="h-px flex-1 bg-zinc-200" />
         </div>
       )}
-      <div className={cx('grid gap-2', !detailed && 'grid-cols-2')}>
+      <div className={cx('grid gap-2 sm:grid-cols-2')}>
         {demo.accounts.map((a) => {
           const Icon = ROLE_ICON[a.role] ?? UserRound;
           return (

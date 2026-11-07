@@ -36,7 +36,7 @@ export function Logo({ inverted = false }: { inverted?: boolean }) {
         inverted ? 'text-white' : 'text-brand-900',
       )}
     >
-      <span className="grid size-8 place-items-center rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 text-white shadow-sm">
+      <span className="grid size-8 place-items-center rounded-lg bg-linear-to-br from-brand-400 to-brand-600 text-white shadow-sm">
         <Sprout className="size-5" aria-hidden />
       </span>
       Agrowth
