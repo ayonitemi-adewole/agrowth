@@ -48,6 +48,17 @@ body {
   font-feature-settings: 'cv11', 'ss01';
 }
 
+/*
+ * Grid items may shrink to their column. By default a grid item is at least as wide as
+ * its content, so a wide table inside one stretches the whole column (and page) past a
+ * phone's screen instead of scrolling inside its own box. Base layer: utilities still win.
+ */
+@layer base {
+  .grid > * {
+    min-width: 0;
+  }
+}
+
 /* Keep Leaflet's controls under menus and dialogs. */
 .leaflet-container {
   z-index: 0;
