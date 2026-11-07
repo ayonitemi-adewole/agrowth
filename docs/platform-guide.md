@@ -2,7 +2,12 @@
 
 What the platform does today, how it works, what every role can do, how to use it step by step, and what is still to be built.
 
-_Status as of 7 November 2026. For setup commands and a scripted demo with exact values, see the [README](../README.md). For the business case, see the [concept document](agrowth-2.0-concept.md)._
+_Status as of 7 November 2026. Related documents:_
+
+- _[Demo Guide](demo-guide.md): opening or setting up the demo, and a scripted tour._
+- _[Design Rationale](design-rationale.md): why the platform is designed this way._
+<!-- - _[Concept document](agrowth-2.0-concept.md): the original remodel concept._ -->
+- _[README](../README.md): developer setup, and a manual walkthrough with exact values._
 
 ---
 
@@ -24,12 +29,12 @@ _Status as of 7 November 2026. For setup commands and a scripted demo with exact
 
 Agrowth is a platform that makes farm finance verifiable. Money for a farming season is held by a licensed **trustee**, never by the platform. It is released in stages, mostly as **inputs paid straight to approved agro-dealers**, and only after a field agent has **checked every farm in person**. The harvest is **already sold** to a contracted buyer (the offtaker) before any money is raised, and the crop is **insured**. When the buyer pays, the trustee splits the proceeds by a fixed **waterfall** and pays everyone out.
 
-One shared core runs two products for two kinds of buyer:
+One shared core runs two editions for two kinds of funding:
 
-- **Investor Edition**: for licensed operators (crowdfunding portals, fund managers, banks) whose investors fund farm cycles for a share of the harvest profit.
-- **Government Edition**: for ministries, agencies and donor programmes that run input-credit or grant schemes and need to see who got what, and what came back.
+- **Investor Edition**: investors fund farm cycles for a share of the harvest profit. Offering investments to the public is regulated, so this edition runs under an SEC-registered operator (a crowdfunding portal, fund manager or bank).
+- **Government Edition**: ministries, agencies and donor programmes run input-credit or grant schemes and see who got what, and what came back.
 
-The aim is to build the product and sell or license it, not to run it.
+How the platform reaches the market is still open. It could be operated directly or with partners, or licensed to organisations that run it themselves. This guide describes the product and how it works, not a commercial model.
 
 ---
 
@@ -58,7 +63,7 @@ The aim is to build the product and sell or license it, not to run it.
 
 **Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 222 automated tests: 165 run the real database migrations and prove the rules; 57 cover the web app's logic. A demo seed builds a lived-in portfolio through the same rules.
 
-**Branches.** The work sits on a chain of branches, each built on the last: `phase-1/foundation` → `phase-2/vouchers` → `phase-2/investor-edition` → `phase-2/government-edition` → `phase-2/offline-agent` (the latest). None of it is merged into `main` yet. The demo Supabase project has every migration applied.
+**Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
 ---
 
@@ -292,7 +297,7 @@ Both editions run on the same core and the same database. What differs is who fu
 
 | | Investor Edition | Government Edition |
 | --- | --- | --- |
-| **Buyer** | Crowdfunding portal, fund manager, bank, fintech | State ministry, ADP, federal agency, donor programme |
+| **Typical operator** | Crowdfunding portal, fund manager, bank, fintech (holds the SEC registration) | State ministry, ADP, federal agency, donor programme |
 | **Who funds cycles** | Retail, high-net-worth and institutional investors | A programme's budget (and optionally investors, in a blended cycle) |
 | **Their screens** | Marketplace, cycle tracker, My investments, Profile and KYC | Programmes list, programme dashboard, audit and open-data exports |
 | **Compliance features** | Investor KYC and classification, retail cap, versioned risk disclosure, cooling-off, reserved pledges | Eligibility rules (commodity, area, hectares, cooperative), package value cap, budget ceiling, fixed terms once active |
@@ -329,7 +334,7 @@ These are enforced by the database itself. They hold even if the web app has a b
 
 ## 8. Running the platform
 
-The [README](../README.md) has the commands in full. In short:
+The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [README](../README.md) has the developer commands in full. In short:
 
 - **Development:** Node 22+ and a Supabase project. Run `npm install`, link the project, then `npx supabase db push` to create the database and `npm run dev` to start the app. Make yourself admin once (README, step 5).
 - **Demo portfolio:** use a separate Supabase project.
@@ -351,8 +356,6 @@ The [README](../README.md) has the commands in full. In short:
 | --- | --- |
 | **USSD / SMS farmer channel** | Farmers dial a short code to check voucher balances and cycle status, and get SMS alerts (voucher issued, visit due, payout made). It needs an aggregator adapter (e.g. Africa's Talking) as a Supabase Edge Function, and an in-app phone simulator for demos until a live short code exists. |
 | **Phase 2 gate: security audit** | The concept's gate before the pilot. It needs an independent security review and penetration test of the app, the database rules and the hosting. |
-| **Merge to `main`** | Review and merge the chain of Phase 1–2 branches into `main`. |
-
 ### Gaps in what's built
 
 | Area | Gap |
@@ -368,17 +371,21 @@ The [README](../README.md) has the commands in full. In short:
 
 ### Integrations (all simulated today)
 
-Every outside party is represented by a person confirming in the app, not by a live connection. For a real pilot, each needs an adapter (built so the buyer can swap providers):
+Every outside party is represented by a person confirming in the app, not by a live connection. For a real pilot, each needs an adapter (built so one provider can be swapped for another):
 
 - **Trustee / bank:** release instructions and confirmations, instead of keyed-in references.
 - **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS).
 - **Identity:** BVN and NIN checks and liveness (e.g. Smile ID, Prembly, Dojah). Today compliance checks documents by eye.
 - **Insurance, weather, satellite data, SMS/USSD.**
 
-### Phases 3 and 4 (from the concept)
+### Next stages
 
-- **Phase 3: pilot season.** One cooperative, 50–100 farmers, a real trustee, offtaker and insurer, and an insured cycle run to settlement and audited.
-- **Phase 4: package and sell.**
-  - The data room: live demo, pilot results, technical documentation, a security report, clean IP, legal templates, a regulatory memo, a financial model and pitch decks.
-  - Licensing terms, buyer pilots and negotiation.
-  - The concept recommends seeking a letter of intent from a first buyer early, since one buyer willing to pilot shapes the product and becomes the reference for the rest.
+- **Pilot season.** One cooperative, 50–100 farmers, a real trustee, offtaker and insurer, and an insured cycle run to settlement and audited. This turns a working demo into evidence.
+- **Partners for the pilot.** A pilot needs partners for the roles the platform doesn't play itself: a licensed trustee to hold the money, an offtaker to buy the harvest, and an insurer. Investor funding also needs an SEC-registered operator. A first pilot funded by a government or donor programme avoids that requirement.
+- **Funding and route to market.** The commercial model is undecided: operating directly or with partners, licensing, or a mix. Whichever is chosen, the same evidence helps:
+  - a live demo and the pilot results,
+  - technical documentation and an independent security report,
+  - clean ownership of the code and contributor agreements,
+  - legal templates (trustee, offtake, investor, farmer and vendor agreements),
+  - a regulatory memo from a capital-markets lawyer,
+  - a financial model.
