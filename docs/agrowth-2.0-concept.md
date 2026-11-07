@@ -4,12 +4,12 @@ Nov 4, 2026 · @Ayo · Living version: [Claude Doc](https://claude.ai/artifact/G
 
 ## Executive summary
 
-Agrowth 2.0 is an agricultural finance platform that makes farm investment verifiable: money is held by a licensed trustee, released in stages as inputs, and repaid from pre-contracted harvest sales. It is built once as a shared core and packaged as two editions for two buyer types.
+Agrowth 2.0 is an agricultural finance platform that makes farm investment verifiable: money is held by a licensed trustee, released in stages as inputs, and repaid from pre-contracted harvest sales. It is built once as a shared core and offered as two editions for two kinds of funding.
 
-- **Investor Edition** — sold or licensed to an SEC-registered operator (fund manager, bank, fintech, crowdfunding portal) who wants an agriculture product. Retail and institutional investors fund verified farm cycles for a variable profit share.
-- **Government Edition** — sold or licensed to a state or federal agriculture body. It runs input-credit programmes: farmer registry, in-kind disbursement, field monitoring, offtake-based repayment and reporting.
+- **Investor Edition** — retail and institutional investors fund verified farm cycles for a variable profit share. Offering investments to the public is regulated, so this edition runs under an SEC-registered operator (fund manager, bank, fintech or crowdfunding portal).
+- **Government Edition** — for state or federal agriculture bodies and donor programmes. It runs input-credit programmes: farmer registry, in-kind disbursement, field monitoring, offtake-based repayment and reporting.
 
-The owner's goal is to build the product and sell it, not to operate it. So the deliverable is a working platform, a clean licensing story and a credible pilot, packaged for a buyer who holds (or will obtain) the licences.
+The route to market is open: the platform could be operated directly or with partners, or licensed to organisations that run it themselves. Whichever route is taken, the same three things are needed: a working platform, a clear regulatory path, and a credible pilot season.
 
 **What changed from Agrowth 1.0:** no guaranteed returns, no platform custody of funds, no funding before an offtake buyer is signed, and every farm verified on the map and in the field.
 
@@ -44,7 +44,7 @@ Two further rules follow. **Repayment comes from the sale, not the farmer:** the
 
 ## Platform architecture
 
-One shared core does the hard work; each edition is a thin layer of screens, roles and reports on top of it. This keeps the build manageable and lets the same product be sold twice.
+One shared core does the hard work; each edition is a thin layer of screens, roles and reports on top of it. This keeps the build manageable and lets one codebase serve both editions.
 
 ```mermaid
 flowchart TB
@@ -66,11 +66,11 @@ flowchart TB
     CORE -- via swappable adapters --> PARTNERS
 ```
 
-The platform only sends instructions to partners. Money sits with the trustee, risk sits with the insurer, and the harvest goes to the offtaker, so no buyer has to trust the software company with funds.
+The platform only sends instructions to partners. Money sits with the trustee, risk sits with the insurer, and the harvest goes to the offtaker, so no funder, programme or operator has to trust the software company with money.
 
 ## Core modules
 
-Ten modules make up the shared core; both editions use all of them. Build these first, because they are what a buyer is really paying for.
+Ten modules make up the shared core; both editions use all of them. Build these first: everything else depends on them.
 
 | Module | What it does | Key users |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ Ten modules make up the shared core; both editions use all of them. Build these 
 | Vendor & voucher network | Registers approved agro-dealers and service providers; farmers redeem vouchers by code or QR; vendors are paid on redemption. | Agro-dealers, farmers |
 | Field monitoring | Offline-first mobile app for agent visits: checklists, geotagged photos, pest and disease reports. Adds satellite vegetation-index checks per farm. | Field agents, monitors |
 | Harvest & settlement | Records harvest weights, quality grades and delivery to offtaker; runs the proceeds waterfall and issues statements. | Aggregators, trustee |
-| Ledger & reporting | Immutable per-cycle ledger of every inflow and outflow; audit trail; regulatory and programme reports; data export. | Auditors, regulators, buyers |
+| Ledger & reporting | Immutable per-cycle ledger of every inflow and outflow; audit trail; regulatory and programme reports; data export. | Auditors, regulators, partners |
 | Admin & compliance | Roles and permissions, KYC/AML checks, approvals workflow, risk flags, document vault. | Compliance officers |
 
 Farmers can use the system through a USSD/SMS channel and assisted onboarding by agents, since many smallholders don't use smartphones.
@@ -117,9 +117,9 @@ The Investor Edition lets a licensed operator offer farm cycles to retail and in
 
 ## Government Edition
 
-The Government Edition lets a ministry, agency or development-finance body run input-credit and subsidy programmes with measurable delivery and recovery. The pitch is simple: past programmes lost money because nobody could see who got what and whether it came back; this system makes that visible.
+The Government Edition lets a ministry, agency or development-finance body run input-credit and subsidy programmes with measurable delivery and recovery. The case is simple: past programmes lost money because nobody could see who got what and whether it came back; this system makes that visible.
 
-**Likely buyers**
+**Likely users**
 
 - State Ministries of Agriculture and state agricultural development programmes (ADPs)
 - Federal Ministry of Agriculture and Food Security and its agencies
@@ -140,7 +140,7 @@ The Government Edition lets a ministry, agency or development-finance body run i
 
 ## Key user flows
 
-Four flows carry the product. The demo for buyers should walk through the first one from start to finish.
+Four flows carry the product. A demo should walk through the first one from start to finish.
 
 **1. A farm cycle, end to end**
 
@@ -175,7 +175,7 @@ Four flows carry the product. The demo for buyers should walk through the first 
 
 ## Regulatory and legal setup
 
-The Investor Edition is a regulated activity; the buyer must hold the licences, and the platform must make compliance easy. Selling it as a technology product (not as a running investment business) keeps the builder outside the regulated perimeter. This section is not legal advice; a capital-markets lawyer should confirm it before any launch or sale.
+The Investor Edition is a regulated activity: whoever offers cycles to investors must hold the licences, and the platform must make compliance easy. That could be Agrowth itself (after registering), a licensed partner, or an organisation that licenses the platform. Each route places the technology company differently relative to the regulated perimeter. This section is not legal advice; a capital-markets lawyer should confirm the chosen route before any launch.
 
 **What applies**
 
@@ -185,21 +185,21 @@ The Investor Edition is a regulated activity; the buyer must hold the licences, 
 - **Data protection.** The Nigeria Data Protection Act 2023 governs farmer and investor personal data (BVN, NIN, location).
 - **Payments.** Wallets and payment flows run through a CBN-licensed payment partner and the trustee's bank, never through the platform company.
 
-**Licensing routes for an Investor Edition buyer**
+**Routes to a licensed Investor Edition**
 
 | Route | Who it suits | Notes |
 | --- | --- | --- |
-| Buyer already registered as a crowdfunding portal | Existing portals adding an agri vertical | Fastest; the platform plugs into their licence |
-| Buyer is a registered fund manager | Asset managers | Structure cycles as a collective investment scheme or private fund for HNW/institutional investors |
-| Buyer registers a new portal | Banks, fintechs, new entrants | Slowest; the compliance features in the platform help their application |
+| Partner with a registered crowdfunding portal | Existing portals adding an agri vertical | Fastest; the platform runs under their registration |
+| Partner with a registered fund manager | Asset managers | Structure cycles as a collective investment scheme or private fund for HNW/institutional investors |
+| Register a new portal (Agrowth or a partner) | Agrowth itself, banks, fintechs, new entrants | Slowest; the compliance features in the platform help the application |
 
-**Legal documents to prepare with the build:** template offtake agreement, trustee/escrow agreement, investor terms and risk disclosure, farmer/cooperative participation agreement, vendor agreement, data-processing agreement, and a software licence or asset-purchase agreement for the sale itself.
+**Legal documents to prepare with the build:** template offtake agreement, trustee/escrow agreement, investor terms and risk disclosure, farmer/cooperative participation agreement, vendor agreement, data-processing agreement, and, depending on the route chosen, partnership, service or licence agreements.
 
 **Government Edition:** procurement follows the Public Procurement Act and state equivalents. Expect an open or selective tender, or a pilot under a memorandum of understanding first; data residency and source-code escrow are common asks.
 
 ## Partners and integrations
 
-The platform depends on partners it doesn't own. Build adapters so the buyer can swap providers; the names below are examples to approach, not confirmed relationships.
+The platform depends on partners it doesn't own. Build adapters so one provider can be swapped for another; the names below are examples to approach, not confirmed relationships.
 
 | Role | Why it's needed | Example providers |
 | --- | --- | --- |
@@ -216,7 +216,7 @@ The platform depends on partners it doesn't own. Build adapters so the buyer can
 
 ## Technology stack and build plan
 
-Use mainstream, well-documented tools so a buyer's team can maintain the platform after handover. Suggested stack:
+Use mainstream, well-documented tools so any team (in-house, a partner's, or a contractor) can maintain the platform. Suggested stack:
 
 | Layer | Choice | Why |
 | --- | --- | --- |
@@ -226,7 +226,7 @@ Use mainstream, well-documented tools so a buyer's team can maintain the platfor
 | Mobile | Flutter or React Native, offline-first with background sync | Field agents work without coverage; investors get a native app |
 | Farmer channel | USSD and SMS through an aggregator | Reaches farmers without smartphones |
 | Geospatial | Sentinel-2 imagery, NDVI processing in Python | Free imagery; automated crop-health checks |
-| Hosting | Containerised (Docker), cloud or local data centre | Meets data-residency asks from government buyers |
+| Hosting | Containerised (Docker), cloud or local data centre | Meets data-residency asks from government clients |
 | Security | Role-based access, encryption at rest, audit logs, 2FA | Required by trustees, regulators and procurement |
 
 The timeline below assumes one lead developer plus contractors for mobile and security; working alone roughly doubles Phases 1–2.
@@ -239,70 +239,69 @@ flowchart LR
     G2{{"Gate: security audit passed"}}
     P3["<b>3 · Pilot season</b><br/>Months 8–13<br/>One cooperative<br/>50–100 farmers<br/>Real trustee, offtaker<br/>Insured cycle"]
     G3{{"Gate: cycle settled, audited"}}
-    P4["<b>4 · Package and sell</b><br/>From month 10<br/>Data room, demos<br/>Licensing terms<br/>Buyer pilots<br/>Negotiation"]
+    P4["<b>4 · Route to market</b><br/>From month 10<br/>Evidence pack, demos<br/>Partners and funders<br/>Commercial terms<br/>Scale-up pilots"]
     P1 --> G1 --> P2 --> G2 --> P3 --> G3 --> P4
     style P3 stroke-width:3px
 ```
 
-The pilot is the critical phase: it turns a demo into evidence. Selling starts in month 10, while the pilot is still running, so early buyer conversations can shape the final product.
+The pilot is the critical phase: it turns a demo into evidence. Conversations with partners and funders start in month 10, while the pilot is still running, so they can shape the final product.
 
-## Sale strategy
+## Route to market and funding
 
-Buyers pay for proof, not code: a working platform plus one settled pilot season is worth far more than a feature-complete product nobody has used. Start talking to buyers during the build, not after it.x
+Proof matters more than features: a working platform plus one settled pilot season is far more convincing to a partner, funder or client than a feature-complete product nobody has used. Start those conversations during the build, not after it.
 
-**Who to approach, in order of likely speed**
+**Possible routes.** These aren't exclusive, and the choice can wait for pilot results.
 
-| Buyer type | What they want | Likely deal |
+- **Operate it, with licensed partners.** Agrowth runs the platform; a trustee holds the money and a registered portal or fund manager offers the Investor Edition. This keeps the most control and the most long-term value, but needs the most capital, staff and regulatory work.
+- **Partnership or joint venture.** An established portal, bank, input company or development-finance body brings licences, distribution or capital; Agrowth brings the platform and operations. The value and the control are shared.
+- **Licensing.** Organisations that hold the licences run the platform themselves, under a licence fee with a support contract. Less operating burden, and less control over how it's used.
+- **Software as a service.** Recurring fees per active farmer, hectare or programme. Steady revenue, but it needs ongoing hosting and support.
+
+**Who to talk to, in order of likely speed**
+
+| Partner type | What they bring | What they'd want |
 | --- | --- | --- |
-| Registered crowdfunding portals and fintechs | A ready agri vertical that fits their licence | Licence + implementation fee, or outright purchase |
-| Fund managers and banks with agri lending | Traceable deployment of agri capital to HNW/institutional clients | Licence or white-label SaaS |
-| Donor-funded programmes and NGOs | Transparent disbursement and reporting for a funded project | Per-programme licence; often the fastest public-sector-adjacent route |
-| State ministries / ADPs | Farmer registry, input-credit tracking, recovery dashboards | Pilot under an MoU, then a tender or direct contract |
-| Federal agencies (FMAFS, NIRSAL, BOA) | National-scale registry and credit tracking | Long sales cycle; best approached with a state reference |
+| Registered crowdfunding portals and fintechs | An SEC registration and an investor base | A ready agri product that fits their licence |
+| Fund managers and banks with agri lending | Capital and HNW/institutional clients | Traceable deployment of agri capital |
+| Donor-funded programmes and NGOs | Grant or programme funding for a pilot | Transparent disbursement and reporting for a funded project; often the fastest route to a first real season |
+| State ministries / ADPs | Farmers, extension agents, programme budgets | Farmer registry, input-credit tracking, recovery dashboards; usually a pilot under an MoU first |
+| Federal agencies (FMAFS, NIRSAL, BOA) | National reach | National-scale registry and credit tracking; a long process, best approached with a state reference |
+| Impact and early-stage investors | Funding for the build and the pilot | A credible path to the pilot and beyond, and evidence the model works |
 
-**Ways to sell it**
-
-- **Outright sale of the IP and codebase.** One payment; clean exit. Lowest total value unless there is pilot traction.
-- **Perpetual licence per buyer.** Sell the same platform to several non-competing buyers (one portal, one state, one donor programme). Best fit for "build and sell" without running the business.
-- **SaaS subscription.** Recurring fees per active farmer, hectare or programme. Highest long-term value, but needs ongoing hosting and support, which conflicts with not operating it.
-- **Hybrid.** Licence fee up front, plus a fixed-term support contract (6–12 months) handed to a maintenance partner afterwards.
-
-Pricing depends on traction and buyer size; set it with a corporate-finance or M&A adviser once pilot results exist.
-
-**What to have ready (the data room)**
+**What to have ready (the evidence pack)**
 
 - [ ] Live demo environment with realistic sample data, scripted around the end-to-end cycle flow
 - [ ] Pilot results: farmers, hectares, disbursement and repayment figures, audited ledger
-- [ ] Technical documentation: architecture, API docs, deployment guide, test coverage
+- [ ] Technical documentation: architecture, design rationale, deployment guide, test coverage
 - [ ] Independent security review and penetration-test report
-- [ ] Clean IP: all code owned by you, contributor and contractor IP assignments, open-source licence list
+- [ ] Clean IP: all code owned by the company, contributor and contractor IP assignments, open-source licence list
 - [ ] Legal templates (offtake, trustee, investor, farmer, vendor agreements)
-- [ ] Regulatory memo from a capital-markets lawyer on how a buyer licenses the Investor Edition
-- [ ] Financial model showing the buyer's revenue per cycle or per programme
-- [ ] Pitch deck, one for each buyer type
-- [ ] Handover plan: who maintains the system after sale
+- [ ] Regulatory memo from a capital-markets lawyer on the route chosen for the Investor Edition
+- [ ] Financial model: costs and revenue per cycle or per programme under the chosen route
+- [ ] A short deck for each audience (funders, operating partners, government)
 
-**Before building everything, try to get a letter of intent.** One buyer willing to pilot shapes the product and becomes the reference that sells the rest.
+**Seek an early commitment.** A letter of intent from one pilot partner or funder shapes the product and becomes the reference for the next.
 
 ## Risks and open questions
 
-The biggest risk is building a complete product with no buyer or pilot lined up. Most of the others can be designed around.
+The biggest risk is building a complete product with no partner, funder or pilot lined up. Most of the others can be designed around.
 
 | Risk | Effect | Mitigation |
 | --- | --- | --- |
-| No buyer signs | Effort produces an unsold product | Seek a letter of intent before Phase 2; build the core first so it can be shown early |
+| No partner or funder commits | Effort produces a product with no pilot or route to market | Seek a letter of intent before Phase 2; build the core first so it can be shown early |
 | Pilot needs a licensed operator | A real investor-funded pilot can't run without one | Run the first pilot on the Government/donor side, or with a partner's licence |
-| Reputation of agri crowdfunding | Buyers and investors distrust the category | Lead with custody, offtake and verification; publish the pilot ledger |
+| Reputation of agri crowdfunding | Partners and investors distrust the category | Lead with custody, offtake and verification; publish the pilot ledger |
 | Partner dependency | A trustee, insurer or offtaker withdraws | Adapters for swappable providers; at least two options per role |
 | Field data quality | Agents fake visits or photos | GPS-boundary check-ins, photo metadata checks, satellite cross-checks, random audits |
-| Government procurement delays | Sale takes years | Treat government as the second sale; use donor programmes as a bridge |
+| Government procurement delays | Contracts take years | Treat government as a later step; use donor programmes as a bridge |
 | Political interference in repayment | Recovery collapses, as with past programmes | Repayment through offtakers and warehouses, not farmer goodwill; public dashboards |
-| Builder capacity | One person can't build, pilot and sell at once | Hire contractors for mobile and security; bring in a part-time sales/BD partner on commission |
+| Builder capacity | One person can't build, pilot and raise funding at once | Hire contractors for mobile and security; bring in a business-development partner |
 
 **Open questions to settle next**
 
 - [ ] Which crops for the pilot? Short-cycle crops with established buyers (maize, soybean, rice, sesame) settle faster.
 - [ ] Which state, cooperative and offtaker for the pilot?
 - [ ] Build alone, or with contractors? This sets the timeline.
-- [ ] Which buyer to approach first for a letter of intent?
+- [ ] Which route to market: operate with partners, partnership, licensing, or a mix?
+- [ ] Which partner or funder to approach first for a letter of intent?
 - [ ] Keep the Agrowth name, or rebrand to separate it from the old model?
