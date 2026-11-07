@@ -7,7 +7,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed:demo": "node --env-file-if-exists=.env.demo seed/run.ts"
+    "seed:demo": "node --env-file-if-exists=.env.demo seed/run.ts",
+    "demo:push": "node --env-file-if-exists=.env.demo seed/demo-db.ts push",
+    "demo:reset": "node --env-file-if-exists=.env.demo seed/demo-db.ts reset"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.15",

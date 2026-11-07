@@ -1,5 +1,14 @@
 import { supabase } from './supabase';
-import type { CycleStatus, HarvestGrade, MilestoneStatus, PayeeKind, PayoutKind } from './types';
+import type {
+  CycleStatus,
+  HarvestGrade,
+  MilestoneStatus,
+  PayeeKind,
+  PayoutKind,
+  VendorKind,
+  VendorStatus,
+  VoucherStatus,
+} from './types';
 
 type Tone = 'neutral' | 'green' | 'amber' | 'red' | 'blue' | 'violet';
 
@@ -27,6 +36,24 @@ export const PAYEE_KIND: Record<PayeeKind, string> = {
   input_vendor: 'Input vendor',
   service_provider: 'Service provider',
   farmer_cash: 'Cash to farmers',
+  input_voucher: 'Input vouchers',
+};
+
+export const VENDOR_KIND: Record<VendorKind, string> = {
+  agro_dealer: 'Agro-dealer',
+  service_provider: 'Service provider',
+};
+
+export const VENDOR_STATUS: Record<VendorStatus, { label: string; tone: Tone }> = {
+  pending: { label: 'Awaiting approval', tone: 'amber' },
+  approved: { label: 'Approved', tone: 'green' },
+  suspended: { label: 'Suspended', tone: 'red' },
+};
+
+export const VOUCHER_STATUS: Record<VoucherStatus, { label: string; tone: Tone }> = {
+  active: { label: 'Active', tone: 'blue' },
+  redeemed: { label: 'Used', tone: 'green' },
+  closed: { label: 'Closed', tone: 'neutral' },
 };
 
 export const HARVEST_GRADE: Record<HarvestGrade, { label: string; tone: Tone }> = {

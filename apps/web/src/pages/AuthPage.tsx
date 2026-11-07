@@ -103,7 +103,7 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 
       {/* Form */}
       <div className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-sm">
+        <div className="w-full max-w-xl">
           <div className="mb-10 lg:hidden">
             <Logo />
           </div>

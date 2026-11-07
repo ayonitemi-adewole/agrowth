@@ -21,21 +21,26 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Next is Phase 2 (investor and government editions, vouchers, the offline agent app, USSD).
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Still to come: USSD and SMS.
 
-| Area                                                                                                           | State |
-| -------------------------------------------------------------------------------------------------------------- | ----- |
-| Accounts and roles: sign-up, admin assigns staff roles, deactivation                                           | Done  |
-| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                                        | Done  |
-| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check                        | Done  |
-| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents                | Done  |
-| Approval: readiness checklist, compliance review, separation of duties                                         | Done  |
-| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled                  | Done  |
-| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release                | Done  |
-| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments                            | Done  |
-| Ledger: double-entry, append-only, balanced, no money moving between cycles                                    | Done  |
-| Harvest: weighed and graded deliveries per farm, voids with a reason                                           | Done  |
-| Settlement: offtake and insurance receipts, fee → capital → profit-share waterfall, payouts, funder statements | Done  |
+| Area                                                                                                                                                                               | State |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| Accounts and roles: sign-up, admin assigns staff roles, deactivation                                                                                                               | Done  |
+| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                                                                                                            | Done  |
+| Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check                                                                                            | Done  |
+| Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents                                                                                    | Done  |
+| Approval: readiness checklist, compliance review, separation of duties                                                                                                             | Done  |
+| Funding: trustee-confirmed deposits, refunds when a cycle misses its deadline or is cancelled                                                                                      | Done  |
+| Field verification: GPS check-in inside the boundary, checklist, photos; failures block release                                                                                    | Done  |
+| Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments                                                                                                | Done  |
+| Ledger: double-entry, append-only, balanced, no money moving between cycles                                                                                                        | Done  |
+| Harvest: weighed and graded deliveries per farm, voids with a reason                                                                                                               | Done  |
+| Settlement: offtake and insurance receipts, fee → capital → profit-share waterfall, payouts, funder statements                                                                     | Done  |
+| Vendors: agro-dealer registry, compliance approval, re-review on bank changes, counter sign-ins                                                                                    | Done  |
+| Vouchers: issued per farm by area, redeemed by code + phone, vendors paid on redemption, unused value returned                                                                     | Done  |
+| Investor Edition: investor KYC and classification, retail cap, risk disclosure, pledges with cooling-off, live tracker, statements, certificates                                   | Done  |
+| Government Edition: programmes with eligibility and budgets, dashboards by state, LGA, ward, commodity and cooperative, repayment, agent visit record, audit and open-data exports | Done  |
+| Offline agent app: installable on a phone's home screen, work list saved on the phone, visits and photos queued with no signal and sent when back in coverage                      | Done  |
 
 ## Getting started
 
@@ -93,38 +98,41 @@ Reload the app. From then on, use the **Users** page to give other staff their r
 For showing Agrowth to customers, one command fills a Supabase project with a lived-in portfolio, so every screen has something real on it:
 
 - 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected
-- 8 funding cycles, one at every stage:
+- 9 funding cycles, one at every stage, and a state wheat programme running two of them:
 
-| Stage             | Cycle                        | What it shows                                                              |
-| ----------------- | ---------------------------- | -------------------------------------------------------------------------- |
-| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram |
-| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%   |
-| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live              |
-| In progress       | Zaria maize, dry season      | A release blocked because one visit checked in 340 m outside the farm      |
-| Funded            | Kura wheat, dry season       | A government programme cycle; field visits under way                       |
-| Open for funding  | Makurdi soybean, next season | 55% raised; the trustee records a deposit live                             |
-| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                               |
-| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                            |
+| Stage             | Cycle                        | What it shows                                                                                              |
+| ----------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Settled           | Zaria maize, wet season      | A full season closed: funders +16%, farmers paid their surplus by kilogram                                 |
+| Settled           | Makurdi soybean, wet season  | A drought year: the insurance claim returned the funders' capital, +0.9%                                   |
+| Settled           | Kura wheat, last dry season  | The wheat programme's first season: input credit repaid in full; one farm short after a pump failure       |
+| Harvested         | Kura rice, wet season        | Harvest in and paid for; the trustee runs the settlement live                                              |
+| In progress       | Zaria maize, dry season      | Inputs paid as vouchers redeemed at an agro-dealer; a release blocked by a check-in 270 m outside the farm |
+| Funded            | Kura wheat, dry season       | The same farms' second programme season; field visits under way                                            |
+| Open for funding  | Makurdi soybean, next season | 55% raised; a retail investor's pledge in cooling-off; the trustee records a deposit live                  |
+| Awaiting approval | Ikara sorghum, next season   | Blended funding; compliance approves it live                                                               |
+| Draft             | Makurdi soybean expansion    | The readiness checklist with two checks failing                                                            |
 
 Every record goes through the same database functions and security rules as the app, signed in as the demo user whose job it is. The seed is also a test (`supabase/tests/seed.test.ts`), so it can't drift from the rules.
 
 **Use a separate Supabase project for this.** The demo accounts share one password, and the records are permanent: the ledger and history are append-only, so only a database reset removes them.
 
-1. Create a new Supabase project (see [Getting started](#getting-started)), link it and push the migrations:
+1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
+2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
+3. Create the tables, rules and functions:
    ```bash
-   npx supabase link --project-ref YOUR_DEMO_PROJECT_ID
-   npx supabase db push
+   npm run demo:push
    ```
-2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), plus a password for the demo accounts. The file is git-ignored; never commit the secret key.
-3. Run:
+4. Run:
    ```bash
    npm run seed:demo
    ```
    It asks you to confirm, takes a few minutes, and prints the accounts and the lines to paste into `apps/web/.env.local` for one-click sign-in.
 
-The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test` and `admin@agrowth.test`.
+The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer), `programme@agrowth.test` (programme manager for the Kano wheat programme) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
 
-Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npx supabase db reset --linked`, then `npm run seed:demo`.
+Three investor accounts use the Investor Edition portal. `investor@agrowth.test` (Adaeze Okoro, high-net-worth) invested in both Zaria maize cycles through the portal, so she has a paid-out statement and a live cycle to track. `investor.retail@agrowth.test` (Funmilayo Adeleke, retail, capped at 10% of income) has a pledge to the open soybean cycle that is still in its 48-hour cooling-off. `investor.new@agrowth.test` (Emeka Obi) is waiting for compliance to check his KYC.
+
+Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npm run demo:reset` (it asks you to type `reset`), then `npm run seed:demo`. After adding a migration, `npm run demo:push` applies it to the demo project. These commands only ever touch the demo project; never use `--linked` or `--remote` on their own for the demo, because they point at your development project.
 
 The field visit photos are labelled illustrations with the visit's GPS stamp, not real photographs.
 
@@ -132,13 +140,13 @@ The field visit photos are labelled illustrations with the visit's GPS stamp, no
 
 To give prospects a link they can open themselves, deploy the web app against the demo project. The repo includes a `vercel.json`, so on [Vercel](https://vercel.com): **Add New → Project**, import this repository, and set these environment variables:
 
-| Variable                        | Value                                                                                                                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                   |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                |
-| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                   |
-| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                              |
-| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test` |
+| Variable                        | Value                                                                                                                                                                                               |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                                              |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                                           |
+| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                                              |
+| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                                                         |
+| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test` |
 
 `VITE_DEMO_MODE=true` makes a production build keep the role buttons and **Simulate GPS at this farm**, lead the sign-in page with "Explore the demo", hide self sign-up, and show a "sample portfolio" banner. A build without it contains no demo accounts or passwords.
 
@@ -155,6 +163,7 @@ This walks one cycle through its whole life by hand, on an empty project. (For a
 | Compliance officer | `compliance_officer` | Verifies farmer KYC, approves cycles                        | comply@officer.test         |
 | Cycle manager      | `cycle_manager`      | Builds the cycle, requests verification, instructs releases | tolu@manager.test           |
 | Trustee            | `trustee`            | Confirms deposits and payments, refunds                     | bank@trustee.test           |
+| Agro-dealer        | `vendor`             | Redeems farmers' input vouchers at the shop counter         | counter@zariaagro.test      |
 
 ### One-click demo sign-in
 
@@ -163,7 +172,7 @@ Add these to `apps/web/.env.local` (never committed) and restart `npm run dev`. 
 ```
 VITE_DEMO_PASSWORD=the password the demo accounts share
 VITE_ADMIN_DEMO_PASSWORD=optional: a different password for the admin account
-VITE_DEMO_ACCOUNTS=admin:agrowth.farmlands@gmail.com,field_agent:damola@agent.test,compliance_officer:comply@officer.test,cycle_manager:tolu@manager.test,trustee:bank@trustee.test
+VITE_DEMO_ACCOUNTS=admin:agrowth.farmlands@gmail.com,field_agent:damola@agent.test,compliance_officer:comply@officer.test,cycle_manager:tolu@manager.test,trustee:bank@trustee.test,vendor:counter@zariaagro.test
 ```
 
 Any role can have its own password the same way: `VITE_<ROLE>_DEMO_PASSWORD`, for example `VITE_TRUSTEE_DEMO_PASSWORD`. Otherwise the shared one is used.
@@ -177,6 +186,21 @@ A field visit passes only if the GPS fix is accurate to 20 m and within 20 m of 
 1. Run `npm run dev:phone`. It prints a `Network` address such as `https://192.168.0.81:5173`.
 2. On a phone on the same Wi-Fi, open that address. Accept the certificate warning: it's a self-signed certificate for local testing. Browsers only share GPS with secure pages.
 3. Map the demo farms **around where you are** (step 3 below), so you're standing at the farms when you visit them.
+
+### Installing the app and working offline
+
+Agrowth installs like an app: on Android, open the site in Chrome and choose **Install app** (or **Add to Home screen**); on an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
+
+For field agents it then works without a connection:
+
+- **Field visits** saves the agent's work list on the phone every time it opens online: the farms to visit, their boundaries and the farmers' names.
+- With no signal, the app still opens, the list and each farm's boundary still show, and GPS still works. Map imagery needs a connection (the tile providers don't allow bulk offline copies), so the boundary and your position are drawn on a plain background.
+- A visit recorded offline is saved on the phone with its photos and sent automatically when coverage returns (on reconnect, and every minute while visits are waiting). The menu shows **Online/Offline** and how many visits are waiting.
+- The database judges it exactly as an online visit, using the time the agent was at the farm. Each visit carries the phone's own id, so a resend after a dropped connection can't record it twice. Staff see "recorded offline, received …" on visits that arrived late.
+- If the database refuses a queued visit (say the milestone was verified by someone else meanwhile), it shows as **Not accepted** with the reason, and the agent can remove it.
+- Signing out removes the saved work list from the phone. Unsent visits stay, and send when the same agent signs in again.
+
+Offline support is in production builds only. To try it on a phone, run `npm run preview:phone` (a production build over HTTPS on your network), open the `Network` address on the phone, sign in as the field agent and open **Field visits**. Then turn on flight mode and record a visit.
 
 ### The walkthrough
 
@@ -296,6 +320,14 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 > Try recording ₦1 more, or reusing `TRX-DEMO-001`: both are refused. After the second deposit the cycle is _Funded_.
 
+**Or invest through the investor portal** instead of one of the deposits above:
+
+1. Sign up a new account (it starts as an investor) → **Profile and KYC**. Fill it in with any 11-digit NIN and BVN and attach an image as the ID.
+2. As compliance (or admin): **Investors** → **Review** → **Verify**. Pick the classification: a retail investor can invest at most 10% of the income they declared, minus what they invest elsewhere.
+3. As the investor: **Marketplace** → the cycle → **Invest**. Read the risk disclosure, tick it, enter ₦900,000 and pledge. The pledge reserves its share of the target and shows the trustee's escrow account and a payment reference.
+4. The trustee can't add the money until the 48-hour cooling-off has passed. For a demo, as admin: **Investors** → **Investor settings** → set cooling-off to 0 hours.
+5. As the trustee: Funding tab → **Investor pledges** → **Confirm payment**. The deposit is recorded against the investor, whose **My investments** page now shows it, with a certificate.
+
 **Step 13 — Cycle manager: request verification.** Milestones tab → milestone 1 → **Request field verification**.
 
 **Step 14 — Field agent: visit each farm** (Field visits → Visit). Use the phone, standing at the farms, or press **Simulate GPS at this farm** for farms you mapped somewhere you can't go. That button appears only on the development server (`npm run dev` / `dev:phone`) and places a ±5 m fix at the farm's centre.
@@ -310,21 +342,55 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 > To see a release being blocked, submit one visit with **Failed** as the crop condition (or from a laptop, where the GPS isn't precise enough). The milestone shows _Blocked_. A passing revisit unblocks it.
 
-**Step 15 — Cycle manager: instruct the release.** Once all three farms have passed, milestone 1 → **Instruct release**. Add three payees that total ₦600,000:
+**Step 15 — Cycle manager: instruct the release.** Once all three farms have passed, milestone 1 → **Instruct release**. Add three lines that total ₦600,000. Seed and fertiliser go out as input vouchers, so farmers pick them up at an approved shop and no cash changes hands:
 
 | Payee type       | Payee name              | Bank and account       | Purpose                       | Amount (₦) |
 | ---------------- | ----------------------- | ---------------------- | ----------------------------- | ---------- |
-| Input vendor     | Zaria Agro Inputs Ltd   | Access Bank 0123456789 | Certified seed and NPK        | 450000     |
+| Input vouchers   | _(none needed)_         | _(none needed)_        | Certified seed and NPK        | 450000     |
 | Service provider | Samaru Tractor Hire     | GTBank 0234567891      | Ploughing and harrowing, 3 ha | 90000      |
 | Cash to farmers  | Cooperative labour fund | Zenith Bank 0345678912 | Planting labour allowance     | 60000      |
 
 > Cash to farmers is capped at 20% of a milestone (₦120,000 here). Try ₦150,000 cash to see it refused.
 
-**Step 16 — Trustee: confirm payments.** Milestones tab → **Confirm payment** for each payee, with references `PAY-DEMO-001`, `PAY-DEMO-002` and `PAY-DEMO-003`. After the third, milestone 1 is _Released_ and the cycle is _In progress_.
+**Step 16 — Trustee: issue the vouchers and confirm payments.** Milestones tab → milestone 1:
 
-**Step 17 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Repeat steps 13–16 for milestones 2 and 3.
+1. **Issue vouchers** on the input-vouchers line and keep the suggested expiry. This ring-fences ₦450,000 of the cycle's cash and issues one voucher per farm, split by farm area (about ₦150,000 each for three 1 ha farms).
+2. **Confirm payment** for the two bank payees, with references `PAY-DEMO-001` and `PAY-DEMO-002`.
 
-**Step 18 — Field agent: record the harvest** (open the cycle → Harvest tab → Record delivery). One row per load, as the offtaker weighs and grades it. The offtake agreement is Northern Mills Ltd for every load.
+Milestone 1 is now _Released_ and the cycle is _In progress_. The cycle has a new **Vouchers** tab.
+
+**Step 17 — Set up the agro-dealer.**
+
+1. Field agent: **Vendors → Register vendor**:
+
+   | Field                    | Value                  |
+   | ------------------------ | ---------------------- |
+   | Business name            | Zaria Agro Inputs Ltd  |
+   | Type                     | Agro-dealer            |
+   | CAC or dealer licence no | RC-1234567             |
+   | Phone                    | +2348035550101         |
+   | State / LGA              | Kaduna / Zaria         |
+   | Shop address             | Samaru Market, Shop 14 |
+   | Bank                     | Access Bank            |
+   | Account number           | 0123456789             |
+   | Account name             | Zaria Agro Inputs Ltd  |
+
+2. Compliance: open the vendor and press **Approve**. Whoever registered a vendor can't approve it.
+3. Sign up `counter@zariaagro.test`. As admin, give it the **Vendor** role on the Users page, then open the vendor and link it under **Counter sign-in**.
+
+> Edit an approved vendor's account number to see it go back to _Awaiting approval_: new bank details always need a fresh review.
+
+**Step 18 — Vendor: redeem the vouchers.** As the cycle manager, open the Vouchers tab and press **Print slips**. In real use a field agent hands each farmer their slip. Then sign in as the agro-dealer → **Redeem vouchers**. For each farmer, enter the code from their slip and the last four digits of their phone (Amina `0001`, Musa `0002`, Hauwa `0003`). Press **Check voucher**, enter "2 bags NPK 15-15-15, 25 kg certified maize seed" and the full amount left on the voucher, then **Redeem**.
+
+> Enter the wrong phone digits: the shop is told only that nothing matches, not which part was wrong. After 5 wrong tries in 15 minutes the counter is locked for 15 minutes. A voucher can also be used in parts, across several visits or shops.
+
+**Step 19 — Trustee: pay the agro-dealer.** Cycle → Vouchers tab → **Pay vendor** for each redemption, with references `VEN-DEMO-001` to `VEN-DEMO-003`. The confirmation shows the vendor's registered account; the trustee pays only that account.
+
+> Any voucher value left unused can be returned to the cycle with **Close** (or **Close expired** once vouchers pass their expiry date). The harvest can't be completed while a voucher is open or a vendor is unpaid.
+
+**Step 20 — Check the ledger** (as trustee or compliance: Ledger → DEMO-MAIZE-2026-001). It shows ₦1,500,000 received, ₦600,000 deployed to farms, ₦900,000 still held, and every entry with its bank reference. Between steps 16 and 19, the voucher money sits in _Cash ring-fenced for input vouchers_. It's still held by the trustee but can't be spent on anything else. Repeat steps 13–16 for milestones 2 and 3 (bank payments only is fine).
+
+**Step 21 — Field agent: record the harvest** (open the cycle → Harvest tab → Record delivery). One row per load, as the offtaker weighs and grades it. The offtake agreement is Northern Mills Ltd for every load.
 
 | Farm       | Weight (kg) | Grade    | Moisture (%) | Waybill     |
 | ---------- | ----------- | -------- | ------------ | ----------- |
@@ -338,9 +404,9 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 The tab now shows 9 t accepted (3 t/ha, the expected yield). The rejected load is kept on record but earns nothing.
 
-**Step 19 — Cycle manager: complete the harvest.** Harvest tab → **Complete harvest**. It's refused while any milestone is unreleased. The cycle is now _Harvested_ and no more loads can be recorded.
+**Step 22 — Cycle manager: complete the harvest.** Harvest tab → **Complete harvest**. It's refused while any milestone is unreleased, any voucher is still open, or any vendor is unpaid. The cycle is now _Harvested_ and no more loads can be recorded.
 
-**Step 20 — Trustee: record the offtaker's payment** (Settlement tab → Record receipt)
+**Step 23 — Trustee: record the offtaker's payment** (Settlement tab → Record receipt)
 
 | Field          | Value                                |
 | -------------- | ------------------------------------ |
@@ -352,7 +418,7 @@ The tab now shows 9 t accepted (3 t/ha, the expected yield). The rejected load i
 
 > An insurer's claim payout is recorded the same way (choose **Insurance payout**). It joins the same waterfall, so funders and farmers see exactly what was recovered.
 
-**Step 21 — Trustee: run the settlement.** The Settlement tab previews the waterfall. Each step is paid in full before the next:
+**Step 24 — Trustee: run the settlement.** The Settlement tab previews the waterfall. Each step is paid in full before the next:
 
 | Step                                          | Amount (₦) |
 | --------------------------------------------- | ---------- |
@@ -366,9 +432,18 @@ Funders are paid in proportion to what they put in: Adaeze Okoro ₦1,353,600 an
 
 > If your cycle was approved before settlement terms existed, its fee is 0% and its funders' share is 30%. The total paid out is the same, but there's no fee line and the screen shows the exact split.
 
-**Step 22 — Trustee: make the payouts.** Settlement tab → **Confirm payment** for each, with references `SET-DEMO-001` to `SET-DEMO-006`. After the last one the cycle is _Settled_.
+**Step 25 — Trustee: make the payouts.** Settlement tab → **Confirm payment** for each, with references `SET-DEMO-001` to `SET-DEMO-006`. After the last one the cycle is _Settled_.
 
-**Step 23 — Check the result.** The **Funder statements** card shows each funder's money in, capital back, return and result. In the Ledger, the trustee's cash, funder capital and farm deployment are all ₦0. The income and expense accounts show where every naira went: ₦4,050,000 harvest proceeds against ₦1,500,000 cost of production, ₦30,000 fee, ₦756,000 funder returns and ₦1,764,000 farmer surplus.
+**Step 26 — Check the result.** The **Funder statements** card shows each funder's money in, capital back, return and result. In the Ledger, the trustee's cash, funder capital and farm deployment are all ₦0. The income and expense accounts show where every naira went: ₦4,050,000 harvest proceeds against ₦1,500,000 cost of production, ₦30,000 fee, ₦756,000 funder returns and ₦1,764,000 farmer surplus.
+
+### The Government Edition
+
+A programme is a ministry's, agency's or donor's scheme: what it funds, where, for whom, and what must come back.
+
+1. As a programme manager (or admin): **Programmes** → **New programme**. Set the commodities, target states and LGAs, the hectare limit, the input package and its value per hectare, the budget, and whether it's an input loan (with the share farmers repay) or a grant. It's saved as a draft; **Activate** fixes the terms.
+2. As the cycle manager: create a cycle with **Funded by** set to a programme or blended, and choose the programme. The readiness checklist now includes the programme's rules: the crop, every farmer inside the target area and under the hectare limit, cooperative membership, the package value, and the programme's dates. Try a farmer from another state to see the check fail.
+3. Run the cycle as usual. When the trustee records a programme deposit, it counts against the programme's budget; one that would overspend it is refused.
+4. The programme's page shows farmers reached (and how many are women), hectares, budget used, inputs delivered, harvest and yield, and the repayment rate once a season settles. Switch the breakdown between state, LGA, ward, commodity and cooperative. Farms that delivered less than the low-yield estimate are listed for follow-up, next to each extension agent's visit record. **Beneficiaries (audit)** downloads every farm with names for auditors and donors; **Open data** downloads totals by LGA with no personal data, safe to publish.
 
 ## Tests
 
@@ -378,9 +453,9 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
-- **Web tests** (`apps/web`) — money, map and error helpers.
+- **Web tests** (`apps/web`) — money, map, error, return-projection and CSV export helpers, and the offline sync queue.
 
 ## Repository layout
 
@@ -388,12 +463,12 @@ This runs:
 apps/
   web/                 React + TypeScript app
     src/
-      pages/           One file per screen (pages/cycle/ holds the cycle detail tabs)
+      pages/           One file per screen (pages/cycle/ holds the cycle detail tabs, pages/invest/ the investor portal, pages/programme/ the Government Edition)
       components/      Layout, map, buttons, inputs
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
@@ -425,5 +500,9 @@ npx supabase db push
 - **Roles come from the database, never the browser.** Sign-up always creates an investor; only an admin can grant staff roles, and nobody can change their own.
 - **Offtake first, insured downside, verified farmers.** A cycle can't be submitted, or approved, until a signed buyer covers at least the low-yield harvest, insurance covers the budget for the whole season, and every farmer has passed KYC.
 - **Separation of duties.** The cycle's own manager can never approve it. Only the trustee confirms deposits, payments and refunds.
+- **Offline visits are judged like any other.** A visit sent late from the phone goes through the same checks, at the time the agent was at the farm (never before verification was requested, never in the future), and the server records when it arrived. A repeated send of the same visit returns the first result and records nothing new; another agent can't reuse its reference.
 - **Money follows verification.** A milestone is released only after every farm passes a field visit (GPS inside the boundary, checklist, photo), in order, and at most 20% may go to farmers as cash. The trustee can't pay out more than it holds for that cycle.
+- **Inputs, not cash.** Vouchers are issued per farm and redeemed only at compliance-approved vendors, with the voucher code plus the last four digits of the farmer's phone. The shop never sees the farmer's phone or full name. Five wrong tries in 15 minutes lock that counter out. The trustee ring-fences voucher money when it issues them and pays only the vendor's registered account. New bank details need a fresh approval, and a suspended vendor's payments are held. Unused value returns to the cycle, and the season can't close while any voucher is open.
+- **Programmes fund only what fits them.** A cycle in a programme can't be submitted or approved unless the programme is active and the cycle meets its rules: a listed commodity, every farmer in the target area, under the hectare limit and in a cooperative, a budget per hectare within the input package, and a season within the programme's dates. An active programme's terms can't be edited. Programme deposits can never exceed its budget, and a closed programme takes no new money.
+- **Investors invest within the rules.** Only a KYC-verified investor can pledge, and only after acknowledging the current version of the risk disclosure (a stale version is refused). Retail investors are capped at a share of their declared income over 12 months, counting what they declared investing elsewhere; compliance decides who is high-net-worth or institutional. A pledge reserves its share of the cycle until its pay-by date, so a cycle can't be oversubscribed. During cooling-off the trustee can't add the money to the cycle, and investors can withdraw until the trustee confirms payment. Investors never read cycle, farm or ledger tables: they see curated listings without farmer names, account numbers or other funders, and field photos only for cycles they have money in.
 - **Evidence is permanent.** Cycle history and field visits are append-only, and uploaded documents can't be replaced or deleted.

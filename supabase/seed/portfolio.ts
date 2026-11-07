@@ -15,7 +15,15 @@ export interface StaffSpec {
 }
 
 export type StaffKey =
-  'admin' | 'agentNorth' | 'agentBenue' | 'compliance' | 'manager' | 'trustee' | 'auditor';
+  | 'admin'
+  | 'agentNorth'
+  | 'agentBenue'
+  | 'compliance'
+  | 'manager'
+  | 'programmeManager'
+  | 'trustee'
+  | 'auditor'
+  | 'vendor';
 
 export const STAFF: StaffSpec[] = [
   { key: 'admin', role: 'admin', fullName: 'Ngozi Adeyemi', email: 'admin@agrowth.test' },
@@ -43,8 +51,218 @@ export const STAFF: StaffSpec[] = [
     fullName: 'Fatima Bello',
     email: 'compliance@agrowth.test',
   },
+  {
+    key: 'programmeManager',
+    role: 'programme_manager',
+    fullName: 'Hadiza Abdullahi',
+    email: 'programme@agrowth.test',
+  },
   { key: 'trustee', role: 'trustee', fullName: 'Kemi Adebayo', email: 'trustee@agrowth.test' },
   { key: 'auditor', role: 'auditor', fullName: 'Ibrahim Musa', email: 'auditor@agrowth.test' },
+  // Counter staff at Zaria Agro Inputs, who redeem farmers' input vouchers.
+  { key: 'vendor', role: 'vendor', fullName: 'Bala Sule', email: 'vendor@agrowth.test' },
+];
+
+export interface VendorSpec {
+  name: string;
+  kind: 'agro_dealer' | 'service_provider';
+  registrationNumber: string;
+  phone: string;
+  email: string;
+  state: string;
+  lga: string;
+  address: string;
+  bank: string;
+  account: string;
+  /** Who registers it. Compliance approves it unless it's `pending`. */
+  registeredBy: StaffKey;
+  pending?: boolean;
+  /** The vendor whose counter the demo vendor account works at. */
+  counter?: boolean;
+}
+
+const vendor = (
+  name: string,
+  registrationNumber: string,
+  n: number,
+  state: string,
+  lga: string,
+  address: string,
+  bank: string,
+  account: string,
+  registeredBy: StaffKey,
+  extra: Partial<VendorSpec> = {},
+): VendorSpec => ({
+  name,
+  kind: 'agro_dealer',
+  registrationNumber,
+  phone: `+23480355501${String(n).padStart(2, '0')}`,
+  email: `sales@${name.toLowerCase().replace(/[^a-z]+/g, '')}.example`,
+  state,
+  lga,
+  address,
+  bank,
+  account,
+  registeredBy,
+  ...extra,
+});
+
+/** Government Edition programmes. Dates are days from the day the seed runs. */
+export interface ProgrammeSpec {
+  key: string;
+  code: string;
+  name: string;
+  sponsor: string;
+  description: string;
+  kind: 'input_loan' | 'grant';
+  budget: number;
+  commodities: string[];
+  states: string[];
+  lgas: string[];
+  maxHectares: number | null;
+  inputPackage: string;
+  packagePerHa: number;
+  repaymentPct: number;
+  starts: number;
+  ends: number;
+}
+
+export const PROGRAMMES: ProgrammeSpec[] = [
+  {
+    key: 'kano-wheat',
+    code: 'KN-WHEAT-ICP',
+    name: 'Kano Dry-Season Wheat Input Credit',
+    sponsor: 'Kano State Ministry of Agriculture (sample programme)',
+    description:
+      'Input credit for irrigated dry-season wheat. Farmers repay the inputs in grain through the contracted mill; any surplus is theirs.',
+    kind: 'input_loan',
+    budget: 60_000_000,
+    commodities: ['wheat'],
+    states: ['Kano'],
+    lgas: ['Kura', 'Garun Mallam', 'Bunkure'],
+    maxHectares: 5,
+    inputPackage:
+      'Per hectare: 120 kg heat-tolerant seed, 4 bags NPK 20-10-10, 2 bags urea, herbicide, ploughing and irrigation pumping.',
+    packagePerHa: 1_100_000,
+    repaymentPct: 100,
+    starts: -400,
+    ends: 400,
+  },
+];
+
+/**
+ * Investor accounts in the Investor Edition portal. A cycle funder whose name matches one of
+ * these invests through the portal (KYC, pledge, trustee-confirmed payment) instead of being
+ * keyed in by the trustee, so their statement and payouts trace back to them.
+ */
+export interface InvestorSpec {
+  fullName: string;
+  email: string;
+  declared: 'retail' | 'high_net_worth' | 'institutional';
+  income: number;
+  /** Crowdfunding elsewhere in the last 12 months. */
+  elsewhere: number;
+  bank: string;
+  account: string;
+  /** False leaves the KYC in compliance's review queue. */
+  verified: boolean;
+  /** A pledge made when the seed finishes, still in cooling-off: cycle key and amount. */
+  pendingPledge?: { cycle: string; amount: number };
+}
+
+export const INVESTORS: InvestorSpec[] = [
+  {
+    fullName: 'Adaeze Okoro',
+    email: 'investor@agrowth.test',
+    declared: 'high_net_worth',
+    income: 180_000_000,
+    elsewhere: 4_000_000,
+    bank: 'Access Bank',
+    account: '0691234570',
+    verified: true,
+  },
+  {
+    fullName: 'Funmilayo Adeleke',
+    email: 'investor.retail@agrowth.test',
+    declared: 'retail',
+    income: 18_000_000,
+    elsewhere: 300_000,
+    bank: 'GTBank',
+    account: '0123456781',
+    verified: true,
+    pendingPledge: { cycle: 'soy-open', amount: 750_000 },
+  },
+  {
+    fullName: 'Emeka Obi',
+    email: 'investor.new@agrowth.test',
+    declared: 'high_net_worth',
+    income: 95_000_000,
+    elsewhere: 0,
+    bank: 'Zenith Bank',
+    account: '2081234567',
+    verified: false,
+  },
+];
+
+/** Agro-dealers where farmers redeem input vouchers. */
+export const VENDORS: VendorSpec[] = [
+  vendor(
+    'Zaria Agro Inputs Ltd',
+    'RC-1458823',
+    1,
+    'Kaduna',
+    'Zaria',
+    '14 Sokoto Road, Zaria',
+    'Access Bank',
+    '0123456789',
+    'agentNorth',
+    { counter: true },
+  ),
+  vendor(
+    'Samaru Farm Supplies',
+    'RC-2290417',
+    2,
+    'Kaduna',
+    'Zaria',
+    'Samaru Market, Zaria',
+    'GTBank',
+    '0234567812',
+    'agentNorth',
+  ),
+  vendor(
+    'Kura Agro Centre',
+    'RC-1873360',
+    3,
+    'Kano',
+    'Kura',
+    'Kura Motor Park Road',
+    'Jaiz Bank',
+    '0012398765',
+    'manager',
+  ),
+  vendor(
+    'Benue Agro Dealers Ltd',
+    'RC-1655092',
+    4,
+    'Benue',
+    'Makurdi',
+    '22 Old Otukpo Road, Makurdi',
+    'Fidelity Bank',
+    '5012398760',
+    'agentBenue',
+  ),
+  vendor(
+    'Ikara Farm Centre',
+    'RC-3012784',
+    5,
+    'Kaduna',
+    'Ikara',
+    'Ikara Central Market',
+    'First Bank',
+    '3023498761',
+    'agentNorth',
+    { pending: true },
+  ),
 ];
 
 export type CoopKey = 'zaria' | 'kura' | 'makurdi' | 'ikara';
@@ -221,7 +439,13 @@ export interface CycleSpec {
   funders: [string, number, number][];
   funderKind?: 'investor' | 'programme';
   /** For harvested and settled cycles. */
+  /** The programme (by key) the cycle belongs to. */
+  programme?: string;
+  /** Last season's cycle on the same farms as this one (by key), instead of new farmers. */
+  sameFarmsAs?: string;
   harvestResult?: {
+    /** A farm (by position) that delivered only this share of the yield. */
+    shortfall?: { position: number; share: number };
     yieldPerHa: number;
     pricePerTonne: number;
     deliveryDays: [first: number, last: number];
@@ -234,6 +458,8 @@ export interface CycleSpec {
   };
   /** Return the first submission with this note before approving. */
   returnedWith?: string;
+  /** Pay the first milestone's input line as farmers' input vouchers instead of to a vendor. */
+  voucherInputs?: boolean;
   /** For draft cycles: what's still missing. */
   withoutInsurance?: boolean;
   /** Farmers (by position in the cycle) whose KYC is still pending. */
@@ -755,6 +981,7 @@ export const CYCLES: CycleSpec[] = [
     buyer: BUYERS.maize,
     insurer: SAVANNA,
     milestones: maizeMilestones([-8, 4, 100]),
+    voucherInputs: true,
     funders: [
       ['Kestrel Agri Fund I', 0.5, -41],
       ['Adaeze Okoro', 0.25, -33],
@@ -762,7 +989,44 @@ export const CYCLES: CycleSpec[] = [
     ],
   },
   {
+    key: 'wheat-programme-settled',
+    stage: 'settled',
+    coop: 'kura',
+    farmers: 0,
+    sameFarmsAs: 'wheat-programme-funded',
+    programme: 'kano-wheat',
+    crop: 'wheat',
+    cropCode: 'WHEAT',
+    fundingSource: 'programme',
+    funderKind: 'programme',
+    budgetPerHa: 1_100_000,
+    yields: [2.5, 3.5, 4.5],
+    prices: [520_000, 620_000, 720_000],
+    feePct: 1,
+    funderSharePct: 0,
+    deadline: -366,
+    start: -356,
+    harvest: -231,
+    description:
+      'Last dry season, the same four farms under the state wheat programme. Three farms beat the estimate; one lost much of its crop to a failed pump and is being followed up.',
+    buyer: BUYERS.wheat,
+    insurer: SHIELD,
+    milestones: wheatMilestones([-363, -310, -240]),
+    funders: [
+      ['Kano Dry-Season Wheat Input Credit', 0.8, -380],
+      ['Kura LGA Counterpart Fund', 0.2, -370],
+    ],
+    harvestResult: {
+      yieldPerHa: 3.6,
+      pricePerTonne: 640_000,
+      deliveryDays: [-228, -220],
+      receiptDay: -205,
+      shortfall: { position: 2, share: 0.35 },
+    },
+  },
+  {
     key: 'wheat-programme-funded',
+    programme: 'kano-wheat',
     stage: 'funded',
     coop: 'kura',
     farmers: 4,
@@ -784,7 +1048,7 @@ export const CYCLES: CycleSpec[] = [
     insurer: SHIELD,
     milestones: wheatMilestones([2, 55, 125]),
     funders: [
-      ['Northern Wheat Input Credit Programme', 0.8, -21],
+      ['Kano Dry-Season Wheat Input Credit', 0.8, -21],
       ['Kura LGA Counterpart Fund', 0.2, -6],
     ],
   },

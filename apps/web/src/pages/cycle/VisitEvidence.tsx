@@ -1,4 +1,5 @@
 import { BadgeCheck, ImageOff, XCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { FarmMap } from '../../components/FarmMap';
 import { Badge, DescriptionList, Modal, Skeleton } from '../../components/ui';
 import { signedUrls } from '../../lib/cycles';
@@ -9,6 +10,11 @@ import type { CycleFarm } from './useCycleData';
 
 const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
+
+/** Reached the server more than 15 minutes after the agent was at the farm. */
+const syncedLate = (v: { visited_at: string; created_at?: string }) =>
+  !!v.created_at &&
+  new Date(v.created_at).getTime() - new Date(v.visited_at).getTime() > 15 * 60_000;
 
 /**
  * Everything a field visit recorded, so anyone reviewing a release can see why it passed or
@@ -52,6 +58,13 @@ function Evidence({
   history: FieldVisit[];
 }) {
   const photos = useAsync(() => signedUrls('field-photos', v.photo_paths), [v.id]);
+  // The dialog opens after this renders. A map created while it's still hidden has no size and
+  // draws nothing, so the map waits one frame, until the dialog is on screen.
+  const [onScreen, setOnScreen] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setOnScreen(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const inside = Number(v.distance_from_boundary_m) === 0;
   const earlier = history.filter((h) => h.id !== v.id);
 
@@ -67,7 +80,10 @@ function Evidence({
             <XCircle className="size-3.5" aria-hidden /> Failed
           </Badge>
         )}
-        <span className="text-sm text-zinc-500">Visited {dateTime(v.visited_at)}</span>
+        <span className="text-sm text-zinc-500">
+          Visited {dateTime(v.visited_at)}
+          {syncedLate(v) && ` · recorded offline, received ${dateTime(v.created_at!)}`}
+        </span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -90,14 +106,18 @@ function Evidence({
             </div>
           )}
         </div>
-        <FarmMap
-          farms={[farm]}
-          highlightId={farm.id}
-          position={{ lon: v.lon, lat: v.lat, accuracy: Number(v.gps_accuracy_m) }}
-          positionLabel="Check-in"
-          fitPosition
-          className="aspect-[4/3] w-full rounded-xl ring-1 ring-zinc-950/5"
-        />
+        {onScreen ? (
+          <FarmMap
+            farms={[farm]}
+            highlightId={farm.id}
+            position={{ lon: v.lon, lat: v.lat, accuracy: Number(v.gps_accuracy_m) }}
+            positionLabel="Check-in"
+            fitPosition
+            className="aspect-[4/3] w-full rounded-xl ring-1 ring-zinc-950/5"
+          />
+        ) : (
+          <Skeleton className="aspect-[4/3] rounded-xl" />
+        )}
       </div>
       {photos.data && photos.data.length > 1 && (
         <p className="text-xs text-zinc-500">

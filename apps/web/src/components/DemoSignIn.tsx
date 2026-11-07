@@ -6,6 +6,8 @@ import {
   Loader2,
   MapPinned,
   ShieldCheck,
+  Store,
+  TrendingUp,
   UserRound,
   Wheat,
   type LucideIcon,
@@ -26,6 +28,8 @@ const ROLE_ICON: Partial<Record<Role, LucideIcon>> = {
   programme_manager: Wheat,
   trustee: Landmark,
   auditor: Eye,
+  vendor: Store,
+  investor: TrendingUp,
 };
 
 const ROLE_HINT: Partial<Record<Role, string>> = {
@@ -36,6 +40,8 @@ const ROLE_HINT: Partial<Record<Role, string>> = {
   programme_manager: 'Builds programme cycles',
   trustee: 'Confirms money',
   auditor: 'Reads the ledger',
+  vendor: 'Redeems vouchers',
+  investor: 'Invests in cycles',
 };
 
 /** What each role does, for visitors to a hosted demo. */
@@ -47,6 +53,8 @@ const ROLE_DETAIL: Partial<Record<Role, string>> = {
   programme_manager: 'Runs government programme cycles',
   trustee: 'Confirms deposits, payments and payouts',
   auditor: 'Read-only view of every record and the ledger',
+  vendor: "An agro-dealer's counter, redeeming farmers' input vouchers",
+  investor: 'Browses cycles, pledges, tracks the farms and the payouts',
 };
 
 /**
@@ -80,7 +88,7 @@ export function DemoSignIn({ detailed = false }: { detailed?: boolean }) {
           <span className="h-px flex-1 bg-zinc-200" />
         </div>
       )}
-      <div className={cx('grid gap-2', !detailed && 'grid-cols-2')}>
+      <div className={cx('grid gap-2 sm:grid-cols-2')}>
         {demo.accounts.map((a) => {
           const Icon = ROLE_ICON[a.role] ?? UserRound;
           return (

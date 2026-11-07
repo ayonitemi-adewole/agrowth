@@ -11,7 +11,15 @@
 export type Row = Record<string, unknown>;
 
 export type Role =
-  'admin' | 'cycle_manager' | 'field_agent' | 'compliance_officer' | 'auditor' | 'trustee';
+  | 'admin'
+  | 'cycle_manager'
+  | 'programme_manager'
+  | 'field_agent'
+  | 'compliance_officer'
+  | 'auditor'
+  | 'trustee'
+  | 'vendor'
+  | 'investor';
 
 /** A signed-in user. */
 export interface Session {
@@ -34,6 +42,9 @@ export interface SeedApi {
   as(userId: string): Session;
   /** Service-level read, used to check whether the project already holds demo data. */
   adminSelect(table: string, columns: string, match: Row): Promise<Row[]>;
-  /** Service-level update, used only to give finished demo cycles past planned dates. */
+  /**
+   * Service-level update, used only to give finished demo cycles (and the investments in
+   * them) past dates, and to pause investor cooling-off while those investments are made.
+   */
   adminUpdate(table: string, match: Row, values: Row): Promise<void>;
 }

@@ -1,5 +1,6 @@
-import { Landmark, Plus, RotateCcw } from 'lucide-react';
+import { Eye, Landmark, Plus, RotateCcw } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../../components/Toast';
 import {
@@ -12,16 +13,18 @@ import {
   Input,
   Modal,
   Progress,
+  SectionTitle,
   Select,
   Table,
 } from '../../components/ui';
 import { isoDate } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { formatDate } from '../../lib/format';
+import { PLEDGE_STATUS } from '../../lib/investing';
 import { formatNaira, parseNaira, ratio, toKobo } from '../../lib/money';
 import { can } from '../../lib/roles';
 import { supabase } from '../../lib/supabase';
-import type { TabProps } from './useCycleData';
+import type { PledgeRow, TabProps } from './useCycleData';
 
 export function FundingTab({ data, reload }: TabProps) {
   const role = useAuth().profile?.role;
@@ -53,7 +56,19 @@ export function FundingTab({ data, reload }: TabProps) {
           The platform never holds money. Funders pay the trustee's escrow account directly; the
           trustee confirms each deposit here, which records it in this cycle's ledger.
         </p>
+        {cycle.funding_source !== 'programme' &&
+          cycle.status !== 'draft' &&
+          cycle.status !== 'pending_approval' && (
+            <Link
+              to={`/invest/${cycle.id}`}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:underline"
+            >
+              <Eye className="size-4" aria-hidden /> See the investor listing
+            </Link>
+          )}
       </Card>
+
+      {data.pledges.length > 0 && <Pledges pledges={data.pledges} reload={reload} />}
 
       {data.contributions.length === 0 ? (
         <EmptyState icon={<Landmark />} title="No deposits yet">
@@ -86,6 +101,147 @@ export function FundingTab({ data, reload }: TabProps) {
         </Table>
       )}
     </div>
+  );
+}
+
+/** Investors' pledges: the trustee matches each bank payment to its reference and confirms it. */
+function Pledges({ pledges, reload }: { pledges: PledgeRow[]; reload: () => void }) {
+  const role = useAuth().profile?.role;
+  const today = isoDate();
+  return (
+    <div>
+      <SectionTitle
+        title="Investor pledges"
+        description="Investors pledge in the portal and pay the escrow account quoting their reference. A pending pledge holds its share of the target until its pay-by date."
+      />
+      <Table head={['Investor', 'Reference', 'Pledged', 'Pay by', 'Amount', 'Status', '']}>
+        {pledges.map((p) => {
+          const lapsed = p.status === 'pending' && p.pay_by < today;
+          const status = PLEDGE_STATUS[lapsed ? 'lapsed' : p.status];
+          const coolingOff = new Date(p.cooling_off_ends_at) > new Date();
+          return (
+            <tr key={p.id}>
+              <td className="font-medium text-zinc-900">
+                {p.investor_profiles?.legal_name ?? 'Investor'}
+              </td>
+              <td className="font-mono text-xs text-zinc-600">{p.reference}</td>
+              <td className="text-zinc-600">{formatDate(p.pledged_at)}</td>
+              <td className="text-zinc-600">{formatDate(p.pay_by)}</td>
+              <td className="font-medium text-zinc-900 tabular-nums">
+                {formatNaira(p.amount_kobo)}
+              </td>
+              <td>
+                <Badge tone={status.tone} dot>
+                  {status.label}
+                </Badge>
+                {p.status === 'pending' && !lapsed && coolingOff && (
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Cooling-off until{' '}
+                    {new Date(p.cooling_off_ends_at).toLocaleString('en-NG', {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </p>
+                )}
+              </td>
+              <td className="text-right">
+                {can.actAsTrustee(role) && p.status === 'pending' && !lapsed && (
+                  <ConfirmPledgeButton pledge={p} disabled={coolingOff} reload={reload} />
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </Table>
+    </div>
+  );
+}
+
+function ConfirmPledgeButton({
+  pledge,
+  disabled,
+  reload,
+}: {
+  pledge: PledgeRow;
+  disabled: boolean;
+  reload: () => void;
+}) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [reference, setReference] = useState('');
+  const [receivedOn, setReceivedOn] = useState(isoDate());
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase.rpc('confirm_pledge_payment', {
+      p_pledge_id: pledge.id,
+      p_trustee_reference: reference,
+      p_received_on: receivedOn,
+    });
+    setBusy(false);
+    if (error) {
+      setError(errorMessage(error));
+      return;
+    }
+    toast.success(`${formatNaira(pledge.amount_kobo)} added to the cycle`);
+    setOpen(false);
+    reload();
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+        title={disabled ? 'The investor is still in their cooling-off period' : undefined}
+      >
+        Confirm payment
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Confirm ${formatNaira(pledge.amount_kobo)} from ${pledge.investor_profiles?.legal_name ?? 'the investor'}`}
+        description={`Only once a transfer quoting ${pledge.reference} has arrived in the escrow account. This records it in the cycle's ledger.`}
+      >
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Bank reference">
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                required
+                maxLength={120}
+                autoFocus
+              />
+            </Field>
+            <Field label="Received on">
+              <Input
+                type="date"
+                min={pledge.pledged_at.slice(0, 10)}
+                max={pledge.pay_by < isoDate() ? pledge.pay_by : isoDate()}
+                value={receivedOn}
+                onChange={(e) => setReceivedOn(e.target.value)}
+                required
+              />
+            </Field>
+          </div>
+          {error && <Alert>{error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" busy={busy}>
+              Confirm payment
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }
 

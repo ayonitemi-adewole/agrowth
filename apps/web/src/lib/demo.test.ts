@@ -27,3 +27,12 @@ it('skips unknown roles, missing emails and blanks', () => {
     parseDemoAccounts('wizard:w@x.com,field_agent:,cycle_manager:not-an-email,,', env),
   ).toEqual([]);
 });
+
+it('tells apart several accounts with the same role by email', () => {
+  expect(
+    parseDemoAccounts(
+      'investor:investor@x.com,investor:investor.retail@x.com,admin:a@x.com',
+      env,
+    ).map((a) => a.label),
+  ).toEqual(['Investor (investor)', 'Investor (investor.retail)', 'Admin']);
+});

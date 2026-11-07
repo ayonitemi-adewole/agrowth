@@ -466,7 +466,8 @@ export function Modal({
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       className={cx(
-        'm-auto w-[calc(100%-2rem)] rounded-2xl bg-white p-0 shadow-pop open:animate-slide-up',
+        // A modal opened from a table cell is that cell's child in the DOM: reset what it inherits.
+        'm-auto w-[calc(100%-2rem)] rounded-2xl bg-white p-0 text-left font-normal whitespace-normal shadow-pop open:animate-slide-up',
         wide ? 'max-w-2xl' : 'max-w-lg',
       )}
     >

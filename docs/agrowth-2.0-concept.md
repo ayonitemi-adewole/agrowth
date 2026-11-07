@@ -248,7 +248,7 @@ The pilot is the critical phase: it turns a demo into evidence. Selling starts i
 
 ## Sale strategy
 
-Buyers pay for proof, not code: a working platform plus one settled pilot season is worth far more than a feature-complete product nobody has used. Start talking to buyers during the build, not after it.
+Buyers pay for proof, not code: a working platform plus one settled pilot season is worth far more than a feature-complete product nobody has used. Start talking to buyers during the build, not after it.x
 
 **Who to approach, in order of likely speed**
 

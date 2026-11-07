@@ -9,13 +9,15 @@ import { Button, Card, Spinner } from './ui';
 
 /** Sends signed-out visitors to sign in; holds non-staff on a waiting page. */
 export function RequireStaff() {
-  const { session, profile, loading, signOut } = useAuth();
+  const { session, profile, loading, offline, signOut } = useAuth();
   const location = useLocation();
 
   if (loading) return <Spinner />;
-  if (!session) return <Navigate to="/sign-in" replace state={{ from: location }} />;
+  if (!session && !(offline && profile)) {
+    return <Navigate to="/sign-in" replace state={{ from: location }} />;
+  }
 
-  if (!profile || !profile.is_active || !can.useStaffApp(profile.role)) {
+  if (!profile || !profile.is_active || !can.useApp(profile.role)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 px-4">
         <div className="w-full max-w-md space-y-6">
@@ -30,9 +32,11 @@ export function RequireStaff() {
             <p className="mt-2 text-sm text-zinc-600">
               {profile && !profile.is_active
                 ? 'Contact an Agrowth admin if you think this is a mistake.'
-                : 'Your account exists, but an admin still needs to give you a staff role. The investor portal is coming in a later release.'}
+                : 'Your account exists, but an admin still needs to give it a role.'}
             </p>
-            <p className="mt-3 text-xs text-zinc-500">Signed in as {session.user.email}</p>
+            <p className="mt-3 text-xs text-zinc-500">
+              Signed in as {session?.user.email ?? profile?.email}
+            </p>
             <Button variant="secondary" className="mt-5" onClick={signOut}>
               Sign out
             </Button>

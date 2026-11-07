@@ -138,7 +138,7 @@ describe('demo seed', () => {
     const settled = await db.query<{ id: string }>(
       `select id from public.cycles where status = 'settled'`,
     );
-    expect(settled.rows).toHaveLength(2);
+    expect(settled.rows).toHaveLength(3);
     for (const { id } of settled.rows) {
       const cash = await one<{ b: string }>(
         `select coalesce(sum(balance_kobo::bigint), 0)::text as b from public.ledger_balances
@@ -186,6 +186,75 @@ describe('demo seed', () => {
     expect(BigInt(open.raised)).toBeLessThan(BigInt(open.target));
   });
 
+  it('runs portal investors through KYC, pledges and payouts, with cooling-off back on', async () => {
+    const { rows } = await db.query<{
+      email: string;
+      kyc: string;
+      status: string;
+      payouts: number;
+      paid_before_pledge: boolean;
+    }>(
+      `select pr.email, ip.kyc_status::text as kyc, p.status::text as status,
+              (select count(*)::int from public.settlement_payouts sp
+                where sp.contribution_id = p.contribution_id and sp.status = 'executed') as payouts,
+              fc.received_on < p.pledged_at::date as paid_before_pledge
+         from public.investor_profiles ip
+         join public.profiles pr on pr.id = ip.user_id
+         left join public.investment_pledges p on p.investor_id = ip.user_id
+         left join public.funding_contributions fc on fc.id = p.contribution_id
+        order by pr.email, p.pledged_at`,
+    );
+    const by = (email: string) => rows.filter((r) => r.email === email);
+    // Adaeze: the settled maize cycle (paid out) and the one in progress.
+    expect(by('investor@agrowth.test').map((r) => [r.status, r.payouts])).toEqual([
+      ['paid', 1],
+      ['paid', 0],
+    ]);
+    expect(by('investor.retail@agrowth.test').map((r) => r.status)).toEqual(['pending']);
+    expect(by('investor.new@agrowth.test')).toMatchObject([{ kyc: 'pending', status: null }]);
+    expect(rows.some((r) => r.paid_before_pledge)).toBe(false);
+
+    const settings = await one<{ h: number }>(
+      `select cooling_off_hours as h from public.investor_settings`,
+    );
+    expect(settings.h).toBe(48);
+    expect(result.accounts.filter((a) => a.role === 'investor')).toHaveLength(3);
+  });
+
+  it('runs the wheat programme over two seasons, with repayment and a farm to follow up', async () => {
+    const [{ id: pm }] = (
+      await db.query<{ id: string }>(
+        `select id from public.profiles where email = 'programme@agrowth.test'`,
+      )
+    ).rows;
+    const [{ id: programme }] = (
+      await db.query<{ id: string }>(`select id from public.programmes where code = 'KN-WHEAT-ICP'`)
+    ).rows;
+    const d = await asUser(db, pm, async (tx) => {
+      const { rows } = await tx.query<{
+        d: {
+          programme: { status: string };
+          totals: {
+            farmers: number;
+            due_kobo: string;
+            recovered_kobo: string;
+            under_delivered: number;
+          };
+          cycles: { status: string }[];
+          under_delivered: { farmer_name: string }[];
+        };
+      }>(`select public.programme_dashboard($1) as d`, [programme]);
+      return rows[0].d;
+    });
+    expect(d.programme.status).toBe('active');
+    expect(d.cycles.map((c) => c.status).sort()).toEqual(['funded', 'settled']);
+    expect(d.totals.farmers).toBe(4);
+    expect(BigInt(d.totals.due_kobo)).toBeGreaterThan(0n);
+    expect(d.totals.recovered_kobo).toBe(d.totals.due_kobo);
+    expect(d.totals.under_delivered).toBe(1);
+    expect(d.under_delivered).toHaveLength(1);
+  });
+
   it('gives finished cycles their real, past planned dates', async () => {
     const { rows } = await db.query<{ n: number }>(
       `select count(*)::int as n from public.cycles
@@ -224,5 +293,26 @@ describe('demo seed', () => {
       async (tx) => (await tx.query(`select id from public.field_visit_evidence`)).rows,
     );
     expect(hidden).toHaveLength(0);
+  });
+
+  it('pays one release as input vouchers redeemed at an approved agro-dealer', async () => {
+    const vouchers = await db.query<{ status: string; redeemed: string; value: string }>(
+      `select status::text, redeemed_kobo::text as redeemed, value_kobo::text as value
+         from public.vouchers`,
+    );
+    expect(vouchers.rows).toHaveLength(5);
+    const statuses = vouchers.rows.map((v) => v.status).sort();
+    expect(statuses).toEqual(['active', 'active', 'redeemed', 'redeemed', 'redeemed']);
+    expect(vouchers.rows.filter((v) => v.redeemed === '0')).toHaveLength(1);
+
+    const unpaid = await one<{ n: number }>(
+      `select count(*)::int as n from public.voucher_redemptions where paid_at is null`,
+    );
+    expect(unpaid.n).toBe(1);
+    const vendors = await db.query<{ status: string; linked: boolean }>(
+      `select status::text, user_id is not null as linked from public.vendors`,
+    );
+    expect(vendors.rows.filter((v) => v.status === 'pending')).toHaveLength(1);
+    expect(vendors.rows.filter((v) => v.linked)).toHaveLength(1);
   });
 });

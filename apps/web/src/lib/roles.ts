@@ -31,8 +31,29 @@ const REGISTRY_READERS: Role[] = [
 ];
 
 export const can = {
-  /** Anyone working the platform (not investors, vendors or offtakers, whose portals come later). */
+  /** Anyone working the platform (not investors, vendors or offtakers). */
   useStaffApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  /** Who can sign in at all: staff, vendors at their shop counter, and investors. */
+  useApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee', 'vendor', 'investor']),
+  /** The investor portal: marketplace, pledges, portfolio, KYC. */
+  invest: (r?: Role) => has(r, ['investor']),
+  /** See a cycle's investor listing: investors, and staff previewing it. */
+  viewListings: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee', 'investor']),
+  /** Investor KYC records: compliance reviews them, the trustee pays out to them. */
+  readInvestors: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
+  reviewInvestors: (r?: Role) => has(r, ['admin', 'compliance_officer']),
+  editInvestorSettings: (r?: Role) => has(r, ['admin']),
+  /** Government Edition programme dashboards. */
+  readProgrammes: (r?: Role) =>
+    has(r, ['admin', 'programme_manager', 'cycle_manager', 'compliance_officer', 'auditor']),
+  manageProgrammes: (r?: Role) => has(r, ['admin', 'programme_manager']),
+  readVendors: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
+  editVendors: (r?: Role) => has(r, ['admin', 'field_agent', 'cycle_manager', 'programme_manager']),
+  reviewVendors: (r?: Role) => has(r, ['admin', 'compliance_officer']),
+  linkVendorAccounts: (r?: Role) => has(r, ['admin']),
+  redeemVouchers: (r?: Role) => has(r, ['vendor']),
+  voidRedemptions: (r?: Role) =>
+    has(r, ['admin', 'cycle_manager', 'programme_manager', 'compliance_officer']),
   readRegistry: (r?: Role) => has(r, REGISTRY_READERS),
   enrol: (r?: Role) => has(r, ['admin', 'field_agent']),
   editCooperatives: (r?: Role) =>

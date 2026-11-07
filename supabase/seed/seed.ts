@@ -14,8 +14,11 @@ import { fieldPhoto, type FieldStage } from './field-photo.ts';
 import {
   COOPERATIVES,
   CYCLES,
+  INVESTORS,
+  PROGRAMMES,
   STAFF,
   UNASSIGNED_REJECTED,
+  VENDORS,
   type CoopKey,
   type CoopSpec,
   type CycleSpec,
@@ -23,6 +26,18 @@ import {
   type Stage,
   type StaffKey,
 } from './portfolio.ts';
+
+/** A placeholder ID document for demo investors' KYC, clearly marked as a sample. */
+function sampleId(name: string): Uint8Array {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <rect width="640" height="400" rx="24" fill="#f4f4f5" stroke="#a1a1aa" stroke-width="4"/>
+  <rect x="40" y="120" width="160" height="200" rx="12" fill="#d4d4d8"/>
+  <text x="40" y="80" font-family="sans-serif" font-size="28" font-weight="700" fill="#27272a">SAMPLE ID: DEMO ONLY</text>
+  <text x="230" y="170" font-family="sans-serif" font-size="26" fill="#18181b">${name}</text>
+  <text x="230" y="215" font-family="sans-serif" font-size="18" fill="#52525b">Not a real identity document</text>
+</svg>`;
+  return new TextEncoder().encode(svg);
+}
 
 /** How many milestones have been paid out by each stage. */
 const RELEASED: Partial<Record<Stage, number>> = { in_progress: 1, harvested: 3, settled: 3 };
@@ -91,6 +106,8 @@ interface Farm {
   farmName: string;
   hectares: number;
   centre: [lon: number, lat: number];
+  /** The farmer's phone; a vendor needs its last four digits to redeem a voucher. */
+  phone: string;
 }
 
 const FARM_NAMES = [
@@ -174,10 +191,110 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   const compliance = as('compliance');
   const trustee = as('trustee');
 
+  // Vendors ---------------------------------------------------------------------------------
+  log('Registering agro-dealers');
+  for (const v of VENDORS) {
+    const [row] = await as(v.registeredBy).insert('vendors', {
+      name: v.name,
+      kind: v.kind,
+      registration_number: v.registrationNumber,
+      contact_phone: v.phone,
+      contact_email: v.email,
+      state: v.state,
+      lga: v.lga,
+      address: v.address,
+      bank_name: v.bank,
+      account_number: v.account,
+      account_name: v.name,
+    });
+    if (!v.pending) {
+      await compliance.rpc('set_vendor_status', { p_vendor_id: row.id, p_status: 'approved' });
+    }
+    if (v.counter) {
+      await as('admin').rpc('link_vendor_account', { p_vendor_id: row.id, p_user_id: ids.vendor });
+    }
+  }
+
+  // Programmes --------------------------------------------------------------------------------
+  log('Designing government programmes');
+  const programmeIds = new Map<string, string>();
+  const pm = as('programmeManager');
+  for (const p of PROGRAMMES) {
+    const [row] = await pm.insert('programmes', {
+      code: p.code,
+      name: p.name,
+      sponsor: p.sponsor,
+      description: p.description,
+      kind: p.kind,
+      budget_kobo: kobo(p.budget),
+      commodities: p.commodities,
+      target_states: p.states,
+      target_lgas: p.lgas,
+      max_hectares_per_farmer: p.maxHectares,
+      require_cooperative: true,
+      input_package: p.inputPackage,
+      max_budget_per_ha_kobo: kobo(p.packagePerHa),
+      repayment_bps: Math.round(p.repaymentPct * 100),
+      starts_on: day(p.starts),
+      ends_on: day(p.ends),
+    });
+    await pm.rpc('activate_programme', { p_programme_id: row.id });
+    programmeIds.set(p.key, row.id as string);
+  }
+
+  // Investors ---------------------------------------------------------------------------------
+  log('Onboarding investors');
+  const investorIds = new Map<string, string>();
+  for (const [i, inv] of INVESTORS.entries()) {
+    const id = await api.ensureUser({
+      email: inv.email,
+      password: opts.password,
+      fullName: inv.fullName,
+      role: 'investor',
+    });
+    investorIds.set(inv.fullName, id);
+    const investor = api.as(id);
+    const idPath = `${id}/national-id.svg`;
+    await investor.upload('investor-documents', idPath, sampleId(inv.fullName), 'image/svg+xml');
+    await investor.rpc('submit_investor_kyc', {
+      p_legal_name: inv.fullName,
+      p_declared_class: inv.declared,
+      p_nin: String(70_000_000_000 + i),
+      p_bvn: String(22_100_000_000 + i),
+      p_annual_income_kobo: kobo(inv.income),
+      p_other_crowdfunding_kobo: kobo(inv.elsewhere),
+      p_id_document_path: idPath,
+      p_bank_name: inv.bank,
+      p_account_number: inv.account,
+      p_account_name: inv.fullName,
+    });
+    if (inv.verified) {
+      await compliance.rpc('review_investor_kyc', {
+        p_user_id: id,
+        p_approve: true,
+        p_classification: inv.declared,
+        p_note: null,
+      });
+    }
+  }
+  // Past investments are made as the story happened, so no cooling-off holds them up here;
+  // it is switched back on once the portfolio is built.
+  const [settings] = await as('admin').select('investor_settings', 'cooling_off_hours', {
+    id: true,
+  });
+  await api.adminUpdate('investor_settings', { id: true }, { cooling_off_hours: 0 });
+  const [{ disclosure_version: disclosureVersion }] = await as('admin').select(
+    'investor_settings',
+    'disclosure_version',
+    { id: true },
+  );
+  const cycleIds = new Map<string, string>();
+
   // Which farmers go into which cycle: each cycle takes the next ones from its cooperative.
   const taken: Record<CoopKey, number> = { zaria: 0, kura: 0, makurdi: 0, ikara: 0 };
   const placement = new Map<string, { cycle: string; position: number }>();
   for (const c of CYCLES) {
+    if (c.sameFarmsAs) continue;
     for (let p = 0; p < c.farmers; p++) {
       placement.set(`${c.coop}:${taken[c.coop]++}`, { cycle: c.key, position: p });
     }
@@ -230,10 +347,11 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     gender: 'female' | 'male',
   ): Promise<Farm> {
     const n = identity++;
+    const phone = `+234803${String(2_100_000 + n * 7_919).padStart(7, '0')}`;
     const farmerId = await agent.rpc<string>('register_farmer', {
       p_first_name: first,
       p_last_name: last,
-      p_phone: `+234803${String(2_100_000 + n * 7_919).padStart(7, '0')}`,
+      p_phone: phone,
       p_state: coop.state,
       p_lga: coop.lga,
       // Most farmers have both identifiers; some have only one.
@@ -262,7 +380,13 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       farmName,
       hectares: Number(farm.area_hectares),
       centre: boundary.centre,
+      phone,
     };
+  }
+
+  // A past season on the same farms as a later cycle.
+  for (const c of CYCLES) {
+    if (c.sameFarmsAs) farmsByCycle.set(c.key, farmsByCycle.get(c.sameFarmsAs)!);
   }
 
   // Cycles ----------------------------------------------------------------------------------
@@ -308,10 +432,12 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       expected_harvest_date: plan(spec.harvest),
       management_fee_bps: Math.round(spec.feePct * 100),
       funder_profit_share_bps: Math.round(spec.funderSharePct * 100),
+      ...(spec.programme ? { programme_id: programmeIds.get(spec.programme) } : {}),
       description: spec.description,
     });
     const cycleId = cycle.id as string;
     cycles.push({ code, stage: spec.stage });
+    cycleIds.set(spec.key, cycleId);
 
     await manager.insert(
       'cycle_farms',
@@ -434,14 +560,46 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         )
       : spec.funders.map((f) => floorTo(target * f[1], 10_000));
     for (const [i, [name, , received]] of spec.funders.entries()) {
-      await trustee.rpc('record_funding', {
+      const reference = `DEP-${code}-${String(i + 1).padStart(2, '0')}`;
+      const investorId = investorIds.get(name);
+      if (!investorId) {
+        await trustee.rpc('record_funding', {
+          p_cycle_id: cycleId,
+          p_funder_name: name,
+          p_funder_kind: spec.funderKind ?? 'investor',
+          p_amount_kobo: kobo(deposits[i]),
+          p_trustee_reference: reference,
+          p_received_on: day(received),
+        });
+        continue;
+      }
+      // A portal investor: pledge, pay, and the trustee confirms against the pledge.
+      const pledge = await api.as(investorId).rpc<{ id: string }>('pledge_investment', {
         p_cycle_id: cycleId,
-        p_funder_name: name,
-        p_funder_kind: spec.funderKind ?? 'investor',
         p_amount_kobo: kobo(deposits[i]),
-        p_trustee_reference: `DEP-${code}-${String(i + 1).padStart(2, '0')}`,
-        p_received_on: day(received),
+        p_disclosure_version: disclosureVersion,
       });
+      const contributionId = await trustee.rpc<string>('confirm_pledge_payment', {
+        p_pledge_id: pledge.id,
+        p_trustee_reference: reference,
+        p_received_on: day(0),
+      });
+      // Then give the investment the dates of the story: pledged three days before paying.
+      await api.adminUpdate(
+        'funding_contributions',
+        { id: contributionId },
+        { received_on: day(received) },
+      );
+      await api.adminUpdate(
+        'investment_pledges',
+        { id: pledge.id },
+        {
+          pledged_at: date(received - 3).toISOString(),
+          disclosure_acknowledged_at: date(received - 3).toISOString(),
+          cooling_off_ends_at: date(received - 1).toISOString(),
+          pay_by: day(received + 4),
+        },
+      );
     }
     if (!fullyFunded) continue;
 
@@ -453,7 +611,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     const visit = async (farm: Farm, m: number, pass: boolean) => {
       const milestoneId = milestoneIds[m];
       const accuracy = 3 + Math.floor(rand() * 6);
-      // A failed visit: the agent checked in from the village, about 340 m away.
+      // A failed visit: the agent checked in from the village, about 340 m from the farm's centre.
       const lon = farm.centre[0] + (pass ? (rand() - 0.5) * 0.0001 : 0.0031);
       const lat = farm.centre[1] + (pass ? (rand() - 0.5) * 0.0001 : 0.0004);
       const path = `${milestoneId}/${farm.farmId}/${crypto.randomUUID()}-photo.svg`;
@@ -499,21 +657,64 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       );
       await manager.rpc('instruct_milestone_release', {
         p_milestone_id: milestoneIds[m],
-        p_lines: payees.map((p, i) => ({
-          payee_kind: p.kind,
-          payee_name: p.name,
-          payee_account: p.account,
-          purpose: p.purpose,
-          amount_kobo: String(kobo(parts[i])),
-        })),
+        p_lines: payees.map((p, i) => {
+          // Inputs can reach farmers as vouchers they redeem at an approved agro-dealer.
+          const voucher = spec.voucherInputs && m === 0 && p.kind === 'input_vendor';
+          return {
+            payee_kind: voucher ? 'input_voucher' : p.kind,
+            payee_name: voucher ? 'Farmers (input vouchers)' : p.name,
+            payee_account: voucher ? 'Redeemable at approved agro-dealers' : p.account,
+            purpose: p.purpose,
+            amount_kobo: String(kobo(parts[i])),
+          };
+        }),
       });
-      const lines = await trustee.select('disbursements', 'id, amount_kobo', {
+      const lines = await trustee.select('disbursements', 'id, payee_kind', {
         milestone_id: milestoneIds[m],
       });
       for (const [i, line] of lines.entries()) {
-        await trustee.rpc('confirm_disbursement', {
-          p_disbursement_id: line.id,
-          p_trustee_reference: `PAY-${code}-M${m + 1}-${String(i + 1).padStart(2, '0')}`,
+        if (line.payee_kind === 'input_voucher') {
+          await trustee.rpc('issue_vouchers', { p_disbursement_id: line.id });
+        } else {
+          await trustee.rpc('confirm_disbursement', {
+            p_disbursement_id: line.id,
+            p_trustee_reference: `PAY-${code}-M${m + 1}-${String(i + 1).padStart(2, '0')}`,
+          });
+        }
+      }
+    };
+
+    /**
+     * Farmers take their vouchers to the agro-dealer's counter: most are used in full, one in
+     * part, one not yet. The trustee has paid the dealer for all but the latest redemption.
+     */
+    const redeemVouchers = async () => {
+      const vouchers = await trustee.select('vouchers', 'code, farm_id, value_kobo', {
+        milestone_id: milestoneIds[0],
+      });
+      const counter = as('vendor');
+      for (const [i, farm] of farms.entries()) {
+        const v = vouchers.find((x) => x.farm_id === farm.farmId);
+        if (!v || i === farms.length - 1) continue;
+        const value = Number(v.value_kobo);
+        const amount = i === farms.length - 2 ? roundTo(value * 0.6, 100_00) : value;
+        const bags = Math.max(1, Math.round(amount / 100 / 45_000));
+        const result = await counter.rpc<{ ok?: boolean; message?: string }>('redeem_voucher', {
+          p_code: v.code,
+          p_phone_last4: farm.phone.slice(-4),
+          p_amount_kobo: amount,
+          p_items: `${bags} bags NPK 15-15-15, ${Math.max(1, Math.round(farm.hectares * 25))} kg certified maize seed`,
+        });
+        if (result.ok === false) throw new Error(`Redeeming ${v.code}: ${result.message}`);
+      }
+      const redemptions = await trustee.select('voucher_redemptions', 'id, redeemed_at', {
+        cycle_id: cycleId,
+      });
+      redemptions.sort((a, b) => String(a.redeemed_at).localeCompare(String(b.redeemed_at)));
+      for (const [i, r] of redemptions.slice(0, -1).entries()) {
+        await trustee.rpc('confirm_redemption_payment', {
+          p_redemption_id: r.id,
+          p_trustee_reference: `VEN-${code}-${String(i + 1).padStart(2, '0')}`,
         });
       }
     };
@@ -523,6 +724,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       await requestVerification(m);
       for (const farm of farms) await visit(farm, m, true);
       await release(m);
+      if (m === 0 && spec.voucherInputs) await redeemVouchers();
     }
 
     if (spec.stage === 'in_progress') {
@@ -564,8 +766,9 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         return id;
       };
 
-      for (const farm of farms) {
-        const total = Math.round(farm.hectares * h.yieldPerHa * 1000 * between(0.9, 1.1));
+      for (const [position, farm] of farms.entries()) {
+        const share = h.shortfall?.position === position ? h.shortfall.share : between(0.9, 1.1);
+        const total = Math.round(farm.hectares * h.yieldPerHa * 1000 * share);
         // One truck carries about 3.5 t.
         const trucks = Math.max(1, Math.ceil(total / 3500));
         const loads = split(total, Array<number>(trucks).fill(1 / trucks), 10);
@@ -640,9 +843,28 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     await restoreDates();
   }
 
+  // Investments still in progress -------------------------------------------------------------
+  await api.adminUpdate(
+    'investor_settings',
+    { id: true },
+    { cooling_off_hours: settings.cooling_off_hours },
+  );
+  for (const inv of INVESTORS) {
+    if (!inv.pendingPledge) continue;
+    log(`${inv.fullName} pledges to ${inv.pendingPledge.cycle}`);
+    await api.as(investorIds.get(inv.fullName)!).rpc('pledge_investment', {
+      p_cycle_id: cycleIds.get(inv.pendingPledge.cycle),
+      p_amount_kobo: kobo(inv.pendingPledge.amount),
+      p_disclosure_version: disclosureVersion,
+    });
+  }
+
   log('Done');
   return {
-    accounts: STAFF.map((s) => ({ role: s.role, email: s.email, fullName: s.fullName })),
+    accounts: [
+      ...STAFF.map((s) => ({ role: s.role, email: s.email, fullName: s.fullName })),
+      ...INVESTORS.map((i) => ({ role: 'investor', email: i.email, fullName: i.fullName })),
+    ],
     cycles,
     farmers: farmerCount,
   };

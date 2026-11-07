@@ -1,9 +1,11 @@
 import { Link, useParams, useSearchParams } from 'react-router';
+import { useAuth } from '../../auth/AuthProvider';
 import { CycleStatusBadge } from '../../components/StatusBadges';
 import { Alert, EmptyState, PageHeader, Skeleton, Tabs } from '../../components/ui';
 import { FUNDING_SOURCE } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { titleCase } from '../../lib/format';
+import { can } from '../../lib/roles';
 import { ContractsTab } from './ContractsTab';
 import { FarmsTab } from './FarmsTab';
 import { FundingTab } from './FundingTab';
@@ -13,6 +15,7 @@ import { MilestonesTab } from './MilestonesTab';
 import { OverviewTab } from './OverviewTab';
 import { SettlementTab } from './SettlementTab';
 import { useCycleData } from './useCycleData';
+import { VouchersTab } from './VouchersTab';
 
 const TABS = [
   'overview',
@@ -20,6 +23,7 @@ const TABS = [
   'milestones',
   'contracts',
   'funding',
+  'vouchers',
   'harvest',
   'settlement',
   'history',
@@ -29,6 +33,9 @@ type Tab = (typeof TABS)[number];
 export function CycleDetailPage() {
   const { id } = useParams<{ id: string }>();
   const state = useCycleData(id!);
+  // The trustee doesn't see the farmer registry, so it gets no Farms tab.
+  const role = useAuth().profile?.role;
+  const seesFarms = can.readRegistry(role);
   // The open tab lives in the URL (?tab=milestones), so it survives a reload and can be linked to.
   const [params, setParams] = useSearchParams();
   const fromUrl = params.get('tab') as Tab | null;
@@ -54,6 +61,8 @@ export function CycleDetailPage() {
   const { cycle } = data;
   const props = { data, reload: state.reload };
   const underway = ['in_progress', 'harvested', 'settled'].includes(cycle.status);
+  const usesVouchers =
+    data.vouchers.length > 0 || data.disbursements.some((d) => d.payee_kind === 'input_voucher');
 
   return (
     <>
@@ -72,6 +81,17 @@ export function CycleDetailPage() {
         description={
           <>
             <span className="font-mono">{cycle.code}</span> · {FUNDING_SOURCE[cycle.funding_source]}
+            {cycle.programme_id && can.readProgrammes(role) && (
+              <>
+                {' · '}
+                <Link
+                  to={`/programmes/${cycle.programme_id}`}
+                  className="font-medium text-brand-700 hover:underline"
+                >
+                  View programme
+                </Link>
+              </>
+            )}
           </>
         }
       />
@@ -81,7 +101,9 @@ export function CycleDetailPage() {
         onChange={setTab}
         tabs={[
           { id: 'overview', label: 'Overview' },
-          { id: 'farms', label: 'Farms', count: data.farms.length },
+          ...(seesFarms
+            ? [{ id: 'farms' as const, label: 'Farms', count: data.farms.length }]
+            : []),
           { id: 'milestones', label: 'Milestones', count: data.milestones.length },
           {
             id: 'contracts',
@@ -89,6 +111,9 @@ export function CycleDetailPage() {
             count: data.offtake.length + data.insurance.length,
           },
           { id: 'funding', label: 'Funding', count: data.contributions.length },
+          ...(usesVouchers
+            ? [{ id: 'vouchers' as const, label: 'Vouchers', count: data.vouchers.length }]
+            : []),
           ...(underway
             ? [
                 {
@@ -109,6 +134,7 @@ export function CycleDetailPage() {
         {tab === 'milestones' && <MilestonesTab {...props} />}
         {tab === 'contracts' && <ContractsTab {...props} />}
         {tab === 'funding' && <FundingTab {...props} />}
+        {tab === 'vouchers' && <VouchersTab {...props} />}
         {tab === 'harvest' && <HarvestTab {...props} />}
         {tab === 'settlement' && <SettlementTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}

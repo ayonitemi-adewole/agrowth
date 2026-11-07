@@ -1,6 +1,16 @@
-import { Camera, CheckCircle2, Crosshair, FlaskConical, ImagePlus, X, XCircle } from 'lucide-react';
+import {
+  Camera,
+  CheckCircle2,
+  CloudOff,
+  Crosshair,
+  FlaskConical,
+  ImagePlus,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
+import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
 import {
   Alert,
@@ -13,12 +23,15 @@ import {
   Textarea,
   cx,
 } from '../components/ui';
-import { uploadFile } from '../lib/cycles';
 import { demo } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
 import { formatHectares } from '../lib/format';
+import { useOffline } from '../lib/offline/OfflineProvider';
+import { snapshots } from '../lib/offline/store';
+import { isNetworkError } from '../lib/offline/sync';
+import type { QueuedVisit } from '../lib/offline/types';
 import { supabase } from '../lib/supabase';
-import type { CropCondition, FarmMap as Farm, Milestone } from '../lib/types';
+import type { CropCondition, FarmMap as Farm } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
 
 /** Must match private.max_checkin_metres() in the database. */
@@ -45,30 +58,77 @@ interface Fix {
   at: string;
 }
 
-interface Result {
-  passed: boolean;
-  gps_ok: boolean;
-  distance_from_boundary_m: number;
-  milestone_status: string;
+type VisitFarm = Pick<
+  Farm,
+  'id' | 'name' | 'area_hectares' | 'primary_crop' | 'boundary' | 'centroid_lon' | 'centroid_lat'
+> & { farmer: string };
+
+interface VisitMilestone {
+  id: string;
+  sequence: number;
+  name: string;
+  code: string;
+}
+
+/** The farm and milestone from the server, or from the work list saved on the phone. */
+async function loadVisit(
+  userId: string,
+  farmId: string,
+  milestoneId: string,
+): Promise<{ fromPhone: boolean; farm: VisitFarm | null; milestone: VisitMilestone | null }> {
+  try {
+    const [farm, milestone] = await Promise.all([
+      supabase.from('farm_maps').select('*, farmers(full_name)').eq('id', farmId).maybeSingle(),
+      supabase
+        .from('milestones')
+        .select('id, sequence, name, cycles(code)')
+        .eq('id', milestoneId)
+        .maybeSingle(),
+    ]);
+    if (farm.error) throw farm.error;
+    if (milestone.error) throw milestone.error;
+    const f = farm.data as (Farm & { farmers: { full_name: string } }) | null;
+    const m = milestone.data as unknown as {
+      id: string;
+      sequence: number;
+      name: string;
+      cycles: { code: string };
+    } | null;
+    return {
+      fromPhone: false,
+      farm: f ? { ...f, farmer: f.farmers.full_name } : null,
+      milestone: m ? { id: m.id, sequence: m.sequence, name: m.name, code: m.cycles.code } : null,
+    };
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    const saved = await snapshots.get(userId);
+    const a = saved?.assignments.find((x) => x.milestone.id === milestoneId);
+    return {
+      fromPhone: true,
+      farm: a?.farms.find((x) => x.id === farmId) ?? null,
+      milestone: a
+        ? {
+            id: a.milestone.id,
+            sequence: a.milestone.sequence,
+            name: a.milestone.name,
+            code: a.milestone.cycle.code,
+          }
+        : null,
+    };
+  }
 }
 
 export function FieldVisitPage() {
   const [params] = useSearchParams();
   const milestoneId = params.get('milestone')!;
   const farmId = params.get('farm')!;
+  const { profile } = useAuth();
+  const { queue, online } = useOffline();
 
-  const info = useAsync(async () => {
-    const [farm, milestone] = await Promise.all([
-      supabase.from('farm_maps').select('*, farmers(full_name)').eq('id', farmId).maybeSingle(),
-      supabase.from('milestones').select('*, cycles(code)').eq('id', milestoneId).maybeSingle(),
-    ]);
-    if (farm.error) throw farm.error;
-    if (milestone.error) throw milestone.error;
-    return {
-      farm: farm.data as (Farm & { farmers: { full_name: string } }) | null,
-      milestone: milestone.data as (Milestone & { cycles: { code: string } }) | null,
-    };
-  }, [farmId, milestoneId]);
+  const info = useAsync(
+    () => loadVisit(profile!.id, farmId, milestoneId),
+    [profile?.id, farmId, milestoneId],
+  );
 
   // Live GPS: keep the best fix while the page is open.
   const [fix, setFix] = useState<Fix | null>(null);
@@ -126,15 +186,21 @@ export function FieldVisitPage() {
   const [photos, setPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<Result | null>(null);
+  const [result, setResult] = useState<QueuedVisit | null>(null);
 
   const previews = usePreviews(photos);
 
   if (info.loading) return <Spinner />;
   if (info.error) return <Alert>{errorMessage(info.error)}</Alert>;
-  const { farm, milestone } = info.data!;
+  const { farm, milestone, fromPhone } = info.data!;
   if (!farm || !milestone)
-    return <Alert>Farm or milestone not found, or you don't have access.</Alert>;
+    return (
+      <Alert>
+        {fromPhone
+          ? "This farm isn't in the work list saved on this phone. Open Field visits with a connection to update it."
+          : "Farm or milestone not found, or you don't have access."}
+      </Alert>
+    );
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -142,23 +208,26 @@ export function FieldVisitPage() {
     setBusy(true);
     setError(null);
     try {
-      const paths = await Promise.all(
-        photos.map((p) => uploadFile('field-photos', `${milestoneId}/${farmId}`, p)),
-      );
-      const { data, error } = await supabase.rpc('record_field_visit', {
-        p_farm_id: farmId,
-        p_milestone_id: milestoneId,
-        p_lon: fix.lon,
-        p_lat: fix.lat,
-        p_gps_accuracy_m: Math.round(fix.accuracy * 10) / 10,
-        p_crop_condition: condition,
-        p_checklist_passed: checks.every(Boolean),
-        p_photo_paths: paths,
-        p_notes: notes || null,
-        p_visited_at: fix.at,
+      // Every visit is saved on the phone first, then sent: nothing is lost if the signal
+      // drops part-way, and a resend can't record it twice.
+      const saved = await queue({
+        id: crypto.randomUUID(),
+        userId: profile!.id,
+        farmId,
+        milestoneId,
+        farmLabel: `${farm.farmer} · ${farm.name ?? 'Farm'}`,
+        milestoneLabel: `${milestone.code}, milestone ${milestone.sequence}: ${milestone.name}`,
+        fix,
+        condition,
+        checklistPassed: checks.every(Boolean),
+        notes: notes.trim() || null,
+        photos: photos.map((p) => ({ name: p.name || 'photo.jpg', type: p.type, blob: p })),
+        createdAt: new Date().toISOString(),
+        state: 'queued',
+        attempts: 0,
+        uploaded: [],
       });
-      if (error) throw error;
-      setResult(data as Result);
+      setResult(saved);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       setError(errorMessage(err));
@@ -167,27 +236,57 @@ export function FieldVisitPage() {
     }
   };
 
-  if (result) {
+  if (result && !result.result) {
+    const refused = result.state === 'failed';
     return (
       <div className="mx-auto max-w-lg py-8 text-center">
         <div
           className={cx(
             'mx-auto grid size-16 place-items-center rounded-full',
-            result.passed ? 'bg-brand-100 text-brand-700' : 'bg-red-100 text-red-600',
+            refused ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700',
           )}
         >
-          {result.passed ? <CheckCircle2 className="size-8" /> : <XCircle className="size-8" />}
+          {refused ? <XCircle className="size-8" /> : <CloudOff className="size-8" />}
         </div>
         <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-950">
-          {result.passed ? 'Visit passed' : 'Visit did not pass'}
+          {refused ? 'The visit was not accepted' : 'Saved on this phone'}
         </h1>
         <p className="mt-2 text-sm text-zinc-600">
-          {result.passed
-            ? result.milestone_status === 'verified'
+          {refused
+            ? result.error
+            : 'No connection right now. The visit, its GPS fix and photos are stored on this phone and are sent automatically when you have signal. The database then decides whether it passes, using the time you were here.'}
+        </p>
+        <div className="mt-8 flex justify-center gap-2">
+          <Link to="/field">
+            <Button>Back to field visits</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (result?.result) {
+    const r = result.result;
+    return (
+      <div className="mx-auto max-w-lg py-8 text-center">
+        <div
+          className={cx(
+            'mx-auto grid size-16 place-items-center rounded-full',
+            r.passed ? 'bg-brand-100 text-brand-700' : 'bg-red-100 text-red-600',
+          )}
+        >
+          {r.passed ? <CheckCircle2 className="size-8" /> : <XCircle className="size-8" />}
+        </div>
+        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-950">
+          {r.passed ? 'Visit passed' : 'Visit did not pass'}
+        </h1>
+        <p className="mt-2 text-sm text-zinc-600">
+          {r.passed
+            ? r.milestone_status === 'verified'
               ? 'Every farm has now passed. The cycle manager can release this milestone.'
               : 'Recorded. The milestone is released once every farm passes.'
-            : !result.gps_ok
-              ? `Your check-in was ${Math.round(result.distance_from_boundary_m)} m from the mapped boundary, or the GPS wasn't precise enough. The release is on hold until a passing visit.`
+            : !r.gps_ok
+              ? `Your check-in was ${Math.round(r.distance_from_boundary_m)} m from the mapped boundary, or the GPS wasn't precise enough. The release is on hold until a passing visit.`
               : 'The release for this milestone is on hold until a passing visit.'}
         </p>
         <div className="mt-8 flex justify-center gap-2">
@@ -210,9 +309,18 @@ export function FieldVisitPage() {
             ← Field visits
           </Link>
         }
-        title={farm.farmers.full_name}
-        description={`${farm.name ?? 'Farm'} · ${formatHectares(farm.area_hectares)} · ${milestone.cycles.code}, milestone ${milestone.sequence}: ${milestone.name}`}
+        title={farm.farmer}
+        description={`${farm.name ?? 'Farm'} · ${formatHectares(farm.area_hectares)} · ${milestone.code}, milestone ${milestone.sequence}: ${milestone.name}`}
       />
+
+      {!online && (
+        <div className="mb-6">
+          <Alert tone="warning" title="No connection">
+            You can still record this visit. It&apos;s saved on this phone and sent when you&apos;re
+            back in coverage. GPS works without signal; the map imagery doesn&apos;t.
+          </Alert>
+        </div>
+      )}
 
       <form onSubmit={submit} className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-4 lg:col-span-3">
@@ -375,7 +483,7 @@ export function FieldVisitPage() {
 
           {error && <Alert>{error}</Alert>}
           <Button type="submit" busy={busy} disabled={!canSubmit} className="w-full">
-            Submit visit
+            {online ? 'Submit visit' : 'Save visit on this phone'}
           </Button>
           {!canSubmit && (
             <p className="text-center text-xs text-zinc-500">
