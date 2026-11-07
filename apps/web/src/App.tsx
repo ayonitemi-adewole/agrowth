@@ -6,6 +6,7 @@ import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
 import { Spinner } from './components/ui';
 import { can } from './lib/roles';
+import { OfflineProvider } from './lib/offline/OfflineProvider';
 import { isConfigured } from './lib/supabase';
 import { AuthPage } from './pages/AuthPage';
 import { OverviewPage } from './pages/OverviewPage';
@@ -46,198 +47,200 @@ export function App() {
   if (!isConfigured) return <SetupNeeded />;
   return (
     <AuthProvider>
-      <ToastProvider>
-        <BrowserRouter>
-          <Suspense fallback={<Spinner />}>
-            <Routes>
-              <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
-              <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
-              <Route element={<RequireStaff />}>
-                <Route
-                  path="cycles/:id/vouchers/print"
-                  element={
-                    <RoleGate allow={can.readCycles}>
-                      <VoucherSlipsPage />
-                    </RoleGate>
-                  }
-                />
-                <Route
-                  path="portfolio/:pledgeId/certificate"
-                  element={
-                    <RoleGate allow={can.invest}>
-                      <CertificatePage />
-                    </RoleGate>
-                  }
-                />
-                <Route element={<Layout />}>
-                  <Route index element={<Home />} />
+      <OfflineProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Suspense fallback={<Spinner />}>
+              <Routes>
+                <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
+                <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
+                <Route element={<RequireStaff />}>
                   <Route
-                    path="invest"
-                    element={
-                      <RoleGate allow={can.invest}>
-                        <MarketplacePage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="invest/:id"
-                    element={
-                      <RoleGate allow={can.viewListings}>
-                        <ListingPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="portfolio"
-                    element={
-                      <RoleGate allow={can.invest}>
-                        <PortfolioPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="profile"
-                    element={
-                      <RoleGate allow={can.invest}>
-                        <InvestorProfilePage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="programmes"
-                    element={
-                      <RoleGate allow={can.readProgrammes}>
-                        <ProgrammesPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="programmes/:id"
-                    element={
-                      <RoleGate allow={can.readProgrammes}>
-                        <ProgrammeDetailPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="investors"
-                    element={
-                      <RoleGate allow={can.readInvestors}>
-                        <InvestorsPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="vendors"
-                    element={
-                      <RoleGate allow={can.readVendors}>
-                        <VendorsPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="redeem"
-                    element={
-                      <RoleGate allow={can.redeemVouchers}>
-                        <RedeemPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="cooperatives"
-                    element={
-                      <RoleGate allow={can.readRegistry}>
-                        <CooperativesPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="farmers"
-                    element={
-                      <RoleGate allow={can.readRegistry}>
-                        <FarmersPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="farmers/new"
-                    element={
-                      <RoleGate allow={can.enrol}>
-                        <RegisterFarmerPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="farmers/:id"
-                    element={
-                      <RoleGate allow={can.readRegistry}>
-                        <FarmerDetailPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="farmers/:id/map"
-                    element={
-                      <RoleGate allow={can.enrol}>
-                        <MapFarmPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="cycles"
+                    path="cycles/:id/vouchers/print"
                     element={
                       <RoleGate allow={can.readCycles}>
-                        <CyclesPage />
+                        <VoucherSlipsPage />
                       </RoleGate>
                     }
                   />
                   <Route
-                    path="cycles/:id"
+                    path="portfolio/:pledgeId/certificate"
                     element={
-                      <RoleGate allow={can.readCycles}>
-                        <CycleDetailPage />
+                      <RoleGate allow={can.invest}>
+                        <CertificatePage />
                       </RoleGate>
                     }
                   />
-                  <Route
-                    path="field"
-                    element={
-                      <RoleGate allow={can.doFieldVisits}>
-                        <FieldWorkPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="field/visit"
-                    element={
-                      <RoleGate allow={can.doFieldVisits}>
-                        <FieldVisitPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="ledger"
-                    element={
-                      <RoleGate allow={can.readLedger}>
-                        <LedgerPage />
-                      </RoleGate>
-                    }
-                  />
-                  <Route
-                    path="users"
-                    element={
-                      <RoleGate allow={can.manageUsers}>
-                        <UsersPage />
-                      </RoleGate>
-                    }
-                  />
+                  <Route element={<Layout />}>
+                    <Route index element={<Home />} />
+                    <Route
+                      path="invest"
+                      element={
+                        <RoleGate allow={can.invest}>
+                          <MarketplacePage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="invest/:id"
+                      element={
+                        <RoleGate allow={can.viewListings}>
+                          <ListingPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="portfolio"
+                      element={
+                        <RoleGate allow={can.invest}>
+                          <PortfolioPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="profile"
+                      element={
+                        <RoleGate allow={can.invest}>
+                          <InvestorProfilePage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="programmes"
+                      element={
+                        <RoleGate allow={can.readProgrammes}>
+                          <ProgrammesPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="programmes/:id"
+                      element={
+                        <RoleGate allow={can.readProgrammes}>
+                          <ProgrammeDetailPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="investors"
+                      element={
+                        <RoleGate allow={can.readInvestors}>
+                          <InvestorsPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="vendors"
+                      element={
+                        <RoleGate allow={can.readVendors}>
+                          <VendorsPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="redeem"
+                      element={
+                        <RoleGate allow={can.redeemVouchers}>
+                          <RedeemPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="cooperatives"
+                      element={
+                        <RoleGate allow={can.readRegistry}>
+                          <CooperativesPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="farmers"
+                      element={
+                        <RoleGate allow={can.readRegistry}>
+                          <FarmersPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="farmers/new"
+                      element={
+                        <RoleGate allow={can.enrol}>
+                          <RegisterFarmerPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="farmers/:id"
+                      element={
+                        <RoleGate allow={can.readRegistry}>
+                          <FarmerDetailPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="farmers/:id/map"
+                      element={
+                        <RoleGate allow={can.enrol}>
+                          <MapFarmPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="cycles"
+                      element={
+                        <RoleGate allow={can.readCycles}>
+                          <CyclesPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="cycles/:id"
+                      element={
+                        <RoleGate allow={can.readCycles}>
+                          <CycleDetailPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="field"
+                      element={
+                        <RoleGate allow={can.doFieldVisits}>
+                          <FieldWorkPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="field/visit"
+                      element={
+                        <RoleGate allow={can.doFieldVisits}>
+                          <FieldVisitPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="ledger"
+                      element={
+                        <RoleGate allow={can.readLedger}>
+                          <LedgerPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="users"
+                      element={
+                        <RoleGate allow={can.manageUsers}>
+                          <UsersPage />
+                        </RoleGate>
+                      }
+                    />
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </ToastProvider>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ToastProvider>
+      </OfflineProvider>
     </AuthProvider>
   );
 }

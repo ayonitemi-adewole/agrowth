@@ -21,7 +21,7 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal and the Government Edition's programmes and dashboards. Still to come: the offline agent app and USSD.
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Still to come: USSD and SMS.
 
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -40,6 +40,7 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Vouchers: issued per farm by area, redeemed by code + phone, vendors paid on redemption, unused value returned                                                                     | Done  |
 | Investor Edition: investor KYC and classification, retail cap, risk disclosure, pledges with cooling-off, live tracker, statements, certificates                                   | Done  |
 | Government Edition: programmes with eligibility and budgets, dashboards by state, LGA, ward, commodity and cooperative, repayment, agent visit record, audit and open-data exports | Done  |
+| Offline agent app: installable on a phone's home screen, work list saved on the phone, visits and photos queued with no signal and sent when back in coverage                      | Done  |
 
 ## Getting started
 
@@ -185,6 +186,21 @@ A field visit passes only if the GPS fix is accurate to 20 m and within 20 m of 
 1. Run `npm run dev:phone`. It prints a `Network` address such as `https://192.168.0.81:5173`.
 2. On a phone on the same Wi-Fi, open that address. Accept the certificate warning: it's a self-signed certificate for local testing. Browsers only share GPS with secure pages.
 3. Map the demo farms **around where you are** (step 3 below), so you're standing at the farms when you visit them.
+
+### Installing the app and working offline
+
+Agrowth installs like an app: on Android, open the site in Chrome and choose **Install app** (or **Add to Home screen**); on an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
+
+For field agents it then works without a connection:
+
+- **Field visits** saves the agent's work list on the phone every time it opens online: the farms to visit, their boundaries and the farmers' names.
+- With no signal, the app still opens, the list and each farm's boundary still show, and GPS still works. Map imagery needs a connection (the tile providers don't allow bulk offline copies), so the boundary and your position are drawn on a plain background.
+- A visit recorded offline is saved on the phone with its photos and sent automatically when coverage returns (on reconnect, and every minute while visits are waiting). The menu shows **Online/Offline** and how many visits are waiting.
+- The database judges it exactly as an online visit, using the time the agent was at the farm. Each visit carries the phone's own id, so a resend after a dropped connection can't record it twice. Staff see "recorded offline, received …" on visits that arrived late.
+- If the database refuses a queued visit (say the milestone was verified by someone else meanwhile), it shows as **Not accepted** with the reason, and the agent can remove it.
+- Signing out removes the saved work list from the phone. Unsent visits stay, and send when the same agent signs in again.
+
+Offline support is in production builds only. To try it on a phone, run `npm run preview:phone` (a production build over HTTPS on your network), open the `Network` address on the phone, sign in as the field agent and open **Field visits**. Then turn on flight mode and record a visit.
 
 ### The walkthrough
 
@@ -437,9 +453,9 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
-- **Web tests** (`apps/web`) — money, map, error, return-projection and CSV export helpers.
+- **Web tests** (`apps/web`) — money, map, error, return-projection and CSV export helpers, and the offline sync queue.
 
 ## Repository layout
 
@@ -452,7 +468,7 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
@@ -484,6 +500,7 @@ npx supabase db push
 - **Roles come from the database, never the browser.** Sign-up always creates an investor; only an admin can grant staff roles, and nobody can change their own.
 - **Offtake first, insured downside, verified farmers.** A cycle can't be submitted, or approved, until a signed buyer covers at least the low-yield harvest, insurance covers the budget for the whole season, and every farmer has passed KYC.
 - **Separation of duties.** The cycle's own manager can never approve it. Only the trustee confirms deposits, payments and refunds.
+- **Offline visits are judged like any other.** A visit sent late from the phone goes through the same checks, at the time the agent was at the farm (never before verification was requested, never in the future), and the server records when it arrived. A repeated send of the same visit returns the first result and records nothing new; another agent can't reuse its reference.
 - **Money follows verification.** A milestone is released only after every farm passes a field visit (GPS inside the boundary, checklist, photo), in order, and at most 20% may go to farmers as cash. The trustee can't pay out more than it holds for that cycle.
 - **Inputs, not cash.** Vouchers are issued per farm and redeemed only at compliance-approved vendors, with the voucher code plus the last four digits of the farmer's phone. The shop never sees the farmer's phone or full name. Five wrong tries in 15 minutes lock that counter out. The trustee ring-fences voucher money when it issues them and pays only the vendor's registered account. New bank details need a fresh approval, and a suspended vendor's payments are held. Unused value returns to the cycle, and the season can't close while any voucher is open.
 - **Programmes fund only what fits them.** A cycle in a programme can't be submitted or approved unless the programme is active and the cycle meets its rules: a listed commodity, every farmer in the target area, under the hectare limit and in a cooperative, a budget per hectare within the input package, and a season within the programme's dates. An active programme's terms can't be edited. Programme deposits can never exceed its budget, and a closed programme takes no new money.

@@ -11,6 +11,11 @@ import type { CycleFarm } from './useCycleData';
 const dateTime = (iso: string) =>
   new Date(iso).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
 
+/** Reached the server more than 15 minutes after the agent was at the farm. */
+const syncedLate = (v: { visited_at: string; created_at?: string }) =>
+  !!v.created_at &&
+  new Date(v.created_at).getTime() - new Date(v.visited_at).getTime() > 15 * 60_000;
+
 /**
  * Everything a field visit recorded, so anyone reviewing a release can see why it passed or
  * failed: the photo, the GPS check-in against the mapped boundary, and the agent's notes.
@@ -75,7 +80,10 @@ function Evidence({
             <XCircle className="size-3.5" aria-hidden /> Failed
           </Badge>
         )}
-        <span className="text-sm text-zinc-500">Visited {dateTime(v.visited_at)}</span>
+        <span className="text-sm text-zinc-500">
+          Visited {dateTime(v.visited_at)}
+          {syncedLate(v) && ` · recorded offline, received ${dateTime(v.created_at!)}`}
+        </span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

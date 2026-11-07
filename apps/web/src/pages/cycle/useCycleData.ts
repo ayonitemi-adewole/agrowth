@@ -137,7 +137,7 @@ export async function loadCycle(id: string): Promise<CycleData | null> {
       ? supabase
           .from('field_visit_evidence')
           .select(
-            'id, farm_id, milestone_id, agent_id, visited_at, lon, lat, gps_accuracy_m, distance_from_boundary_m, gps_ok, checklist_passed, crop_condition, notes, photo_paths, passed',
+            'id, farm_id, milestone_id, agent_id, visited_at, created_at, lon, lat, gps_accuracy_m, distance_from_boundary_m, gps_ok, checklist_passed, crop_condition, notes, photo_paths, passed',
           )
           .in(
             'milestone_id',

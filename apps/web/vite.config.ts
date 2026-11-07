@@ -8,4 +8,6 @@ import { defineConfig } from 'vite';
 export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss(), ...(mode === 'phone' ? [basicSsl()] : [])],
   server: mode === 'phone' ? { host: true } : undefined,
+  // `npm run preview:phone`: the production build (with offline support) on your network.
+  preview: mode === 'phone' ? { host: true } : undefined,
 }));

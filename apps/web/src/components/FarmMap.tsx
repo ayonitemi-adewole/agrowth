@@ -20,8 +20,14 @@ import type { FarmMap as Farm } from '../lib/types';
 /** Default view: central Nigeria. */
 const NIGERIA_CENTRE: LatLngExpression = [9.08, 8.68];
 
+/** What the map needs to draw a farm; a full farm record or a saved offline copy both fit. */
+export type MapFarm = Pick<
+  Farm,
+  'id' | 'name' | 'area_hectares' | 'primary_crop' | 'boundary' | 'centroid_lon' | 'centroid_lat'
+>;
+
 interface Props {
-  farms?: Farm[];
+  farms?: MapFarm[];
   highlightId?: string;
   /** Farms drawn in the highlight colour, e.g. those in a live cycle. */
   highlightIds?: ReadonlySet<string>;
@@ -154,7 +160,7 @@ function ClickHandler({ onClick }: { onClick: (p: LonLat) => void }) {
 }
 
 /** Farms are too small to see when zoomed out, so show each one as a dot until you zoom in. */
-function FarmDots({ farms, lit }: { farms: Farm[]; lit: (id: string) => boolean }) {
+function FarmDots({ farms, lit }: { farms: MapFarm[]; lit: (id: string) => boolean }) {
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
   useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
@@ -193,7 +199,7 @@ function FitTo({
   focus,
   extra,
 }: {
-  farms: Farm[];
+  farms: MapFarm[];
   drawing?: LonLat[];
   focus?: { lon: number; lat: number } | null;
   extra?: [lat: number, lon: number];

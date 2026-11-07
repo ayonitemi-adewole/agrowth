@@ -235,6 +235,8 @@ export interface FieldVisit {
   milestone_id: string;
   agent_id: string;
   visited_at: string;
+  /** When it reached the server; later than visited_at if it was recorded offline. */
+  created_at?: string;
   /** Where the agent checked in. */
   lon: number;
   lat: number;

@@ -1,5 +1,7 @@
 import {
   BadgeCheck,
+  CloudOff,
+  CloudUpload,
   BookOpenCheck,
   BriefcaseBusiness,
   Landmark,
@@ -23,6 +25,7 @@ import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { demo } from '../lib/demo';
+import { useOffline } from '../lib/offline/OfflineProvider';
 import { can, ROLE_LABELS } from '../lib/roles';
 import type { Role } from '../lib/types';
 import { DemoSwitcher } from './DemoSignIn';
@@ -95,6 +98,7 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
 
 export function Layout() {
   const { profile, signOut } = useAuth();
+  const { pending } = useOffline();
   const [open, setOpen] = useState(false);
   const role = profile?.role;
 
@@ -151,6 +155,7 @@ export function Layout() {
           );
         })}
       </nav>
+      {can.doFieldVisits(role) && <SyncStatus />}
       <DemoSwitcher />
       <div className="mt-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
         <Avatar
@@ -164,7 +169,17 @@ export function Layout() {
           <p className="truncate text-xs text-brand-200/70">{role ? ROLE_LABELS[role] : ''}</p>
         </div>
         <button
-          onClick={signOut}
+          onClick={() => {
+            if (
+              pending > 0 &&
+              !window.confirm(
+                `${pending} visit(s) on this phone haven't been sent yet. They stay on the phone and send after you sign in again. Sign out anyway?`,
+              )
+            ) {
+              return;
+            }
+            void signOut();
+          }}
           className="rounded-lg p-1.5 text-brand-200/70 hover:bg-white/10 hover:text-white"
           aria-label="Sign out"
           title="Sign out"
@@ -219,6 +234,40 @@ export function Layout() {
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
         <Outlet />
       </main>
+    </div>
+  );
+}
+
+/** For field agents: whether there's a connection, and visits still waiting to send. */
+function SyncStatus() {
+  const { online, pending, failed, syncing, syncNow } = useOffline();
+  const { offline: signedInOffline } = useAuth();
+  return (
+    <div className="mt-4 rounded-xl bg-white/5 px-3 py-2.5 text-xs text-brand-100/80">
+      <div className="flex items-center gap-2">
+        {online ? (
+          <span className="size-2 rounded-full bg-brand-400" aria-hidden />
+        ) : (
+          <CloudOff className="size-3.5 text-amber-300" aria-hidden />
+        )}
+        <span className="font-medium text-white">{online ? 'Online' : 'Offline'}</span>
+        {pending > 0 && (
+          <button
+            onClick={() => void syncNow()}
+            disabled={!online || syncing}
+            className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-brand-200 hover:bg-white/10 disabled:opacity-60"
+          >
+            <CloudUpload className={cx('size-3.5', syncing && 'animate-pulse')} aria-hidden />
+            {pending} to send
+          </button>
+        )}
+      </div>
+      {failed > 0 && (
+        <p className="mt-1 text-red-300">{failed} visit(s) not accepted: see Field visits</p>
+      )}
+      {signedInOffline && (
+        <p className="mt-1">Working from this phone. Visits send once you&apos;re back online.</p>
+      )}
     </div>
   );
 }
