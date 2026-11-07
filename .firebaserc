@@ -1,8 +1,0 @@
-{
-  "projects": {
-    "default": "jobb-deddf",
-    "staging": "jobb-deddf"
-  },
-  "targets": {},
-  "etags": {}
-}
