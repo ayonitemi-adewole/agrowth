@@ -5,7 +5,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { Row, SeedApi, Session } from '../seed/api';
 import { CYCLES } from '../seed/portfolio';
 import { isSeeded, seedDemo, type SeedResult } from '../seed/seed';
-import { asUser, createDb, createUser } from './db';
+import { asService, asUser, createDb, createUser } from './db';
 
 const ident = (name: string) => {
   if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`Bad identifier ${name}`);
@@ -89,6 +89,14 @@ function pgliteApi(db: PGlite): SeedApi {
         [...keys.map((k) => values[k]), ...w.values],
       );
     },
+    adminRpc: (fn, args) =>
+      asService(db, async (tx) => {
+        const keys = Object.keys(args);
+        await tx.query(
+          `select public.${ident(fn)}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')})`,
+          keys.map((k) => param(args[k])),
+        );
+      }),
   };
 }
 
@@ -132,6 +140,28 @@ describe('demo seed', () => {
     expect(counts.pending).toBe(3);
     expect(counts.rejected).toBe(1);
     expect(result.farmers).toBe(43);
+  });
+
+  it('checks every identity number, and verifies only people whose numbers matched', async () => {
+    const { rows } = await db.query<{ subject: string; kyc: string; status: string; n: number }>(
+      `select c.subject, coalesce(f.kyc_status, i.kyc_status)::text as kyc, c.status::text,
+              count(*)::int as n
+         from public.identity_checks c
+         left join public.farmers f on f.id = c.farmer_id
+         left join public.investor_profiles i on i.user_id = c.investor_id
+        group by 1, 2, 3 order by 1, 2, 3`,
+    );
+    const statuses = (subject: string, kyc: string) =>
+      rows.filter((r) => r.subject === subject && r.kyc === kyc).map((r) => r.status);
+    expect(statuses('farmer', 'verified')).toEqual(['match']);
+    expect(statuses('farmer', 'rejected')).toEqual(['no_match']);
+    expect(statuses('farmer', 'pending')).toContain('partial');
+    expect(statuses('investor', 'verified')).toEqual(['match']);
+    const unchecked = await db.query(
+      `select 1 from public.farmers f
+        where not exists (select 1 from public.identity_checks c where c.farmer_id = f.id)`,
+    );
+    expect(unchecked.rows).toHaveLength(0);
   });
 
   it('closes the books on settled cycles and keeps the ledger balanced', async () => {

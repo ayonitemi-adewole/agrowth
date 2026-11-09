@@ -40,12 +40,13 @@ How the platform reaches the market is still open. It could be operated directly
 
 ## 2. Where the project stands
 
-**Phase 1 (core platform)** is complete. **Phase 2 (two editions)** is complete except the USSD/SMS farmer channel.
+**Phase 1 (core platform)** and **Phase 2 (two editions)** are complete. The USSD/SMS farmer channel and the security audit have moved to **Phase 3**, which is on hold. The current work is replacing the simulated outside parties (trustee, payments, identity and the rest) with live integrations; see [section 9](#9-what-is-yet-to-be-done).
 
 | Area | What it does | State |
 | --- | --- | --- |
 | Accounts and roles | Sign-up, sign-in, admin assigns roles, deactivation | Done |
 | Farmer registry | Cooperatives, farmer enrolment with NIN/BVN duplicate check, KYC review | Done |
+| Identity checks | NIN and BVN looked up with an identity provider at enrolment and investor KYC; verifying needs a match or a written reason. Provider: Dojah; runs simulated until its keys are added | Done |
 | Farm mapping | Draw on satellite imagery or GPS-walk the boundary; area computed; overlapping farms refused | Done |
 | Cycle builder | Budget, yield and price ranges, farms, milestones, offtake contract, insurance, documents | Done |
 | Approval | Readiness checklist, compliance review, separation of duties | Done |
@@ -59,9 +60,9 @@ How the platform reaches the market is still open. It could be operated directly
 | **Investor Edition** | Investor KYC and classification, retail cap, risk disclosure, marketplace, pledges with cooling-off, live tracker, statements, certificates | Done |
 | **Government Edition** | Programmes with eligibility and budgets, dashboards by state/LGA/ward/commodity/cooperative, repayment, agent visit record, audit and open-data exports | Done |
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
-| USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | **To do** |
+| USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 222 automated tests: 165 run the real database migrations and prove the rules; 57 cover the web app's logic. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 244 automated tests: 183 run the real database migrations and the identity-provider code and prove the rules; 61 cover the web app's logic. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -188,10 +189,10 @@ Sign in at the app's address. On the demo there's a button per account and a **D
 
 ### Compliance officer: checks and approvals
 
-- **Farmer KYC:** open a farmer → **Verify** or **Reject**. Every farmer in a cycle must be verified before the cycle can be submitted.
+- **Farmer KYC:** open a farmer. **Identity checks** shows, for each NIN and BVN on record, what the identity provider said (**Match**, **Partial match**, **No match**, **Not found** or **Check failed**) and which fields agreed: names, date of birth, phone. Checks run automatically at enrolment; **Check NIN / Check BVN** runs one again (type the number from the farmer's ID, as it isn't stored). Then **Verify** or **Reject**. Verifying needs a match on every number on record; otherwise write a note saying how you confirmed who they are (for example, a changed phone number confirmed with the cooperative). The note is kept with the decision. Every farmer in a cycle must be verified before the cycle can be submitted.
 - **Cycle approval:** open a cycle that's _Awaiting approval_. Check the readiness list and documents, then **Approve** (it opens for funding and its ledger accounts are created) or **Return with note** (it goes back to draft). You can never approve a cycle you manage.
 - **Vendors:** open a vendor → **Approve** or **Suspend**. Changing an approved vendor's bank details sends it back for review automatically. A suspended vendor's payments are held.
-- **Investors:** **Investors → Awaiting review → Review**. The modal shows what the investor submitted, warns if the payout account name doesn't match, and links to the ID document. Choose the classification (**Retail** is limited; **High-net-worth** and **Institutional** are not, so only confirm those with evidence), then **Verify**, or **Reject** with a note the investor will see.
+- **Investors:** **Investors → Awaiting review → Review**. The modal shows what the investor submitted, warns if the payout account name doesn't match, links to the ID document, and shows the NIN and BVN identity checks run since they last submitted. Verifying needs both to match, or a note. Choose the classification (**Retail** is limited; **High-net-worth** and **Institutional** are not, so only confirm those with evidence), then **Verify**, or **Reject** with a note the investor will see.
 - **Voiding a redemption:** if a shop recorded goods that were never handed over, void the unpaid redemption; its value goes back onto the voucher.
 - **Ledger:** read-only, by cycle.
 
@@ -266,7 +267,7 @@ Every list, cycle, ledger and programme dashboard is visible, and nothing can be
 ### Investor: investing in farm cycles
 
 1. **Sign up**, then **Profile and KYC**. Enter:
-   - your legal name, NIN and BVN (kept only as one-way fingerprints) and an ID document,
+   - your legal name, NIN and BVN (checked with the identity provider as you submit, then kept only as one-way fingerprints) and an ID document,
    - your net annual income and crowdfunding done elsewhere in the last 12 months,
    - the bank account for payouts, in your own name,
    - whether you're retail, high-net-worth or institutional. Compliance checks the claim.
@@ -321,6 +322,7 @@ These are enforced by the database itself. They hold even if the web app has a b
 - **Inputs, not cash.** Vouchers are redeemable only at approved vendors, with a code plus the farmer's phone digits. Guessing is locked out. Vendors are paid only to their registered account, and new bank details need a fresh approval.
 - **The ledger is append-only and balanced.** There are no edits or deletions, only reversing entries. Every entry sums to zero, and no money moves between cycles.
 - **One farmer, one record; one piece of land, one farm.** Duplicate NIN/BVN and overlapping boundaries are refused. Identity numbers are stored only as keyed hashes.
+- **Identity checks can't be faked.** A check is only of the number on record, by someone allowed to check that person, and only the identity service can record the answer. Only match or no-match per field is kept, never the provider's copy of the person's details. Verifying KYC needs a match, or a written reason.
 - **Investors invest within the rules.**
   - Only KYC-verified investors can pledge, and only on the current disclosure version.
   - Retail investors are capped, and pledges reserve capacity, so a cycle can't be oversubscribed.
@@ -336,13 +338,13 @@ These are enforced by the database itself. They hold even if the web app has a b
 
 The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [README](../README.md) has the developer commands in full. In short:
 
-- **Development:** Node 22+ and a Supabase project. Run `npm install`, link the project, then `npx supabase db push` to create the database and `npm run dev` to start the app. Make yourself admin once (README, step 5).
+- **Development:** Node 22+ and a Supabase project. Run `npm install`, link the project, then `npx supabase db push` to create the database, `npx supabase functions deploy identity-check` for identity checks (simulated until Dojah keys are set as secrets), and `npm run dev` to start the app. Make yourself admin once (README, step 5).
 - **Demo portfolio:** use a separate Supabase project.
-  1. `npm run demo:push` applies the migrations.
+  1. `npm run demo:push` applies the migrations; deploy the identity-check function to the demo project too.
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 222, with no database server needed.
+- **Tests:** `npm test` runs all 244, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -350,12 +352,28 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
 
 ## 9. What is yet to be done
 
-### Finish Phase 2
+### Now: live integrations
+
+Outside parties are simulated today: a person confirms in the app instead of a live connection. Replacing them is the current work. For a real pilot, each needs an adapter, built so one provider can be swapped for another:
+
+| Integration | State |
+| --- | --- |
+| **Identity:** BVN and NIN checks | **Built.** The `identity-check` Edge Function looks numbers up and records the outcome, at enrolment, at investor KYC and on demand. The provider is **Dojah**; its adapter is built. Until its keys are set it runs a simulated provider, and the app marks those answers _Simulated_. Still to do: get Dojah keys and test against the sandbox; liveness (a selfie matched to the ID photo). Paystack was considered and ruled out: it can't check NINs, it doesn't return the BVN record, and it needs a bank account, which most farmers don't give. |
+| **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | Next |
+| **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | To do |
+| **Insurance, weather and satellite data** | To do |
+
+SMS and USSD are part of Phase 3 below.
+
+### Phase 3: farmer channel and security audit (on hold)
+
+Moved out of Phase 2 and skipped for now.
 
 | Item | What it involves |
 | --- | --- |
 | **USSD / SMS farmer channel** | Farmers dial a short code to check voucher balances and cycle status, and get SMS alerts (voucher issued, visit due, payout made). It needs an aggregator adapter (e.g. Africa's Talking) as a Supabase Edge Function, and an in-app phone simulator for demos until a live short code exists. |
-| **Phase 2 gate: security audit** | The concept's gate before the pilot. It needs an independent security review and penetration test of the app, the database rules and the hosting. |
+| **Security audit** | The concept's gate before the pilot. It needs an independent security review and penetration test of the app, the database rules and the hosting. |
+
 ### Gaps in what's built
 
 | Area | Gap |
@@ -368,15 +386,6 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
 | Offline app | Map imagery isn't available offline (the tile providers' terms don't allow bulk copies). Assigning farms to specific agents, and storage limits for very large photo queues, aren't handled yet. |
 | Satellite monitoring | Sentinel-2 crop-health (NDVI) checks per farm, alongside agent visits. In the concept, not built. |
 | Insurance claims flow | Insurance payouts are recorded as receipts. A guided claim (damage flagged → insurer notified → loss assessed) isn't built. |
-
-### Integrations (all simulated today)
-
-Every outside party is represented by a person confirming in the app, not by a live connection. For a real pilot, each needs an adapter (built so one provider can be swapped for another):
-
-- **Trustee / bank:** release instructions and confirmations, instead of keyed-in references.
-- **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS).
-- **Identity:** BVN and NIN checks and liveness (e.g. Smile ID, Prembly, Dojah). Today compliance checks documents by eye.
-- **Insurance, weather, satellite data, SMS/USSD.**
 
 ### Next stages
 

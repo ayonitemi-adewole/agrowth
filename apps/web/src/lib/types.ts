@@ -48,6 +48,9 @@ export interface Farmer {
   nin_last4: string | null;
   bvn_last4: string | null;
   kyc_status: KycStatus;
+  /** Compliance's note on the KYC decision, e.g. why it verified without a matching check. */
+  kyc_note: string | null;
+  kyc_reviewed_at: string | null;
   state: string;
   lga: string;
   ward: string | null;

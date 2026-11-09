@@ -17,6 +17,7 @@ import {
 } from '../../components/ui';
 import { formatBps, uploadFile } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
+import { describeOutcomes, runIdentityChecks } from '../../lib/identity';
 import { formatDate } from '../../lib/format';
 import { INVESTOR_CLASS } from '../../lib/investing';
 import { formatNaira, nairaInput, parseNaira } from '../../lib/money';
@@ -169,7 +170,20 @@ function KycForm({
         p_account_name: form.account_name,
       });
       if (error) throw error;
-      toast.success('Sent to compliance for review');
+      // Check both numbers with the identity provider. Compliance sees the outcome; if the
+      // service is unreachable it can check again, so the submission stands either way.
+      try {
+        const { ok, message } = describeOutcomes(
+          await runIdentityChecks('investor', session!.user.id, [
+            { number_type: 'nin', number: form.nin },
+            { number_type: 'bvn', number: form.bvn },
+          ]),
+        );
+        if (ok) toast.success('Identity confirmed. Sent to compliance for review.');
+        else toast.error(`${message}. Sent to compliance, who will follow up.`);
+      } catch {
+        toast.success('Sent to compliance for review');
+      }
       onDone();
     } catch (err) {
       setError(errorMessage(err));

@@ -21,12 +21,13 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Still to come: USSD and SMS.
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Next: replacing the simulated trustee, payment and identity steps with live integrations. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
 
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | Accounts and roles: sign-up, admin assigns staff roles, deactivation                                                                                                               | Done  |
 | Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                                                                                                            | Done  |
+| Identity checks: NIN and BVN looked up with an identity provider (Dojah adapter, or simulated), KYC verification needs a match or a written reason                                 | Done  |
 | Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check                                                                                            | Done  |
 | Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents                                                                                    | Done  |
 | Approval: readiness checklist, compliance review, separation of duties                                                                                                             | Done  |
@@ -65,6 +66,20 @@ npx supabase db push                                # creates all tables, rules 
 
 > If you prefer clicking: open **SQL Editor** in Supabase and run each file in `supabase/migrations` in order (oldest first). `db push` is better, because it remembers which migrations have already run.
 
+Then deploy the identity check, the Edge Function that looks up NINs and BVNs:
+
+```bash
+npx supabase functions deploy identity-check
+```
+
+Out of the box it uses a **simulated provider**, so no keys are needed, and the app labels its answers _Simulated_. It treats every number as belonging to the person who gave it, except numbers ending in `0000` (not found), `1111` (someone else's), `2222` (name matches, date of birth and phone don't) and `9999` (provider unavailable). To use **Dojah**, copy `supabase/functions/.env.example` to `supabase/functions/.env`, set `IDENTITY_PROVIDER=dojah` and your keys (`DOJAH_BASE_URL=https://sandbox.dojah.io` for sandbox keys), then:
+
+```bash
+npx supabase secrets set --env-file supabase/functions/.env
+```
+
+Without the function, enrolment and KYC still work; the checks just can't run, so compliance must write down why it's verifying anyone.
+
 ### 3. Connect the web app
 
 ```bash
@@ -97,7 +112,7 @@ Reload the app. From then on, use the **Users** page to give other staff their r
 
 For showing Agrowth to customers, one command fills a Supabase project with a lived-in portfolio, so every screen has something real on it:
 
-- 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected
+- 4 cooperatives in Kaduna, Kano and Benue, 43 farmers with mapped farms, KYC verified, pending and rejected, each with simulated identity checks (matches, partial matches awaiting review, and a number that belongs to someone else)
 - 9 funding cycles, one at every stage, and a state wheat programme running two of them:
 
 | Stage             | Cycle                        | What it shows                                                                                              |
@@ -118,9 +133,10 @@ Every record goes through the same database functions and security rules as the 
 
 1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
 2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
-3. Create the tables, rules and functions:
+3. Create the tables, rules and functions, and deploy the identity check (it runs simulated on the demo, so visitors can try checks without any keys):
    ```bash
    npm run demo:push
+   npx supabase functions deploy identity-check --project-ref DEMO_PROJECT_ID
    ```
 4. Run:
    ```bash
@@ -245,7 +261,9 @@ Aim for squares about **100 m × 100 m (≈1 ha)**, so the three farms total abo
 
 > Try drawing a fourth farm on top of an existing one. It's refused as land that's already registered.
 
-**Step 4 — Compliance officer: verify KYC.** Open each of the three farmers and press **Verify**.
+**Step 4 — Compliance officer: verify KYC.** Open each of the three farmers. Their numbers were checked when they were enrolled: under **Identity checks**, each NIN and BVN shows **Match** (marked _Simulated_ until a real provider is set up). Press **Verify**.
+
+> Enrol a farmer with a NIN ending in `1111` and the check comes back **No match**. **Verify** then stays disabled until you write a note saying how you confirmed who they are. If the identity-check function isn't deployed, every farmer is in that position.
 
 **Step 5 — Cycle manager: create the cycle** (Funding cycles → New cycle)
 
@@ -453,9 +471,10 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
-- **Web tests** (`apps/web`) — money, map, error, return-projection and CSV export helpers, and the offline sync queue.
+- **Identity provider tests** — the name, date and phone matching, the simulated provider, and the Dojah adapter against canned responses.
+- **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check and CSV export helpers, and the offline sync queue.
 
 ## Repository layout
 
@@ -468,7 +487,8 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks
+  functions/           Edge Functions: identity-check, and _shared/identity (providers, matching) used by it, the seed and the tests
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
@@ -494,6 +514,7 @@ npx supabase db push
 - **No recycling.** An entry can only touch its own cycle's accounts (plus platform-level accounts such as fees), so one cycle's money can never pay another cycle's investors.
 - **Nobody posts money through the API**, not even admins. Only internal functions (funding, disbursement, settlement) can.
 - **Identity numbers are never stored.** BVN and NIN are kept only as keyed hashes (key held in Supabase Vault) plus the last four digits. The hashes are in a schema the API can't reach.
+- **Identity checks can't be faked.** A check can only be opened for the number on record (it must hash to the stored fingerprint), by someone allowed to check that person, and only the identity service (service role) can record the answer. Only match or no-match per field is kept, never the provider's copy of the person's details. Verifying KYC needs a matching check of every number on record, or a written reason.
 - **One farmer, one record; one piece of land, one farm.** Enrolment needs a NIN or BVN, and a repeat is refused. A boundary that overlaps a registered farm by more than 5% of the smaller farm is refused.
 - **Farm area is computed by the database** from the mapped boundary; invalid polygons are rejected.
 - **Boundaries are locked while a cycle is live**, from approval through harvest.

@@ -21,8 +21,10 @@ import {
   Textarea,
 } from '../components/ui';
 import { formatBps, openFile } from '../lib/cycles';
+import { IdentityChecks } from '../components/IdentityChecks';
 import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
+import { identityConfirmed, loadIdentityChecks, type IdentityCheck } from '../lib/identity';
 import { INVESTOR_CLASS } from '../lib/investing';
 import { formatNaira, nairaInput, parseNaira, toKobo } from '../lib/money';
 import { can } from '../lib/roles';
@@ -168,13 +170,23 @@ function ReviewButton({
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [checks, setChecks] = useState<IdentityCheck[] | null>(null);
 
+  const loadChecks = () =>
+    loadIdentityChecks('investor', investor.user_id)
+      .then(setChecks)
+      .catch((err) => setError(errorMessage(err)));
   const start = () => {
     setClassification(investor.declared_class);
     setNote('');
     setError(null);
+    setChecks(null);
     setOpen(true);
+    void loadChecks();
   };
+  const confirmed =
+    checks !== null && identityConfirmed(['nin', 'bvn'], checks, investor.submitted_at);
+  const needsNote = !confirmed && !note.trim();
   const viewId = () =>
     openFile('investor-documents', investor.id_document_path).catch((err) =>
       setError(errorMessage(err)),
@@ -240,7 +252,6 @@ function ReviewButton({
                       <span className="block text-zinc-600">{investor.account_name}</span>
                     </>,
                   ],
-                  ['NIN and BVN', 'Received; stored only as fingerprints'],
                 ] as [string, ReactNode][]
               ).map(([label, value]) => (
                 <div key={label} className="min-w-0">
@@ -256,6 +267,23 @@ function ReviewButton({
                   own account.
                 </Alert>
               </div>
+            )}
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-zinc-900">Identity checks</p>
+            {checks === null ? (
+              <Spinner label="Loading checks…" />
+            ) : (
+              <IdentityChecks
+                subject="investor"
+                subjectId={investor.user_id}
+                checks={checks}
+                onRecord={[{ type: 'nin' }, { type: 'bvn' }]}
+                since={investor.submitted_at}
+                canRun
+                onChecked={loadChecks}
+              />
             )}
           </div>
 
@@ -297,8 +325,12 @@ function ReviewButton({
           </fieldset>
 
           <Field
-            label="Note to the investor"
-            hint="Needed to reject, so they know what to fix. Optional when verifying."
+            label="Note"
+            hint={
+              confirmed
+                ? 'Needed to reject: the investor sees it, so they know what to fix. Optional when verifying.'
+                : 'Needed to reject (the investor sees it). Also needed to verify, as the NIN and BVN don’t both have a matching check: say how you confirmed who they are.'
+            }
           >
             <Textarea
               rows={3}
@@ -327,7 +359,8 @@ function ReviewButton({
               </Button>
               <Button
                 busy={busy === 'approve'}
-                disabled={busy !== null}
+                disabled={busy !== null || needsNote}
+                title={needsNote ? 'Add a note, or run the identity checks first' : undefined}
                 onClick={() => review(true)}
               >
                 Verify as {INVESTOR_CLASS[classification].toLowerCase()}

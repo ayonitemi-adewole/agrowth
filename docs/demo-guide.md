@@ -208,7 +208,9 @@ Switch to `investor.retail@agrowth.test` (Funmilayo). **My investments** shows h
 
 Switch to **trustee**, then soybean cycle → **Funding**. Funmilayo's pledge can't be confirmed yet: her 48-hour cooling-off hasn't ended.
 
-Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. **Review** shows his details, ID document and classification options.
+Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. **Review** shows his details, ID document, the identity checks of his NIN and BVN (both **Match**, marked _Simulated_ on the demo), and classification options.
+
+Then **Farmers** and filter by KYC pending: one farmer's NIN came back **Partial match** (the name matches, the date of birth and phone don't). **Verify** stays disabled until compliance writes down how they confirmed who the farmer is. The rejected farmer's number belongs to someone else.
 
 > **The point:** investors see a verifiable, honest picture (ranges, not promises), and the regulatory rules (KYC, caps, disclosures, cooling-off) are built in.
 
@@ -226,8 +228,8 @@ Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. *
 
 ### Closing (2 min)
 
-- **What's built:** the core platform, both editions and the offline field app.
-- **What's next:** the farmer USSD/SMS channel, an independent security audit, live integrations with a trustee, payments and identity checks, and a pilot season with one cooperative, a real trustee, offtaker and insurer.
+- **What's built:** the core platform, both editions, the offline field app, and automated NIN/BVN identity checks (simulated on the demo, ready for a live provider).
+- **What's next:** live integrations with a trustee and payments, then a pilot season with one cooperative, a real trustee, offtaker and insurer. The farmer USSD/SMS channel and an independent security audit follow in a later phase.
 - The [Platform Guide](platform-guide.md) lists the full status.
 
 ---

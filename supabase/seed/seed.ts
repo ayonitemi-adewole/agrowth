@@ -9,6 +9,9 @@
  * given their real planned dates. System timestamps (history, field visits, the ledger)
  * are append-only and show when the seed ran.
  */
+import { MOCK_ENDINGS, mockProvider } from '../functions/_shared/identity/mock.ts';
+import { runIdentityCheck } from '../functions/_shared/identity/run.ts';
+import type { NumberType, Subject } from '../functions/_shared/identity/types.ts';
 import type { SeedApi, Session } from './api.ts';
 import { fieldPhoto, type FieldStage } from './field-photo.ts';
 import {
@@ -70,6 +73,15 @@ const kobo = (naira: number) => Math.round(naira * 100);
 const roundTo = (n: number, step: number) => Math.round(n / step) * step;
 const floorTo = (n: number, step: number) => Math.floor(n / step) * step;
 const naira = (n: number) => `₦${Math.round(n).toLocaleString('en-NG')}`;
+
+type Kyc = 'verified' | 'pending' | 'rejected';
+const SPECIAL_ENDINGS: string[] = Object.values(MOCK_ENDINGS);
+/**
+ * An identity number the simulated provider will match: steps past the endings it
+ * reserves for other answers. Seed numbers are spaced well apart, so this stays unique.
+ */
+const ordinaryNumber = (n: number) =>
+  String(SPECIAL_ENDINGS.includes(String(n).slice(-4)) ? n + 1 : n);
 
 /** Deterministic random numbers (mulberry32), so every seed builds the same portfolio. */
 function random(seed: number) {
@@ -191,6 +203,33 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   const compliance = as('compliance');
   const trustee = as('trustee');
 
+  /**
+   * Checks an identity number with the simulated provider, through the same code as the
+   * identity-check Edge Function: opened by `caller`, recorded at the service level.
+   */
+  const checkIdentity = (
+    caller: Session,
+    subject: Subject,
+    subjectId: string,
+    type: NumberType,
+    number: string,
+  ) =>
+    runIdentityCheck(
+      mockProvider,
+      {
+        start: (r, provider) =>
+          caller.rpc('start_identity_check', {
+            p_subject: r.subject,
+            p_subject_id: r.subject_id,
+            p_number_type: r.number_type,
+            p_number: r.number,
+            p_provider: provider,
+          }),
+        complete: (args) => api.adminRpc('complete_identity_check', args),
+      },
+      { subject, subject_id: subjectId, number_type: type, number },
+    );
+
   // Vendors ---------------------------------------------------------------------------------
   log('Registering agro-dealers');
   for (const v of VENDORS) {
@@ -256,11 +295,13 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     const investor = api.as(id);
     const idPath = `${id}/national-id.svg`;
     await investor.upload('investor-documents', idPath, sampleId(inv.fullName), 'image/svg+xml');
+    const nin = ordinaryNumber(70_000_000_101 + i);
+    const bvn = ordinaryNumber(22_100_000_101 + i);
     await investor.rpc('submit_investor_kyc', {
       p_legal_name: inv.fullName,
       p_declared_class: inv.declared,
-      p_nin: String(70_000_000_000 + i),
-      p_bvn: String(22_100_000_000 + i),
+      p_nin: nin,
+      p_bvn: bvn,
       p_annual_income_kobo: kobo(inv.income),
       p_other_crowdfunding_kobo: kobo(inv.elsewhere),
       p_id_document_path: idPath,
@@ -268,6 +309,9 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       p_account_number: inv.account,
       p_account_name: inv.fullName,
     });
+    // The app checks both numbers as soon as an investor submits them.
+    await checkIdentity(investor, 'investor', id, 'nin', nin);
+    await checkIdentity(investor, 'investor', id, 'bvn', bvn);
     if (inv.verified) {
       await compliance.rpc('review_investor_kyc', {
         p_user_id: id,
@@ -320,15 +364,21 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     coopIds[coop.key] = row.id as string;
 
     for (const [i, [first, last, gender]] of coop.farmers.entries()) {
-      const farm = await enrolAndMap(agent, coop, i, first, last, gender);
-      farmerCount++;
       const placed = placement.get(`${coop.key}:${i}`);
       const spec = placed && CYCLES.find((c) => c.key === placed.cycle);
-      let kyc: 'verified' | 'pending' | 'rejected' = 'verified';
+      let kyc: Kyc = 'verified';
       if (!spec) kyc = i - taken[coop.key] < UNASSIGNED_REJECTED ? 'rejected' : 'pending';
       else if (spec.pendingKyc?.includes(placed.position)) kyc = 'pending';
-      if (kyc !== 'pending') {
+      const farm = await enrolAndMap(agent, coop, i, first, last, gender, kyc);
+      farmerCount++;
+      if (kyc === 'verified') {
         await compliance.rpc('set_farmer_kyc', { p_farmer_id: farm.farmerId, p_status: kyc });
+      } else if (kyc === 'rejected') {
+        await compliance.rpc('set_farmer_kyc', {
+          p_farmer_id: farm.farmerId,
+          p_status: kyc,
+          p_note: 'The identity provider has this number under a different name.',
+        });
       }
       if (placed) {
         const list = farmsByCycle.get(placed.cycle) ?? [];
@@ -345,23 +395,38 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     first: string,
     last: string,
     gender: 'female' | 'male',
+    kyc: Kyc,
   ): Promise<Farm> {
     const n = identity++;
     const phone = `+234803${String(2_100_000 + n * 7_919).padStart(7, '0')}`;
+    // Most farmers have both identifiers; some have only one. The simulated provider
+    // answers by the last four digits (see mock.ts): farmers who'll be rejected have
+    // numbers that belong to someone else, and those awaiting review a NIN with a
+    // different date of birth and phone, for compliance to look into.
+    let nin = n % 3 === 2 ? null : ordinaryNumber(61_000_000_000 + n * 7_331);
+    let bvn = n % 3 === 0 ? null : ordinaryNumber(22_150_000_000 + n * 4_517);
+    if (kyc === 'rejected') {
+      if (nin) nin = `${6_190_000 + n}${MOCK_ENDINGS.someoneElse}`;
+      if (bvn) bvn = `${2_219_000 + n}${MOCK_ENDINGS.someoneElse}`;
+    } else if (kyc === 'pending' && nin) {
+      nin = `${6_180_000 + n}${MOCK_ENDINGS.partial}`;
+    }
     const farmerId = await agent.rpc<string>('register_farmer', {
       p_first_name: first,
       p_last_name: last,
       p_phone: phone,
       p_state: coop.state,
       p_lga: coop.lga,
-      // Most farmers have both identifiers; some have only one.
-      p_nin: n % 3 === 2 ? null : String(61_000_000_000 + n * 7_331),
-      p_bvn: n % 3 === 0 ? null : String(22_150_000_000 + n * 4_517),
+      p_nin: nin,
+      p_bvn: bvn,
       p_gender: gender,
       p_date_of_birth: day(-Math.round(between(25, 58) * 365.25)),
       p_ward: coop.wards[i % coop.wards.length],
       p_cooperative_id: coopIds[coop.key],
     });
+    // The app checks the numbers straight after enrolment.
+    if (nin) await checkIdentity(agent, 'farmer', farmerId, 'nin', nin);
+    if (bvn) await checkIdentity(agent, 'farmer', farmerId, 'bvn', bvn);
     const boundary = farmBoundary(coop.origin, i, rand);
     const farmName = FARM_NAMES[i % FARM_NAMES.length];
     const farmId = await agent.rpc<string>('map_farm', {

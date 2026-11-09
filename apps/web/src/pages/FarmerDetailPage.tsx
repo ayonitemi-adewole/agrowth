@@ -3,9 +3,21 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
-import { Alert, Button, Card, EmptyState, KycBadge, PageHeader, Spinner } from '../components/ui';
+import { IdentityChecks } from '../components/IdentityChecks';
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  Field,
+  KycBadge,
+  PageHeader,
+  Spinner,
+  Textarea,
+} from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { formatDate, formatHectares, titleCase } from '../lib/format';
+import { identityConfirmed, loadIdentityChecks, type NumberType } from '../lib/identity';
 import { can } from '../lib/roles';
 import { supabase } from '../lib/supabase';
 import type { Farmer, FarmMap as Farm, KycStatus } from '../lib/types';
@@ -17,9 +29,16 @@ export function FarmerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { profile } = useAuth();
   const location = useLocation();
-  const justEnrolled = (location.state as { justEnrolled?: boolean } | null)?.justEnrolled;
+  const { justEnrolled, identityNotice } =
+    (location.state as {
+      justEnrolled?: boolean;
+      identityNotice?: { ok: boolean; message: string };
+    } | null) ?? {};
   const [kycBusy, setKycBusy] = useState<KycStatus | null>(null);
   const [kycError, setKycError] = useState<string | null>(null);
+  const [kycNote, setKycNote] = useState('');
+
+  const checks = useAsync(() => loadIdentityChecks('farmer', id!), [id]);
 
   const farmer = useAsync(async () => {
     const { data, error } = await supabase
@@ -44,10 +63,17 @@ export function FarmerDetailPage() {
   const setKyc = async (status: KycStatus) => {
     setKycBusy(status);
     setKycError(null);
-    const { error } = await supabase.rpc('set_farmer_kyc', { p_farmer_id: id, p_status: status });
+    const { error } = await supabase.rpc('set_farmer_kyc', {
+      p_farmer_id: id,
+      p_status: status,
+      p_note: kycNote.trim() || null,
+    });
     setKycBusy(null);
     if (error) setKycError(errorMessage(error));
-    else farmer.reload();
+    else {
+      setKycNote('');
+      farmer.reload();
+    }
   };
 
   if (farmer.loading && !farmer.data) return <Spinner />;
@@ -56,6 +82,19 @@ export function FarmerDetailPage() {
   if (!f) return <EmptyState>Farmer not found, or you don't have access.</EmptyState>;
 
   const totalHa = (farms.data ?? []).reduce((s, x) => s + Number(x.area_hectares), 0);
+  const onRecord = (
+    [
+      ['nin', f.nin_last4],
+      ['bvn', f.bvn_last4],
+    ] as [NumberType, string | null][]
+  )
+    .filter(([, last4]) => last4)
+    .map(([type, last4]) => ({ type, last4 }));
+  const confirmed = identityConfirmed(
+    onRecord.map((r) => r.type),
+    checks.data ?? [],
+  );
+  const needsNote = !confirmed && !kycNote.trim();
 
   return (
     <>
@@ -79,6 +118,14 @@ export function FarmerDetailPage() {
       {justEnrolled && (
         <div className="mb-4">
           <Alert tone="success">Farmer enrolled. Next, walk or trace their farm boundary.</Alert>
+        </div>
+      )}
+      {identityNotice && !identityNotice.ok && (
+        <div className="mb-4">
+          <Alert tone="warning" title="Identity not confirmed yet">
+            {identityNotice.message}. Compliance will see this when reviewing KYC; you can check
+            again below.
+          </Alert>
         </div>
       )}
 
@@ -106,12 +153,60 @@ export function FarmerDetailPage() {
             <Item label="Enrolled">{formatDate(f.created_at)}</Item>
           </dl>
 
+          <div className="space-y-2 border-t border-zinc-200 pt-4">
+            <p className="text-sm font-medium text-zinc-700">Identity checks</p>
+            {checks.error ? (
+              <Alert>{errorMessage(checks.error)}</Alert>
+            ) : checks.loading && !checks.data ? (
+              <Spinner />
+            ) : (
+              <IdentityChecks
+                subject="farmer"
+                subjectId={f.id}
+                checks={checks.data ?? []}
+                onRecord={onRecord}
+                canRun={can.enrol(profile?.role) || can.reviewKyc(profile?.role)}
+                onChecked={checks.reload}
+              />
+            )}
+          </div>
+
+          {f.kyc_note && (
+            <div className="border-t border-zinc-200 pt-4 text-sm">
+              <p className="font-medium text-zinc-700">Compliance note</p>
+              <p className="mt-1 text-zinc-600">{f.kyc_note}</p>
+              {f.kyc_reviewed_at && (
+                <p className="mt-1 text-xs text-zinc-500">{formatDate(f.kyc_reviewed_at)}</p>
+              )}
+            </div>
+          )}
+
           {can.reviewKyc(profile?.role) && (
             <div className="space-y-2 border-t border-zinc-200 pt-4">
               <p className="text-sm font-medium text-zinc-700">KYC decision</p>
+              <Field
+                label="Note"
+                hint={
+                  confirmed
+                    ? 'Optional. Kept with the decision.'
+                    : 'Needed to verify: not every number has a matching check. Say how you confirmed who they are.'
+                }
+              >
+                <Textarea
+                  rows={2}
+                  value={kycNote}
+                  onChange={(e) => setKycNote(e.target.value)}
+                  maxLength={2000}
+                />
+              </Field>
               <div className="flex flex-wrap gap-2">
                 {f.kyc_status !== 'verified' && (
-                  <Button busy={kycBusy === 'verified'} onClick={() => setKyc('verified')}>
+                  <Button
+                    busy={kycBusy === 'verified'}
+                    disabled={needsNote}
+                    title={needsNote ? 'Add a note, or run the identity checks first' : undefined}
+                    onClick={() => setKyc('verified')}
+                  >
                     Verify
                   </Button>
                 )}

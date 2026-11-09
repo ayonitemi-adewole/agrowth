@@ -5,8 +5,9 @@
  * - the test in tests/seed.test.ts runs the same seed against the migrations on PGlite.
  *
  * Every write goes through a signed-in user, so row-level security and the database
- * functions check it. The only service-level writes are creating the accounts and giving
- * finished demo cycles past dates (see seed.ts).
+ * functions check it. The only service-level writes are creating the accounts, giving
+ * finished demo cycles past dates (see seed.ts), and recording identity-check results as
+ * the identity-check Edge Function does.
  */
 export type Row = Record<string, unknown>;
 
@@ -47,4 +48,6 @@ export interface SeedApi {
    * them) past dates, and to pause investor cooling-off while those investments are made.
    */
   adminUpdate(table: string, match: Row, values: Row): Promise<void>;
+  /** Service-level function call, used only for public.complete_identity_check. */
+  adminRpc(fn: string, args: Row): Promise<void>;
 }

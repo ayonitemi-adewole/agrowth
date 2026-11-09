@@ -122,5 +122,9 @@ export function supabaseApi(config: Config): SeedApi {
       const { error } = await admin.from(table).update(values).match(match);
       if (error) fail(`Updating ${table}`, error);
     },
+    async adminRpc(fn, args) {
+      const { error } = await admin.rpc(fn, args);
+      if (error) fail(fn, error);
+    },
   };
 }
