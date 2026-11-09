@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireStaff, RoleGate } from './components/Guards';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
-import { Spinner } from './components/ui';
+import { SplashScreen } from './components/SplashScreen';
 import { can } from './lib/roles';
 import { OfflineProvider } from './lib/offline/OfflineProvider';
 import { isConfigured } from './lib/supabase';
@@ -32,11 +32,16 @@ const MarketplacePage = page(() => import('./pages/invest/MarketplacePage'), 'Ma
 const ListingPage = page(() => import('./pages/invest/ListingPage'), 'ListingPage');
 const PortfolioPage = page(() => import('./pages/invest/PortfolioPage'), 'PortfolioPage');
 const CertificatePage = page(() => import('./pages/invest/CertificatePage'), 'CertificatePage');
+const SimulatedCheckoutPage = page(
+  () => import('./pages/invest/SimulatedCheckoutPage'),
+  'SimulatedCheckoutPage',
+);
 const InvestorProfilePage = page(
   () => import('./pages/invest/InvestorProfilePage'),
   'InvestorProfilePage',
 );
 const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
+const BankFilesPage = page(() => import('./pages/BankFilesPage'), 'BankFilesPage');
 const ProgrammesPage = page(() => import('./pages/programme/ProgrammesPage'), 'ProgrammesPage');
 const ProgrammeDetailPage = page(
   () => import('./pages/programme/ProgrammeDetailPage'),
@@ -50,7 +55,7 @@ export function App() {
       <OfflineProvider>
         <ToastProvider>
           <BrowserRouter>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<SplashScreen />}>
               <Routes>
                 <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
                 <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
@@ -68,6 +73,14 @@ export function App() {
                     element={
                       <RoleGate allow={can.invest}>
                         <CertificatePage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="pay/simulated"
+                    element={
+                      <RoleGate allow={can.invest}>
+                        <SimulatedCheckoutPage />
                       </RoleGate>
                     }
                   />
@@ -214,6 +227,14 @@ export function App() {
                       element={
                         <RoleGate allow={can.doFieldVisits}>
                           <FieldVisitPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="bank"
+                      element={
+                        <RoleGate allow={can.readBankFiles}>
+                          <BankFilesPage />
                         </RoleGate>
                       }
                     />

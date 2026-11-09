@@ -174,7 +174,9 @@ Now open the **Ikara sorghum** cycle, which is awaiting approval. The cycle mana
 
 Back as the **cycle manager**, open the **Zaria maize, dry season** cycle → Milestones. One release is **blocked** because an agent checked in 270 m from the farm. It stays blocked until a passing revisit.
 
-> **The point:** money only moves after someone has stood on every farm, and the phone proves where they were.
+Then the cycle's **Weather** tab. This is real weather at those farms: the last 60 days of rain against the usual for the time of year, and the coming week. Any dry spell, heavy rain or heat shows at the top of the tab and on the Overview. If the tab says there's no weather yet, press **Refresh weather**.
+
+> **The point:** money only moves after someone has stood on every farm, and the phone proves where they were. Between visits, the weather keeps watch, and its record is there if a claim is ever made.
 
 ### Scene 5 — Inputs, not cash (4 min)
 
@@ -192,9 +194,11 @@ Back as the **cycle manager**, open the **Zaria maize, dry season** cycle → Mi
 
 1. The preview shows the cash held, the fee, the funders' capital and return, and each farmer's surplus by kilograms.
 2. **Run settlement:** this fixes the payouts.
-3. **Confirm payment** on each, with any reference. After the last one the cycle is **Settled** and the trustee holds nothing for it.
+3. Payouts to farmers and the platform fee have no bank account on file, so **Confirm payment** on each, with any reference.
+4. Open **Bank files** in the menu. Under **Waiting for a payment file** are the investors' payouts, which have bank accounts on file, and the agro-dealer's latest voucher payment. **Select all** → **Make payment file** downloads the CSV a trustee would upload to its bank's bulk payments. Each narration starts with the payment's AGP reference.
+5. **Simulated bank statement** downloads the statement the bank would send back. It shows those payments made and Funmilayo's pledge payment received. Under **Statements**, **Choose CSV** → **Import and match**. The payments are confirmed under the bank's references and posted to the ledger, and the cycle is **Settled**. Funmilayo's pledge lands in **Needs attention**: her cooling-off hasn't ended, so it can't be added yet.
 
-> **The point:** the platform never holds money. It tells the trustee what to pay and records what the trustee confirms.
+> **The point:** the platform never holds money. It tells the trustee's bank what to pay, and the bank's own statement confirms it.
 
 ### Scene 7 — Investor Edition (6 min)
 
@@ -202,13 +206,16 @@ Back as the **cycle manager**, open the **Zaria maize, dry season** cycle → Mi
 
 1. **Marketplace:** the open soybean cycle. Show the projected low/expected/high return, the 1–5 risk score with its reasons, how much is subscribed, the farm map (no farmer names), the buyer and the insurer.
 2. **Invest:** read the risk disclosure, tick it, enter an amount and pledge. The investor gets the trustee's escrow account and a payment reference, and can withdraw until the trustee confirms payment.
-3. **My investments:** a statement for the settled maize cycle (paid in, capital back, return) and a printable certificate. Then **Track the cycle** on the live maize cycle: field checks with photos, releases and history.
+3. **My investments:** her earlier ₦500,000 soybean pledge is past its cooling-off and waiting for payment. **Pay online** shows the amount and the gateway's fee (none on the simulated gateway), then **Continue to payment** opens the simulated gateway's page. **Pay** brings her back with "Payment received": the pledge is confirmed and the deposit is on the cycle's ledger, with no one at the trustee's desk. With Paystack switched on, the same button opens Paystack's checkout.
+4. Also under **My investments:** a statement for the settled maize cycle (paid in, capital back, return) and a printable certificate. Then **Track the cycle** on the live maize cycle: field checks with photos, releases and history.
 
 Switch to `investor.retail@agrowth.test` (Funmilayo). **My investments** shows her retail limit: at most 10% of declared income a year across all crowdfunding. She has a pledge waiting for payment.
 
 Switch to **trustee**, then soybean cycle → **Funding**. Funmilayo's pledge can't be confirmed yet: her 48-hour cooling-off hasn't ended.
 
-Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. **Review** shows his details, ID document and classification options.
+Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. **Review** shows his details, ID document, the identity checks of his NIN and BVN (both **Match**, marked _Simulated_ on the demo), and classification options.
+
+Then **Farmers** and filter by KYC pending: one farmer's NIN came back **Partial match** (the name matches, the date of birth and phone don't). **Verify** stays disabled until compliance writes down how they confirmed who the farmer is. The rejected farmer's number belongs to someone else.
 
 > **The point:** investors see a verifiable, honest picture (ranges, not promises), and the regulatory rules (KYC, caps, disclosures, cooling-off) are built in.
 
@@ -226,8 +233,8 @@ Switch to **compliance**, then **Investors**. Emeka is waiting for KYC review. *
 
 ### Closing (2 min)
 
-- **What's built:** the core platform, both editions and the offline field app.
-- **What's next:** the farmer USSD/SMS channel, an independent security audit, live integrations with a trustee, payments and identity checks, and a pilot season with one cooperative, a real trustee, offtaker and insurer.
+- **What's built:** the core platform, both editions, the offline field app, automated NIN/BVN identity checks (simulated on the demo, ready for a live provider), and the trustee's bank files: payment files out, statements back in.
+- **What's next:** a payments integration for collections and payouts, then a pilot season with one cooperative, a real trustee, offtaker and insurer. The farmer USSD/SMS channel and an independent security audit follow in a later phase.
 - The [Platform Guide](platform-guide.md) lists the full status.
 
 ---

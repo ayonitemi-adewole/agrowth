@@ -78,7 +78,7 @@ describe('government programmes', () => {
          p_gender => $5, p_cooperative_id => $6) as id`,
       [last, where[0], where[1], String(nextNin++), gender, cooperative],
     );
-    await as(compliance, `select public.set_farmer_kyc($1, 'verified')`, [farmer]);
+    await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmer]);
     const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
       farmer,
       JSON.stringify(square(lon, 11.7, size)),

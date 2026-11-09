@@ -4,6 +4,7 @@ import {
   CloudUpload,
   BookOpenCheck,
   BriefcaseBusiness,
+  FileSpreadsheet,
   Landmark,
   LandPlot,
   TrendingUp,
@@ -21,13 +22,14 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { demo } from '../lib/demo';
 import { useOffline } from '../lib/offline/OfflineProvider';
 import { can, ROLE_LABELS } from '../lib/roles';
 import type { Role } from '../lib/types';
+import { SplashScreen } from './SplashScreen';
 import { DemoSwitcher } from './DemoSignIn';
 import { Avatar, cx } from './ui';
 
@@ -90,6 +92,7 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
     title: 'Oversight',
     items: [
       { to: '/investors', label: 'Investors', icon: Landmark, show: can.readInvestors },
+      { to: '/bank', label: 'Bank files', icon: FileSpreadsheet, show: can.readBankFiles },
       { to: '/ledger', label: 'Ledger', icon: BookOpenCheck, show: can.readLedger },
       { to: '/users', label: 'Users', icon: Users, show: can.manageUsers },
     ],
@@ -232,7 +235,10 @@ export function Layout() {
         </div>
       )}
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-10 lg:py-10">
-        <Outlet />
+        {/* A screen still loading shows in the page area; the menu stays put. */}
+        <Suspense fallback={<SplashScreen inline />}>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );

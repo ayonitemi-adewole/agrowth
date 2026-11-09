@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Alert, Button, Card, Field, Input, PageHeader, Select } from '../components/ui';
 import { duplicateFarmerId, errorMessage } from '../lib/errors';
+import { describeOutcomes, runIdentityChecks } from '../lib/identity';
 import { supabase } from '../lib/supabase';
 import type { Cooperative } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -73,12 +74,30 @@ export function RegisterFarmerPage() {
       p_ward: orNull(form.ward),
       p_cooperative_id: orNull(form.cooperative_id),
     });
-    setBusy(false);
     if (error) {
+      setBusy(false);
       setError({ message: errorMessage(error), existingId: duplicateFarmerId(error) });
       return;
     }
-    navigate(`/farmers/${data as string}`, { state: { justEnrolled: true } });
+    // Enrolled. Now check the numbers with the identity provider; the farmer's page shows
+    // the outcome. A failure here doesn't undo the enrolment: the check can be rerun there.
+    const farmerId = data as string;
+    let identityNotice: { ok: boolean; message: string };
+    try {
+      identityNotice = describeOutcomes(
+        await runIdentityChecks(
+          'farmer',
+          farmerId,
+          (['nin', 'bvn'] as const)
+            .filter((t) => form[t].trim())
+            .map((t) => ({ number_type: t, number: form[t] })),
+        ),
+      );
+    } catch (err) {
+      identityNotice = { ok: false, message: errorMessage(err) };
+    }
+    setBusy(false);
+    navigate(`/farmers/${farmerId}`, { state: { justEnrolled: true, identityNotice } });
   };
 
   const idPattern = '[0-9 \\-]{11,15}';
@@ -87,7 +106,7 @@ export function RegisterFarmerPage() {
     <>
       <PageHeader
         title="Enrol a farmer"
-        description="NIN and BVN are never stored — only a fingerprint used to stop duplicate enrolments, and the last four digits."
+        description="NIN and BVN are checked with the identity provider, then kept only as a fingerprint that stops duplicate enrolments, and the last four digits."
       />
       <Card className="max-w-3xl">
         <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">

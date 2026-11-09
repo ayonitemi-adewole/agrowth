@@ -118,6 +118,17 @@ export function asUser<T>(db: PGlite, userId: string, work: (tx: Tx) => Promise<
   });
 }
 
+/** Runs queries as the service role (the secret key), as an Edge Function does. */
+export function asService<T>(db: PGlite, work: (tx: Tx) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.query(`select set_config('request.jwt.claims', $1, true)`, [
+      JSON.stringify({ role: 'service_role' }),
+    ]);
+    await tx.exec('set local role service_role');
+    return work(tx);
+  });
+}
+
 /** Rejects with the PostgreSQL error, so tests can check code and message. */
 export async function pgError(promise: Promise<unknown>): Promise<{
   code: string;

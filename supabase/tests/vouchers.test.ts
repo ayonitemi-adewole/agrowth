@@ -51,7 +51,7 @@ describe('vendors and input vouchers', () => {
       `select public.register_farmer('Farmer', $1, $2, 'Kaduna', 'Zaria', $3) as id`,
       [lastName, phone, String(nextNin++)],
     );
-    await as(compliance, `select public.set_farmer_kyc($1, 'verified')`, [farmer]);
+    await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmer]);
     const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
       farmer,
       JSON.stringify(square(lon, 11.2, size)),

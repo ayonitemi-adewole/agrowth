@@ -2,95 +2,11 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { PGlite } from '@electric-sql/pglite';
 import { beforeAll, describe, expect, it } from 'vitest';
-import type { Row, SeedApi, Session } from '../seed/api';
+import type { SeedApi } from '../seed/api';
 import { CYCLES } from '../seed/portfolio';
 import { isSeeded, seedDemo, type SeedResult } from '../seed/seed';
 import { asUser, createDb, createUser } from './db';
-
-const ident = (name: string) => {
-  if (!/^[a-z_][a-z0-9_]*$/.test(name)) throw new Error(`Bad identifier ${name}`);
-  return name;
-};
-
-/** jsonb arguments travel as JSON text; text[] arrays and scalars as they are. */
-const param = (v: unknown) =>
-  v !== null &&
-  typeof v === 'object' &&
-  !(Array.isArray(v) && v.every((x) => typeof x === 'string'))
-    ? JSON.stringify(v)
-    : v;
-
-const where = (match: Row, offset = 0) => {
-  const keys = Object.keys(match);
-  return {
-    sql: keys.length
-      ? ` where ${keys.map((k, i) => `${ident(k)} = $${i + 1 + offset}`).join(' and ')}`
-      : '',
-    values: keys.map((k) => match[k]),
-  };
-};
-
-/** The seed's database interface, implemented on PGlite with the same RLS as Supabase's API. */
-function pgliteApi(db: PGlite): SeedApi {
-  const session = (userId: string): Session => ({
-    rpc: (fn, args) =>
-      asUser(db, userId, async (tx) => {
-        const keys = Object.keys(args);
-        const { rows } = await tx.query<{ r: unknown }>(
-          `select public.${ident(fn)}(${keys.map((k, i) => `${ident(k)} => $${i + 1}`).join(', ')}) as r`,
-          keys.map((k) => param(args[k])),
-        );
-        return rows[0].r as never;
-      }),
-    insert: (table, input) =>
-      asUser(db, userId, async (tx) => {
-        const rows = Array.isArray(input) ? input : [input];
-        const cols = Object.keys(rows[0]);
-        const values: unknown[] = [];
-        const tuples = rows.map(
-          (r) => `(${cols.map((c) => `$${values.push(param(r[c]))}`).join(', ')})`,
-        );
-        const { rows: out } = await tx.query<Row>(
-          `insert into public.${ident(table)} (${cols.map(ident).join(', ')}) values ${tuples.join(', ')} returning *`,
-          values,
-        );
-        return out;
-      }),
-    select: (table, columns, match) =>
-      asUser(db, userId, async (tx) => {
-        const w = where(match);
-        return (
-          await tx.query<Row>(`select ${columns} from public.${ident(table)}${w.sql}`, w.values)
-        ).rows;
-      }),
-    upload: (bucket, path) =>
-      asUser(db, userId, async (tx) => {
-        await tx.query(`insert into storage.objects (bucket_id, name) values ($1, $2)`, [
-          bucket,
-          path,
-        ]);
-      }),
-  });
-
-  return {
-    ensureUser: ({ email, fullName, role }) => createUser(db, email, role, { full_name: fullName }),
-    as: session,
-    adminSelect: async (table, columns, match) => {
-      const w = where(match);
-      return (
-        await db.query<Row>(`select ${columns} from public.${ident(table)}${w.sql}`, w.values)
-      ).rows;
-    },
-    adminUpdate: async (table, match, values) => {
-      const keys = Object.keys(values);
-      const w = where(match, keys.length);
-      await db.query(
-        `update public.${ident(table)} set ${keys.map((k, i) => `${ident(k)} = $${i + 1}`).join(', ')}${w.sql}`,
-        [...keys.map((k) => values[k]), ...w.values],
-      );
-    },
-  };
-}
+import { pgliteApi } from './pglite-api';
 
 /**
  * The demo seed, run through the real migrations: every cycle must reach its intended stage
@@ -132,6 +48,28 @@ describe('demo seed', () => {
     expect(counts.pending).toBe(3);
     expect(counts.rejected).toBe(1);
     expect(result.farmers).toBe(43);
+  });
+
+  it('checks every identity number, and verifies only people whose numbers matched', async () => {
+    const { rows } = await db.query<{ subject: string; kyc: string; status: string; n: number }>(
+      `select c.subject, coalesce(f.kyc_status, i.kyc_status)::text as kyc, c.status::text,
+              count(*)::int as n
+         from public.identity_checks c
+         left join public.farmers f on f.id = c.farmer_id
+         left join public.investor_profiles i on i.user_id = c.investor_id
+        group by 1, 2, 3 order by 1, 2, 3`,
+    );
+    const statuses = (subject: string, kyc: string) =>
+      rows.filter((r) => r.subject === subject && r.kyc === kyc).map((r) => r.status);
+    expect(statuses('farmer', 'verified')).toEqual(['match']);
+    expect(statuses('farmer', 'rejected')).toEqual(['no_match']);
+    expect(statuses('farmer', 'pending')).toContain('partial');
+    expect(statuses('investor', 'verified')).toEqual(['match']);
+    const unchecked = await db.query(
+      `select 1 from public.farmers f
+        where not exists (select 1 from public.identity_checks c where c.farmer_id = f.id)`,
+    );
+    expect(unchecked.rows).toHaveLength(0);
   });
 
   it('closes the books on settled cycles and keeps the ledger balanced', async () => {
@@ -205,10 +143,12 @@ describe('demo seed', () => {
         order by pr.email, p.pledged_at`,
     );
     const by = (email: string) => rows.filter((r) => r.email === email);
-    // Adaeze: the settled maize cycle (paid out) and the one in progress.
+    // Adaeze: the settled maize cycle (paid out), the one in progress, and a pledge to the
+    // open soybean cycle that's past its cooling-off, ready to pay online.
     expect(by('investor@agrowth.test').map((r) => [r.status, r.payouts])).toEqual([
       ['paid', 1],
       ['paid', 0],
+      ['pending', 0],
     ]);
     expect(by('investor.retail@agrowth.test').map((r) => r.status)).toEqual(['pending']);
     expect(by('investor.new@agrowth.test')).toMatchObject([{ kyc: 'pending', status: null }]);
@@ -218,6 +158,11 @@ describe('demo seed', () => {
       `select cooling_off_hours as h from public.investor_settings`,
     );
     expect(settings.h).toBe(48);
+    const ready = await one<{ n: number }>(
+      `select count(*)::int as n from public.investment_pledges
+        where status = 'pending' and cooling_off_ends_at <= now()`,
+    );
+    expect(ready.n).toBe(1);
     expect(result.accounts.filter((a) => a.role === 'investor')).toHaveLength(3);
   });
 

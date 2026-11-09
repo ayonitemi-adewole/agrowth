@@ -62,7 +62,7 @@ describe('harvest and settlement', () => {
       `select public.register_farmer('Farmer', $1, '+2348012345678', 'Kaduna', 'Zaria', $2) as id`,
       [lastName, String(nextNin++)],
     );
-    await as(compliance, `select public.set_farmer_kyc($1, 'verified')`, [farmer]);
+    await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmer]);
     const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
       farmer,
       JSON.stringify(square(lon, 11.1)),

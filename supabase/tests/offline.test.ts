@@ -57,7 +57,9 @@ describe('offline field visits', () => {
         `select public.register_farmer('Farmer', $1, '+2348044440000', 'Kaduna', 'Zaria', $2) as id`,
         [last, String(90_000_000_000 + i)],
       );
-      await as(compliance, `select public.set_farmer_kyc($1, 'verified')`, [farmer]);
+      await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [
+        farmer,
+      ]);
       const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
         farmer,
         JSON.stringify(square(8.5 + i * 0.01, 11.3)),

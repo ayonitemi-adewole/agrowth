@@ -19,6 +19,7 @@ import { lazy, Suspense } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { Alert, Card, SectionTitle, Skeleton, Stat } from '../components/ui';
+import { WeatherWatch } from '../components/WeatherWatch';
 import { errorMessage } from '../lib/errors';
 import { formatHectares } from '../lib/format';
 import { formatNaira, toKobo } from '../lib/money';
@@ -478,6 +479,8 @@ export function OverviewPage() {
                   </ul>
                 )}
               </Card>
+
+              {can.readCycles(role) && <WeatherWatch />}
 
               <Card>
                 <SectionTitle title="Recent activity" />

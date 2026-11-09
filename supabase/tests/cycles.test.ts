@@ -224,7 +224,7 @@ describe('a funding cycle, end to end', () => {
     it('requires every farmer to have passed KYC', async () => {
       expect((await readiness()).find((c) => c.key === 'kyc')!.ok).toBe(false);
       for (const f of [farmerA, farmerB]) {
-        await as(compliance, `select public.set_farmer_kyc($1, 'verified')`, [f]);
+        await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [f]);
       }
       const failing = (await readiness()).filter((c) => !c.ok);
       expect(failing).toEqual([]);

@@ -193,7 +193,7 @@ describe('registry', () => {
       );
       expect(err.code).toBe('PT403');
       await asUser(db, compliance, (tx) =>
-        tx.query(`select public.set_farmer_kyc($1, 'verified')`, [farmerId]),
+        tx.query(`select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmerId]),
       );
       const { rows } = await db.query<{ kyc_status: string }>(
         `select kyc_status from public.farmers where id = $1`,

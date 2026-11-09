@@ -1,5 +1,6 @@
 import { BriefcaseBusiness, Coins, Gauge, TrendingUp, Wallet } from 'lucide-react';
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { CycleStatusBadge } from '../../components/StatusBadges';
 import {
   Alert,
@@ -12,23 +13,53 @@ import {
   Spinner,
   Stat,
 } from '../../components/ui';
+import { demo } from '../../lib/demo';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, titleCase } from '../../lib/format';
 import { INVESTOR_CLASS, statement } from '../../lib/investing';
 import { formatNaira, ratio, toKobo } from '../../lib/money';
+import {
+  paymentGateway,
+  RETURN_MESSAGE,
+  returnedReference,
+  verifyPayment,
+} from '../../lib/payments';
 import { supabase } from '../../lib/supabase';
 import type { MyInvestments } from '../../lib/types';
 import { useAsync } from '../../lib/useAsync';
+import { PayOnline } from './PayOnline';
 import { PaymentInstructions, PledgeStatusBadge, WithdrawButton } from './shared';
 
 type Position = MyInvestments['pledges'][number];
 
 export function PortfolioPage() {
+  // Back from the payment gateway: ask how it went (which records it), then load the
+  // investments, so a confirmed payment already shows.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [returned] = useState(() => returnedReference(location.search));
+  useEffect(() => {
+    if (returned) navigate('/portfolio', { replace: true });
+  }, [returned, navigate]);
+  const check = useAsync(
+    async () =>
+      returned
+        ? verifyPayment(returned).then(
+            (status) => RETURN_MESSAGE[status],
+            (err: unknown) => ({ ok: false, text: errorMessage(err) }),
+          )
+        : null,
+    [returned],
+  );
+  const paymentResult =
+    returned && check.loading ? { ok: true, text: 'Checking your payment…' } : check.data;
+
   const state = useAsync(async () => {
     const { data, error } = await supabase.rpc('my_investments');
     if (error) throw error;
     return data as MyInvestments;
-  }, []);
+  }, [check.data]);
+  const gateway = useAsync(() => paymentGateway(), []);
 
   if (state.loading && !state.data) return <Spinner />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
@@ -65,6 +96,10 @@ export function PortfolioPage() {
         }
       />
 
+      {paymentResult && (
+        <Alert tone={paymentResult.ok ? 'success' : 'warning'}>{paymentResult.text}</Alert>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           icon={<Wallet />}
@@ -100,6 +135,21 @@ export function PortfolioPage() {
                 <div className="mt-4">
                   <PaymentInstructions pledge={p} escrow={escrow} />
                 </div>
+                {gateway.data?.provider ? (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-zinc-950/5 pt-4">
+                    <span className="text-sm text-zinc-600">Or pay online, confirmed at once.</span>
+                    <PayOnline gateway={gateway.data.provider} pledge={p} />
+                  </div>
+                ) : (
+                  // Investors on a live system just don't see the option; the developer
+                  // or demo host is told why.
+                  demo.enabled &&
+                  gateway.data?.problem && (
+                    <p className="mt-4 border-t border-zinc-950/5 pt-4 text-xs text-zinc-500">
+                      Online payments are off here. {gateway.data.problem}
+                    </p>
+                  )
+                )}
               </Card>
             ))}
           </div>
