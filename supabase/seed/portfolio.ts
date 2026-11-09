@@ -168,6 +168,8 @@ export interface InvestorSpec {
   verified: boolean;
   /** A pledge made when the seed finishes, still in cooling-off: cycle key and amount. */
   pendingPledge?: { cycle: string; amount: number };
+  /** A pledge whose cooling-off is already over: waiting to be paid (online, on the demo). */
+  readyPledge?: { cycle: string; amount: number };
 }
 
 export const INVESTORS: InvestorSpec[] = [
@@ -180,6 +182,7 @@ export const INVESTORS: InvestorSpec[] = [
     bank: 'Access Bank',
     account: '0691234570',
     verified: true,
+    readyPledge: { cycle: 'soy-open', amount: 500_000 },
   },
   {
     fullName: 'Funmilayo Adeleke',

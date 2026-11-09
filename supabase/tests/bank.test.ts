@@ -155,7 +155,7 @@ describe('trustee bank files', () => {
 
   it('confirms payments and pledges from the bank statement, and flags the rest', async () => {
     const pledge = await one<{ id: string; reference: string; amount_kobo: string }>(
-      `select id, reference, amount_kobo from public.investment_pledges where status = 'pending' limit 1`,
+      `select id, reference, amount_kobo from public.investment_pledges where status = 'pending' and cooling_off_ends_at > now() limit 1`,
     );
     const summary = await importStatement([
       {

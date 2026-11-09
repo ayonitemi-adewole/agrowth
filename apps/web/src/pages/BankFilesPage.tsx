@@ -33,6 +33,7 @@ import { demo } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { formatNaira, toKobo } from '../lib/money';
+import type { OnlinePayment } from '../lib/payments';
 import { download } from '../lib/programmes';
 import { can } from '../lib/roles';
 import { supabase } from '../lib/supabase';
@@ -303,6 +304,8 @@ function Payments({
           <PaymentTable rows={byHand} showProblem />
         )}
       </section>
+
+      <OnlinePaymentsToResolve isTrustee={isTrustee} />
     </div>
   );
 }
@@ -764,5 +767,115 @@ function SimulatedStatement({ payments }: { payments: TrusteePayment[] }) {
     <Button variant="secondary" busy={busy} onClick={make} title="Demo only: no bank involved">
       <Landmark aria-hidden /> Simulated bank statement
     </Button>
+  );
+}
+
+// ---------- Online payments ----------
+
+/**
+ * Pledge payments made online that couldn't be applied: paid after the pledge closed, or
+ * the wrong amount. The trustee refunds or sorts them out at the bank, then notes how.
+ */
+function OnlinePaymentsToResolve({ isTrustee }: { isTrustee: boolean }) {
+  const rows = useAsync(async () => {
+    const { data, error } = await supabase
+      .from('online_payments')
+      .select('*, investor_profiles(legal_name), cycles(code)')
+      .in('status', ['needs_refund', 'needs_review'])
+      .order('created_at');
+    if (error) throw error;
+    return data as (OnlinePayment & {
+      investor_profiles: { legal_name: string } | null;
+      cycles: { code: string } | null;
+    })[];
+  }, []);
+
+  if (rows.loading && !rows.data) return null;
+  if (rows.error) return <Alert>{errorMessage(rows.error)}</Alert>;
+  if (rows.data!.length === 0) return null;
+  return (
+    <section>
+      <SectionTitle
+        title="Online payments to resolve"
+        description="Paid through the gateway, but they couldn't be applied to the pledge. Refund the investor (or sort it out with them), then note how."
+      />
+      <Table head={['Payment', 'Investor', 'Paid', 'Why', '']}>
+        {rows.data!.map((p) => (
+          <tr key={p.id}>
+            <td className="font-mono text-xs whitespace-nowrap">
+              {p.reference}
+              <span className="block text-zinc-500">
+                {p.provider} {p.provider_reference}
+              </span>
+            </td>
+            <td>
+              {p.investor_profiles?.legal_name ?? '—'}
+              <span className="block text-xs text-zinc-500">{p.cycles?.code}</span>
+            </td>
+            <td className="text-right whitespace-nowrap tabular-nums">
+              {formatNaira(p.paid_kobo ?? 0)}
+            </td>
+            <td className="min-w-56 text-amber-800">{p.note}</td>
+            <td className="text-right">
+              {isTrustee && <ResolveOnlinePayment payment={p} onDone={rows.reload} />}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </section>
+  );
+}
+
+function ResolveOnlinePayment({ payment, onDone }: { payment: OnlinePayment; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const resolve = async () => {
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase.rpc('resolve_online_payment', {
+      p_payment_id: payment.id,
+      p_note: note,
+    });
+    setBusy(false);
+    if (error) setError(errorMessage(error));
+    else {
+      setOpen(false);
+      onDone();
+    }
+  };
+  return (
+    <>
+      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        Resolve
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Resolve ${payment.reference}`}
+        description={payment.note ?? undefined}
+      >
+        <div className="space-y-4">
+          <Field label="How was it resolved?" hint="Kept with the payment, for the auditors.">
+            <Textarea
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Refunded to the investor's account, bank reference NIP-…"
+            />
+          </Field>
+          {error && <Alert>{error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button busy={busy} disabled={!note.trim()} onClick={resolve}>
+              Resolve
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 }

@@ -21,7 +21,7 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks and the trustee's bank files are built; payments are next. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks, the trustee's bank files and online pledge payments are built. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
 
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -35,6 +35,7 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Field verification: GPS check-in inside the boundary, checklist, photos; failures block release                                                                                    | Done  |
 | Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments                                                                                                | Done  |
 | Ledger: double-entry, append-only, balanced, no money moving between cycles                                                                                                        | Done  |
+| Online payments: investors pay pledges through Paystack (or a simulated gateway), settled to the trustee and confirmed by webhook                                                  | Done  |
 | Trustee bank files: bulk-payment files for the trustee's bank, statement imports that confirm payments and pledge payments by reference                                            | Done  |
 | Harvest: weighed and graded deliveries per farm, voids with a reason                                                                                                               | Done  |
 | Settlement: offtake and insurance receipts, fee → capital → profit-share waterfall, payouts, funder statements                                                                     | Done  |
@@ -80,6 +81,19 @@ npx supabase secrets set --env-file supabase/functions/.env
 ```
 
 Without the function, enrolment and KYC still work; the checks just can't run, so compliance must write down why it's verifying anyone.
+
+**Online payments** (optional) let investors pay a pledge by card, bank transfer or USSD through a payment gateway instead of a bank transfer. They are off until `PAYMENTS_PROVIDER` is set in `supabase/functions/.env`:
+
+- `PAYMENTS_PROVIDER=mock` uses a simulated gateway, a checkout page in the app where no money moves. The database also refuses simulated payments until an admin allows them: `update public.investor_settings set allow_simulated_payments = true;` (the demo seed does this).
+- `PAYMENTS_PROVIDER=paystack` with `PAYSTACK_SECRET_KEY` (`sk_test_…` to test) uses Paystack. In the Paystack dashboard, set the **settlement account to the trustee's escrow account**, so the money never sits with the platform, and set the webhook URL to `https://YOUR_PROJECT_ID.supabase.co/functions/v1/payments-webhook`.
+
+```bash
+npx supabase secrets set --env-file supabase/functions/.env
+npx supabase functions deploy payments
+npx supabase functions deploy payments-webhook --no-verify-jwt
+```
+
+The gateway's fee is added on top of the pledge, so the trustee receives it in full.
 
 ### 3. Connect the web app
 
@@ -134,10 +148,13 @@ Every record goes through the same database functions and security rules as the 
 
 1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
 2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
-3. Create the tables, rules and functions, and deploy the identity check (it runs simulated on the demo, so visitors can try checks without any keys):
+3. Create the tables, rules and functions, and deploy the Edge Functions. On the demo they run simulated, so visitors can try identity checks and online payments without any keys:
    ```bash
    npm run demo:push
+   npx supabase secrets set PAYMENTS_PROVIDER=mock --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy identity-check --project-ref DEMO_PROJECT_ID
+   npx supabase functions deploy payments --project-ref DEMO_PROJECT_ID
+   npx supabase functions deploy payments-webhook --no-verify-jwt --project-ref DEMO_PROJECT_ID
    ```
 4. Run:
    ```bash
@@ -472,10 +489,10 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), online payments (only the payments service records a result, the first report counts, late or wrong payments flagged for refund, simulated payments refused unless allowed), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
-- **Identity provider tests** — the name, date and phone matching, the simulated provider, and the Dojah adapter against canned responses.
-- **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check and CSV export helpers, reading bank statements in the usual layouts, and the offline sync queue.
+- **Provider tests** — identity matching and the Dojah adapter, and the Paystack adapter (fees, checkout, verification, webhook signatures), against canned responses.
+- **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check and CSV export helpers, the payment gateway's return, reading bank statements in the usual layouts, and the offline sync queue.
 
 ## Repository layout
 
@@ -488,8 +505,8 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files
-  functions/           Edge Functions: identity-check, and _shared/identity (providers, matching) used by it, the seed and the tests
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments
+  functions/           Edge Functions: identity-check, payments and payments-webhook, and _shared/ (identity and payment providers) used by them, the seed and the tests
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
@@ -516,6 +533,7 @@ npx supabase db push
 - **Nobody posts money through the API**, not even admins. Only internal functions (funding, disbursement, settlement) can.
 - **Identity numbers are never stored.** BVN and NIN are kept only as keyed hashes (key held in Supabase Vault) plus the last four digits. The hashes are in a schema the API can't reach.
 - **Identity checks can't be faked.** A check can only be opened for the number on record (it must hash to the stored fingerprint), by someone allowed to check that person, and only the identity service (service role) can record the answer. Only match or no-match per field is kept, never the provider's copy of the person's details. Verifying KYC needs a matching check of every number on record, or a written reason.
+- **Online payments can't be faked.** Only the payments service (service role) records a gateway's answer, after checking the gateway's signature or asking the gateway itself. The first answer counts, and a payment for a closed pledge or of the wrong amount is flagged for the trustee rather than applied. Simulated payments are refused unless an admin allows them.
 - **A bank statement confirms only what it proves.** A statement line confirms a payment only if it quotes that payment's reference and the exact amount, and it goes through the same checks as the trustee confirming by hand, under the bank's own reference. A payment can be in only one live payment file, a second debit for something already paid is flagged, and statement lines are kept, with re-imported lines skipped.
 - **One farmer, one record; one piece of land, one farm.** Enrolment needs a NIN or BVN, and a repeat is refused. A boundary that overlaps a registered farm by more than 5% of the smaller farm is refused.
 - **Farm area is computed by the database** from the mapped boundary; invalid polygons are rejected.

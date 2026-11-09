@@ -45,7 +45,8 @@ export interface SeedApi {
   adminSelect(table: string, columns: string, match: Row): Promise<Row[]>;
   /**
    * Service-level update, used only to give finished demo cycles (and the investments in
-   * them) past dates, and to pause investor cooling-off while those investments are made.
+   * them) past dates, to pause investor cooling-off while those investments are made, and
+   * to allow simulated online payments on the demo.
    */
   adminUpdate(table: string, match: Row, values: Row): Promise<void>;
   /** Service-level function call, used only for public.complete_identity_check. */

@@ -143,10 +143,12 @@ describe('demo seed', () => {
         order by pr.email, p.pledged_at`,
     );
     const by = (email: string) => rows.filter((r) => r.email === email);
-    // Adaeze: the settled maize cycle (paid out) and the one in progress.
+    // Adaeze: the settled maize cycle (paid out), the one in progress, and a pledge to the
+    // open soybean cycle that's past its cooling-off, ready to pay online.
     expect(by('investor@agrowth.test').map((r) => [r.status, r.payouts])).toEqual([
       ['paid', 1],
       ['paid', 0],
+      ['pending', 0],
     ]);
     expect(by('investor.retail@agrowth.test').map((r) => r.status)).toEqual(['pending']);
     expect(by('investor.new@agrowth.test')).toMatchObject([{ kyc: 'pending', status: null }]);
@@ -156,6 +158,11 @@ describe('demo seed', () => {
       `select cooling_off_hours as h from public.investor_settings`,
     );
     expect(settings.h).toBe(48);
+    const ready = await one<{ n: number }>(
+      `select count(*)::int as n from public.investment_pledges
+        where status = 'pending' and cooling_off_ends_at <= now()`,
+    );
+    expect(ready.n).toBe(1);
     expect(result.accounts.filter((a) => a.role === 'investor')).toHaveLength(3);
   });
 

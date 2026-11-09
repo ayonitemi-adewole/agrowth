@@ -909,10 +909,21 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   }
 
   // Investments still in progress -------------------------------------------------------------
+  // Made while cooling-off is still paused, so they're ready to pay.
+  for (const inv of INVESTORS) {
+    if (!inv.readyPledge) continue;
+    log(`${inv.fullName} pledges to ${inv.readyPledge.cycle}, ready to pay`);
+    await api.as(investorIds.get(inv.fullName)!).rpc('pledge_investment', {
+      p_cycle_id: cycleIds.get(inv.readyPledge.cycle),
+      p_amount_kobo: kobo(inv.readyPledge.amount),
+      p_disclosure_version: disclosureVersion,
+    });
+  }
+  // The demo lets investors try paying online with the simulated gateway.
   await api.adminUpdate(
     'investor_settings',
     { id: true },
-    { cooling_off_hours: settings.cooling_off_hours },
+    { cooling_off_hours: settings.cooling_off_hours, allow_simulated_payments: true },
   );
   for (const inv of INVESTORS) {
     if (!inv.pendingPledge) continue;

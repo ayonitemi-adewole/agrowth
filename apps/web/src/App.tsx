@@ -32,6 +32,10 @@ const MarketplacePage = page(() => import('./pages/invest/MarketplacePage'), 'Ma
 const ListingPage = page(() => import('./pages/invest/ListingPage'), 'ListingPage');
 const PortfolioPage = page(() => import('./pages/invest/PortfolioPage'), 'PortfolioPage');
 const CertificatePage = page(() => import('./pages/invest/CertificatePage'), 'CertificatePage');
+const SimulatedCheckoutPage = page(
+  () => import('./pages/invest/SimulatedCheckoutPage'),
+  'SimulatedCheckoutPage',
+);
 const InvestorProfilePage = page(
   () => import('./pages/invest/InvestorProfilePage'),
   'InvestorProfilePage',
@@ -69,6 +73,14 @@ export function App() {
                     element={
                       <RoleGate allow={can.invest}>
                         <CertificatePage />
+                      </RoleGate>
+                    }
+                  />
+                  <Route
+                    path="pay/simulated"
+                    element={
+                      <RoleGate allow={can.invest}>
+                        <SimulatedCheckoutPage />
                       </RoleGate>
                     }
                   />

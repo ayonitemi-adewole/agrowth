@@ -204,7 +204,8 @@ Back as the **cycle manager**, open the **Zaria maize, dry season** cycle → Mi
 
 1. **Marketplace:** the open soybean cycle. Show the projected low/expected/high return, the 1–5 risk score with its reasons, how much is subscribed, the farm map (no farmer names), the buyer and the insurer.
 2. **Invest:** read the risk disclosure, tick it, enter an amount and pledge. The investor gets the trustee's escrow account and a payment reference, and can withdraw until the trustee confirms payment.
-3. **My investments:** a statement for the settled maize cycle (paid in, capital back, return) and a printable certificate. Then **Track the cycle** on the live maize cycle: field checks with photos, releases and history.
+3. **My investments:** her earlier ₦500,000 soybean pledge is past its cooling-off and waiting for payment. **Pay online** shows the amount and the gateway's fee (none on the simulated gateway), then **Continue to payment** opens the simulated gateway's page. **Pay** brings her back with "Payment received": the pledge is confirmed and the deposit is on the cycle's ledger, with no one at the trustee's desk. With Paystack switched on, the same button opens Paystack's checkout.
+4. Also under **My investments:** a statement for the settled maize cycle (paid in, capital back, return) and a printable certificate. Then **Track the cycle** on the live maize cycle: field checks with photos, releases and history.
 
 Switch to `investor.retail@agrowth.test` (Funmilayo). **My investments** shows her retail limit: at most 10% of declared income a year across all crowdfunding. She has a pledge waiting for payment.
 
