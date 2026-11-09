@@ -32,6 +32,7 @@ import { formatNaira, nairaInput, parseNaira } from '../../lib/money';
 import { can } from '../../lib/roles';
 import { supabase } from '../../lib/supabase';
 import type { InsuranceCover, InsurancePolicy, OfftakeContract, PriceTerms } from '../../lib/types';
+import { ClaimsSection } from './ClaimsSection';
 import type { TabProps } from './useCycleData';
 
 const BUCKET = 'cycle-documents';
@@ -167,6 +168,8 @@ export function ContractsTab({ data, reload }: TabProps) {
           </div>
         )}
       </section>
+
+      <ClaimsSection data={data} reload={reload} />
 
       <Modal
         open={offtake !== null}

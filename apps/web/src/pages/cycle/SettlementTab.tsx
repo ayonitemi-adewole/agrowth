@@ -368,16 +368,11 @@ function WaterfallCard({
 function RecordReceiptButton({ data, reload }: TabProps) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
-  const sources = [
-    ...data.offtake.map((o) => ({
-      value: `offtake_payment:${o.id}`,
-      label: `Harvest payment · ${o.buyer_name}`,
-    })),
-    ...data.insurance.map((p) => ({
-      value: `insurance_payout:${p.id}`,
-      label: `Insurance payout · ${p.insurer_name}`,
-    })),
-  ];
+  // Insurance payouts are recorded on their claim (Offtake & insurance tab), not here.
+  const sources = data.offtake.map((o) => ({
+    value: `offtake_payment:${o.id}`,
+    label: `Harvest payment · ${o.buyer_name}`,
+  }));
   const blank = {
     source: sources[0]?.value ?? '',
     amount: '',
@@ -430,7 +425,7 @@ function RecordReceiptButton({ data, reload }: TabProps) {
         open={open}
         onClose={() => setOpen(false)}
         title="Record money received"
-        description="Confirm a payment that has arrived in the escrow account for this cycle."
+        description="Confirm a buyer's payment that has arrived in the escrow account for this cycle. Insurance payouts are recorded on their claim, under Offtake & insurance."
       >
         <form onSubmit={submit} className="space-y-4">
           <Field label="From">

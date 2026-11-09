@@ -150,7 +150,13 @@ Eight short scenes, about 40 minutes in all. Each says which account to use and 
 7. **Settlement:** the waterfall. First the management fee, then funders' capital back, then the profit split between funders (+16%) and farmers (by kilograms delivered).
 8. **History**, then **Ledger** in the menu: every entry with its reference. The trustee's cash for this cycle ends at exactly zero.
 
-Then open the **Makurdi soybean** settled cycle: a drought year. The harvest fell short, the insurance claim came in, and funders still got their capital back.
+Then open the **Makurdi soybean** settled cycle: a drought year. The harvest fell short, the insurance claim came in, and funders still got their capital back. Under **Offtake & insurance → Insurance claims**, **Open** the drought claim to see its whole course:
+- reported during the dry spell, on every farm, with the latest field visits kept as evidence;
+- the insurer told five days later, with its claim number;
+- assessed after a harvest-time crop cut;
+- paid to the trustee, and from there into the waterfall.
+
+For a claim still under way, open the **Zaria maize, dry season** cycle's claim: fall armyworm on two farms, with the insurer already told. As the cycle manager, **Record the assessment**. Then, as the trustee, **Record the insurer's payment**. Claims waiting on someone also show on the Overview, under **Needs your attention**.
 
 > **The point:** every naira is traceable from deposit, to a verified farm, to the harvest, to the payout. Nothing can be edited after the fact.
 
