@@ -34,6 +34,9 @@ import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { formatNaira, toKobo } from '../lib/money';
 import type { OnlinePayment } from '../lib/payments';
+import { isLive, TRANSFER_STATUS, useGatewayPayouts, type GatewayTransfer } from '../lib/payouts';
+import { GatewayPayButton } from '../components/GatewayPayButton';
+import { EditBankAccount } from '../components/BankAccountForm';
 import { download } from '../lib/programmes';
 import { can } from '../lib/roles';
 import { supabase } from '../lib/supabase';
@@ -120,6 +123,7 @@ export function BankFilesPage() {
           ) : undefined
         }
       />
+      {role === 'admin' && <OperatorFeeAccount onSaved={payments.reload} />}
       <Tabs
         tabs={[
           { id: 'payments', label: 'Payments', count: waiting.length },
@@ -160,7 +164,9 @@ function Payments({
   onChange: () => void;
 }) {
   const toast = useToast();
-  const waiting = payments.filter((p) => !p.problem && !p.batch_id);
+  const gateway = useGatewayPayouts(isTrustee);
+  const inTransfer = (p: TrusteePayment) => Boolean(gateway.data?.liveFor(p.kind, p.item_id));
+  const waiting = payments.filter((p) => !p.problem && !p.batch_id && !inTransfer(p));
   const withBank = payments.filter((p) => p.batch_id);
   const byHand = payments.filter((p) => p.problem && !p.batch_id);
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -201,8 +207,12 @@ function Payments({
     <div className="space-y-8">
       <section>
         <SectionTitle
-          title="Waiting for a payment file"
-          description="Choose payments, make the file, and upload it to the trustee account's bulk payments. Each narration starts with the payment's AGP reference, which is how the statement confirms it."
+          title="Waiting to be paid"
+          description={
+            gateway.data?.provider
+              ? "Choose payments and pay them through Paystack, from the trustee's balance. Or make a payment file to upload to the trustee account's bulk payments; each narration starts with the payment's AGP reference, which is how the statement confirms it."
+              : "Choose payments, then make a payment file to upload to the trustee account's bulk payments. Each narration starts with the payment's AGP reference, which is how the statement confirms it."
+          }
           actions={
             isTrustee && waiting.length > 0 ? (
               <>
@@ -218,11 +228,35 @@ function Payments({
                 >
                   {picked.size === waiting.length ? 'Clear' : 'Select all'}
                 </Button>
-                <Button busy={busy} disabled={chosen.length === 0} onClick={createFile}>
+                <Button
+                  variant={gateway.data?.provider ? 'secondary' : 'primary'}
+                  busy={busy}
+                  disabled={chosen.length === 0}
+                  onClick={createFile}
+                >
                   <Download aria-hidden /> Make payment file
-                  {chosen.length > 0 &&
+                  {!gateway.data?.provider &&
+                    chosen.length > 0 &&
                     ` (${chosen.length}, ${formatNaira(total, { compact: true })})`}
                 </Button>
+                {/* Where the gateway is on, paying through it is the main action. */}
+                {gateway.data?.provider && (
+                  <GatewayPayButton
+                    payments={chosen}
+                    provider={gateway.data.provider}
+                    balance={gateway.data.balance}
+                    label={
+                      chosen.length > 0
+                        ? `Pay through Paystack (${chosen.length}, ${formatNaira(total, { compact: true })})`
+                        : 'Pay through Paystack'
+                    }
+                    onDone={() => {
+                      setPicked(new Set());
+                      gateway.reload();
+                      onChange();
+                    }}
+                  />
+                )}
               </>
             ) : undefined
           }
@@ -304,6 +338,17 @@ function Payments({
           <PaymentTable rows={byHand} showProblem />
         )}
       </section>
+
+      {gateway.data && gateway.data.transfers.length > 0 && (
+        <GatewayTransfers
+          transfers={gateway.data.transfers}
+          isTrustee={isTrustee}
+          onChange={() => {
+            gateway.reload();
+            onChange();
+          }}
+        />
+      )}
 
       <OnlinePaymentsToResolve isTrustee={isTrustee} />
     </div>
@@ -877,5 +922,168 @@ function ResolveOnlinePayment({ payment, onDone }: { payment: OnlinePayment; onD
         </div>
       </Modal>
     </>
+  );
+}
+
+// ---------- Paid through the gateway ----------
+
+/** Transfers sent through the gateway: those still out first, then the latest settled. */
+function GatewayTransfers({
+  transfers,
+  isTrustee,
+  onChange,
+}: {
+  transfers: GatewayTransfer[];
+  isTrustee: boolean;
+  onChange: () => void;
+}) {
+  const shown = [
+    ...transfers.filter((t) => isLive(t.status)),
+    ...transfers.filter((t) => !isLive(t.status)).slice(0, 15),
+  ];
+  return (
+    <section>
+      <SectionTitle
+        title="Through Paystack"
+        description="Transfers from the trustee's Paystack balance. Each is confirmed in the books when Paystack says it has arrived; a failed one goes back to the payments waiting."
+      />
+      <Table head={['Payee', 'Account', 'Amount', 'Status', '']}>
+        {shown.map((t) => (
+          <tr key={t.id}>
+            <td>
+              <span className="font-medium text-zinc-900">{t.payee_name}</span>
+              <span className="block text-xs text-zinc-500">
+                {PAYMENT_KIND[t.kind]} · {formatDate(t.requested_at)}
+              </span>
+            </td>
+            <td className="text-zinc-600">
+              {t.bank_name} <span className="font-mono">{t.account_number}</span>
+              {t.resolved_account_name && (
+                <span className="block text-xs text-zinc-500">
+                  Bank holds it for {t.resolved_account_name}
+                </span>
+              )}
+            </td>
+            <td className="text-right whitespace-nowrap tabular-nums">
+              {formatNaira(t.amount_kobo)}
+            </td>
+            <td className="min-w-48">
+              <Badge tone={TRANSFER_STATUS[t.status].tone} dot>
+                {TRANSFER_STATUS[t.status].label}
+              </Badge>
+              {t.message && <span className="mt-1 block text-xs text-zinc-600">{t.message}</span>}
+            </td>
+            <td className="text-right">
+              {isTrustee && t.status === 'needs_review' && (
+                <CancelTransfer transfer={t} onDone={onChange} />
+              )}
+            </td>
+          </tr>
+        ))}
+      </Table>
+    </section>
+  );
+}
+
+function CancelTransfer({ transfer, onDone }: { transfer: GatewayTransfer; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const cancel = async () => {
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase.rpc('cancel_gateway_transfer', {
+      p_transfer_id: transfer.id,
+      p_note: note,
+    });
+    setBusy(false);
+    if (error) setError(errorMessage(error));
+    else {
+      setOpen(false);
+      onDone();
+    }
+  };
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)}>
+        Let it go
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`Let go of the transfer to ${transfer.payee_name}`}
+        description="Only once you've checked in Paystack that nothing was sent. The payment goes back to the payments waiting, to pay again or confirm by hand."
+      >
+        <div className="space-y-4">
+          <Field label="What you checked">
+            <Textarea
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="e.g. Nothing sent: the bank holds the account for someone else"
+            />
+          </Field>
+          {error && <Alert>{error}</Alert>}
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button busy={busy} disabled={!note.trim()} onClick={cancel}>
+              Let it go
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+// ---------- The operator's fee account ----------
+
+/** Admin only: where the platform's management fee is paid at settlement. */
+function OperatorFeeAccount({ onSaved }: { onSaved: () => void }) {
+  const account = useAsync(async () => {
+    const { data, error } = await supabase
+      .from('operator_settings')
+      .select('fee_bank_name, fee_account_number, fee_account_name')
+      .single();
+    if (error) throw error;
+    return data as {
+      fee_bank_name: string | null;
+      fee_account_number: string | null;
+      fee_account_name: string | null;
+    };
+  }, []);
+  if (!account.data) return null;
+  const a = account.data;
+  return (
+    <Card className="mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-zinc-900">Platform fee account</p>
+          <p className="text-sm text-zinc-500">
+            {a.fee_account_number
+              ? `${a.fee_bank_name} ${a.fee_account_number} · ${a.fee_account_name}. The management fee is paid here at settlement.`
+              : 'Not set: the management fee is paid by hand until it is.'}
+          </p>
+        </div>
+        <EditBankAccount
+          title="Platform fee account"
+          description="The operator's account the management fee is paid to at settlement."
+          current={{
+            bank_name: a.fee_bank_name,
+            account_number: a.fee_account_number,
+            account_name: a.fee_account_name,
+          }}
+          rpc="set_operator_fee_account"
+          args={{}}
+          onSaved={() => {
+            account.reload();
+            onSaved();
+          }}
+        />
+      </div>
+    </Card>
   );
 }

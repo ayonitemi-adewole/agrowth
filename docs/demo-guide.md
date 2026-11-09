@@ -202,11 +202,12 @@ Then the cycle's **Weather** tab. This is real weather at those farms: the last 
 
 1. The preview shows the cash held, the fee, the funders' capital and return, and each farmer's surplus by kilograms.
 2. **Run settlement:** this fixes the payouts.
-3. Payouts to farmers and the platform fee have no bank account on file, so **Confirm payment** on each, with any reference.
-4. Open **Bank files** in the menu. Under **Waiting for a payment file** are the investors' payouts, which have bank accounts on file, and the agro-dealer's latest voucher payment. **Select all** → **Make payment file** downloads the CSV a trustee would upload to its bank's bulk payments. Each narration starts with the payment's AGP reference.
-5. **Simulated bank statement** downloads the statement the bank would send back. It shows those payments made and Funmilayo's pledge payment received. Under **Statements**, **Choose CSV** → **Import and match**. The payments are confirmed under the bank's references and posted to the ledger, and the cycle is **Settled**. Funmilayo's pledge lands in **Needs attention**: her cooling-off hasn't ended, so it can't be added yet.
+3. Adaeze invested through the portal, so her bank account is on file: press **Pay through Paystack** on her payout. **Record bank payment** beside it is for when the trustee has paid from its bank instead. Paystack checks the account is hers before anything is sent, then the transfer goes out and her payout is confirmed in the books under Paystack's reference. On the demo the gateway is simulated.
+4. Most of the other payouts have an account on file too: the farmers who gave one (many on mobile money), the fund's account the trustee recorded, and the platform's fee account. Pay them through Paystack the same way. A few farmers gave no account: **Confirm payment** on theirs, with any reference, as the trustee would after paying them by hand.
+5. Open **Bank files** in the menu. Under **Waiting to be paid** is the agro-dealer's latest voucher payment. Select it, then **Make payment file** for the CSV a trustee would upload to its bank's bulk payments (each narration starts with the payment's AGP reference), or **Pay through Paystack**.
+6. If you made a file: **Simulated bank statement** downloads the statement the bank would send back. It shows the payment made and Funmilayo's pledge payment received. Under **Statements**, **Choose CSV** → **Import and match** confirms the payment under the bank's reference. Funmilayo's pledge lands in **Needs attention**: her cooling-off hasn't ended, so it can't be added yet.
 
-> **The point:** the platform never holds money. It tells the trustee's bank what to pay, and the bank's own statement confirms it.
+> **The point:** the platform never holds money. The trustee pays from its bank or its own Paystack balance, and the bank's statement or Paystack's report confirms each payment.
 
 ### Scene 7 — Investor Edition (6 min)
 

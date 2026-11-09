@@ -201,6 +201,12 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
   const as = (key: StaffKey): Session => api.as(ids[key]);
   const manager = as('manager');
   const compliance = as('compliance');
+  // Where the platform's management fee is paid.
+  await as('admin').rpc('set_operator_fee_account', {
+    p_bank_name: 'Zenith Bank',
+    p_account_number: '1012345678',
+    p_account_name: 'Agrowth Operations Ltd',
+  });
   const trustee = as('trustee');
 
   /**
@@ -424,6 +430,16 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       p_ward: coop.wards[i % coop.wards.length],
       p_cooperative_id: coopIds[coop.key],
     });
+    // Most farmers have an account for their harvest surplus, many of them mobile money;
+    // a few don't, and are paid by hand.
+    if (n % 5 !== 4) {
+      await agent.rpc('set_farmer_bank_account', {
+        p_farmer_id: farmerId,
+        p_bank_name: ['OPay', 'First Bank', 'PalmPay', 'UBA'][n % 4],
+        p_account_number: String(8_000_000_000 + n * 104_729),
+        p_account_name: `${last} ${first}`.toUpperCase(),
+      });
+    }
     // The app checks the numbers straight after enrolment.
     if (nin) await checkIdentity(agent, 'farmer', farmerId, 'nin', nin);
     if (bvn) await checkIdentity(agent, 'farmer', farmerId, 'bvn', bvn);
@@ -628,13 +644,20 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       const reference = `DEP-${code}-${String(i + 1).padStart(2, '0')}`;
       const investorId = investorIds.get(name);
       if (!investorId) {
-        await trustee.rpc('record_funding', {
+        const contributionId = await trustee.rpc<string>('record_funding', {
           p_cycle_id: cycleId,
           p_funder_name: name,
           p_funder_kind: spec.funderKind ?? 'investor',
           p_amount_kobo: kobo(deposits[i]),
           p_trustee_reference: reference,
           p_received_on: day(received),
+        });
+        // Where to pay them back at settlement.
+        await trustee.rpc('set_contribution_payout_account', {
+          p_contribution_id: contributionId,
+          p_bank_name: ['Zenith Bank', 'Stanbic IBTC', 'GTBank'][i % 3],
+          p_account_number: String(1_100_000_000 + (cycleIds.size * 10 + i) * 7_919),
+          p_account_name: name,
         });
         continue;
       }

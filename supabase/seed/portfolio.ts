@@ -952,7 +952,8 @@ export const CYCLES: CycleSpec[] = [
     funders: [
       ['Riverbend Agri Fund I', 0.5, -205],
       ['Ngozi Nnaji', 0.25, -196],
-      ['Ibrahim Waziri', 0.25, -181],
+      // Through the portal: her payout has a bank account on file, to pay through Paystack.
+      ['Adaeze Okoro', 0.25, -181],
     ],
     harvestResult: {
       yieldPerHa: 4.7,

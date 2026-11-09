@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
+import { EditBankAccount } from '../components/BankAccountForm';
 import { IdentityChecks } from '../components/IdentityChecks';
 import {
   Alert,
@@ -152,6 +153,33 @@ export function FarmerDetailPage() {
             </Item>
             <Item label="Enrolled">{formatDate(f.created_at)}</Item>
           </dl>
+
+          <div className="space-y-2 border-t border-zinc-200 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium text-zinc-700">Payout account</p>
+              {(can.enrol(profile?.role) || can.reviewKyc(profile?.role)) && (
+                <EditBankAccount
+                  title={`Payout account for ${f.full_name}`}
+                  description="Where the farmer's share of a harvest is paid. It must be in the farmer's own name; before paying through Paystack, the bank's name for the account is checked too."
+                  current={f}
+                  defaultName={f.full_name}
+                  rpc="set_farmer_bank_account"
+                  args={{ p_farmer_id: f.id }}
+                  onSaved={farmer.reload}
+                />
+              )}
+            </div>
+            <p className="text-sm text-zinc-600">
+              {f.account_number ? (
+                <>
+                  {f.bank_name} <span className="font-mono">{f.account_number}</span>
+                  <span className="block text-xs text-zinc-500">{f.account_name}</span>
+                </>
+              ) : (
+                'None on file. Their harvest surplus is paid by hand.'
+              )}
+            </p>
+          </div>
 
           <div className="space-y-2 border-t border-zinc-200 pt-4">
             <p className="text-sm font-medium text-zinc-700">Identity checks</p>

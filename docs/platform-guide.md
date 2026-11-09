@@ -45,7 +45,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Area | What it does | State |
 | --- | --- | --- |
 | Accounts and roles | Sign-up, sign-in, admin assigns roles, deactivation | Done |
-| Farmer registry | Cooperatives, farmer enrolment with NIN/BVN duplicate check, KYC review | Done |
+| Farmer registry | Cooperatives, farmer enrolment with NIN/BVN duplicate check, KYC review, payout accounts (bank or mobile money) in the farmer's own name | Done |
 | Identity checks | NIN and BVN looked up with an identity provider at enrolment and investor KYC; verifying needs a match or a written reason. Provider: Dojah; runs simulated until its keys are added | Done |
 | Farm mapping | Draw on satellite imagery or GPS-walk the boundary; area computed; overlapping farms refused | Done |
 | Cycle builder | Budget, yield and price ranges, farms, milestones, offtake contract, insurance, documents | Done |
@@ -58,6 +58,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Trustee bank files | Bulk-payment files for the trustee's bank; statement imports that confirm payments and pledge payments by reference and flag the rest | Done |
 | Insurance claims | Losses reported with weather and field-visit evidence, the insurer notified, the assessment and approved amount recorded, and the payout received against the claim | Done |
 | Weather per farm | Daily rainfall and temperatures for every farm in a live cycle, from Open-Meteo, against the 10-year normal; a Weather tab per cycle, and dry-spell, very-wet, heavy-rain and heat flags on the overview | Done |
+| Payouts through Paystack | The trustee pays settlements, vendors and releases from its Paystack balance, each account checked first, confirmed by Paystack's report; bank files and confirming by hand stay | Done |
 | Online payments | Investors pay pledges through Paystack (or a simulated gateway on the demo), settled to the trustee and confirmed by webhook; problem payments flagged for refund | Done |
 | Harvest and settlement | Weighed and graded deliveries, buyer and insurance receipts, payout waterfall, statements | Done |
 | Portfolio dashboard | Staff overview: money raised, released and repaid, pipeline, map, what needs attention | Done |
@@ -66,7 +67,7 @@ How the platform reaches the market is still open. It could be operated directly
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 306 automated tests: 229 run the real database migrations and the identity, payment and weather provider code and prove the rules; 77 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 324 automated tests: 245 run the real database migrations and the identity, payment and weather provider code and prove the rules; 79 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -171,7 +172,8 @@ Sign in at the app's address. On the demo there's a button per account and a **D
 
 1. **Cooperatives → New cooperative**: name, registration number, state, LGA, wards.
 2. **Farmers → Enrol farmer**: name, phone, state and LGA, cooperative, and a **NIN or BVN** (at least one). If that NIN or BVN is already registered, enrolment is refused and the existing farmer is shown, so nobody is enrolled twice.
-3. Open the farmer → **Map a farm**. Either tap the corners on the satellite map, or walk the boundary with GPS. The database computes the area and refuses a boundary that overlaps another farm by more than 5%.
+3. On the farmer's page, **Payout account → Add account**: where their share of a harvest is paid, at a bank or with mobile money (OPay, PalmPay, Moniepoint, Kuda). It must be in the farmer's own name, and the change is recorded. Without one, their surplus is paid by hand.
+4. Open the farmer → **Map a farm**. Either tap the corners on the satellite map, or walk the boundary with GPS. The database computes the area and refuses a boundary that overlaps another farm by more than 5%.
 
 **Register an agro-dealer:** **Vendors → Register vendor** with the dealer's licence number, shop address and bank account. Compliance must approve it before it can take vouchers.
 
@@ -279,7 +281,7 @@ The platform only records what the trustee confirms, always under the bank's own
 
 **Bank files** (in the menu) connects to the trustee's bank the way trustees work: bulk-payment files out, statements back in.
 
-- **Payments:** every outstanding payment to a bank account is listed with a payment reference (AGP-…): release payments, voucher payments to dealers and settlement payouts. Choose payments → **Make payment file** downloads a CSV for the bank's bulk-payment upload, with the reference at the start of each narration. A payment in a file can't go in another, so it can't be paid twice by mistake. If the bank rejects one, **Withdraw** it, with the reason, and it goes back to waiting. Payments with no bank account on file (farmers' surplus, the platform fee, programme funders) are listed under **Pay by hand** and confirmed on the cycle as before.
+- **Payments:** every outstanding payment to a bank account is listed with a payment reference (AGP-…): release payments, voucher payments to dealers and settlement payouts. Choose payments → **Make payment file** downloads a CSV for the bank's bulk-payment upload, with the reference at the start of each narration. A payment in a file can't go in another, so it can't be paid twice by mistake. If the bank rejects one, **Withdraw** it, with the reason, and it goes back to waiting. Payments with no bank account on file are listed under **Pay by hand** and confirmed on the cycle as before, until an account is added. A farmer's goes on their page, a funder's from outside the portal on the cycle's **Funding** tab, and the platform fee account (admin) on **Bank files**.
 - **Statements:** **Choose CSV** with the trustee account's statement, exported from internet banking. The usual layouts are read: a date, a narration, and Debit and Credit or a signed Amount. **Import and match** then works through each line:
   - Money out quoting an AGP reference, for the right amount, confirms that payment.
   - Money in quoting a pledge reference (AGR-…), for the pledged amount, confirms the pledge payment.
@@ -288,6 +290,12 @@ The platform only records what the trustee confirms, always under the bank's own
   - Importing overlapping statements is safe: lines already imported are skipped.
 - **Simulated bank statement** (demo and development only) makes the statement a bank would send after paying what's with the bank and receiving pending pledges, so the whole flow can be tried without a bank.
 - **Online payments to resolve:** pledges paid online are confirmed on their own, with the gateway's reference in the ledger. A payment that couldn't be applied is listed here: paid after the pledge was withdrawn or lapsed, a second payment of the same pledge, or the wrong amount. Refund the investor (or sort it out with them), then **Resolve** with a note such as the refund's bank reference.
+- **Paying through Paystack:** where payouts through the gateway are switched on, select payments under **Waiting to be paid** and press **Pay through Paystack** instead of making a file. It works for any payment with the payee's bank account on file.
+  - **Account check first:** for each payment, Paystack asks the bank whose account it is. If the bank holds it for someone else, or there's no such account, nothing is sent and the transfer is **Held**.
+  - **Sending:** otherwise the transfer goes from the trustee's Paystack balance, and is confirmed in the books when Paystack reports it has arrived, under Paystack's reference.
+  - **Failures:** a failed transfer goes back to the payments waiting. A held one stays out of files and further transfers until the trustee has checked Paystack and pressed **Let it go**.
+  - **Through Paystack** lists every transfer and where it stands.
+  - **The Paystack account:** it must be the trustee's own, with transfers enabled and the OTP on each transfer switched off. Keep its balance topped up from the escrow account; the transfer fees come from it too.
 - **Gateway settlements:** Paystack pays each day's online payments into the escrow account as one credit, after its fees. That credit has no pledge reference, so it waits under **Needs attention**. Check it against Paystack's settlement report, then dismiss it with a note: the pledges in it were already confirmed one by one.
 
 Confirming by hand on the cycle still works, for anything paid outside a file:
@@ -299,7 +307,7 @@ Confirming by hand on the cycle still works, for anything paid outside a file:
 - **Releases:** **Milestones** tab → confirm each payment line as paid. For a voucher line, **Issue vouchers**: one per farm, split by area, with the money ring-fenced.
 - **Paying dealers:** **Vouchers** tab → **Pay vendor** for each redemption. The vendor's registered account is shown, and only that account is paid.
 - **Receipts:** **Settlement** tab → **Record receipt** for the buyer's payment. An insurance payout is recorded on its claim instead (**Offtake & insurance → Insurance claims → Record the insurer's payment**), once the claim has been assessed.
-- **Settlement:** the **Settlement** tab previews the waterfall. **Run settlement** fixes the payouts; **Confirm payment** on each. After the last one the cycle is _Settled_. Investors' payout bank accounts are on the **Investors** page.
+- **Settlement:** the **Settlement** tab previews the waterfall. **Run settlement** fixes the payouts. Where payouts through the gateway are on and the payee's bank account is on file, **Pay through Paystack** is the main action, with **Record bank payment** beside it for a payment already made from the bank. Otherwise pay from the bank and **Confirm payment** with the bank's reference. After the last one the cycle is _Settled_. Investors' payout bank accounts are on the **Investors** page.
 
 ### Auditor: read everything
 
@@ -396,7 +404,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 306, with no database server needed.
+- **Tests:** `npm test` runs all 324, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -412,7 +420,7 @@ Outside parties are simulated today: a person confirms in the app instead of a l
 | --- | --- |
 | **Identity:** BVN and NIN checks | **Built.** The `identity-check` Edge Function looks numbers up and records the outcome, at enrolment, at investor KYC and on demand. The provider is **Dojah**; its adapter is built. Until its keys are set it runs a simulated provider, and the app marks those answers _Simulated_. Still to do: get Dojah keys and test against the sandbox; liveness (a selfie matched to the ID photo). Paystack was considered and ruled out: it can't check NINs, it doesn't return the BVN record, and it needs a bank account, which most farmers don't give. |
 | **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | **Built, as bank files.** Payment files for the bank's bulk-payment upload, and statement imports that confirm payments and pledge payments by reference (see the trustee section). Works with any bank and needs no keys. Still to do: check the file layout against the pilot trustee's bank template; a bank API, if the trustee's bank offers one, would call the same database functions. |
-| **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | **Collections built.** Investors pay pledges online through Paystack; it settles to the trustee's escrow account and its webhook confirms the pledge at once. A simulated gateway runs on the demo. Payouts stay with the trustee's bank files, so custody never moves. Still to do: a Paystack business account (with the trustee's account for settlement) and a test with its test keys; matching Paystack's daily settlement credit on the bank statement. |
+| **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | **Built.** Investors pay pledges online through Paystack; it settles to the trustee's escrow account and its webhook confirms the pledge at once. The trustee can also pay payouts, vendors and releases through Paystack from its own balance, with each account checked before sending, alongside bank files and confirming by hand. A simulated gateway runs on the demo. Still to do: a Paystack business account (with the trustee's account for settlement) and a test with its test keys (collections and transfers); matching Paystack's daily settlement credit on the bank statement. |
 | **Weather** | **Built.** Daily rainfall and temperatures for every farm in a live cycle from Open-Meteo (free, no keys; a subscription for commercial use), with flags against the 10-year normal. Kept day by day, so a claim has the weather behind it. |
 | **Insurance** | **Claims built.** A loss is reported with the weather and field visits as evidence, then the insurer notified, the claim assessed and the payout received against it. The insurer is dealt with by the cycle manager and recorded here; a direct link to an insurer's systems, if one offers it, is still to do. |
 | **Satellite data** | To do |
