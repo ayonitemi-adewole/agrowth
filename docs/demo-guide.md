@@ -188,9 +188,11 @@ Then the cycle's **Weather** tab. This is real weather at those farms: the last 
 
 **Sign in as:** cycle manager. Open the **Zaria maize, dry season** cycle → **Vouchers**.
 
-- Seed and fertiliser money went out as **input vouchers**: one per farm, split by farm area. **Print slips** shows what a farmer is handed.
+- Seed and fertiliser money went out as **input vouchers**: one per farm, split by farm area. **Print slips** shows what a farmer is handed: the code and a QR code.
 - Each redemption is listed: which approved agro-dealer supplied what, and when the trustee paid the dealer's registered account.
-- **Optional:** if a voucher is still active, sign in as the **vendor**. Enter its code and the last four digits of the farmer's phone (shown on the farmer's page to staff), then redeem part of it. The shop never sees the farmer's name or phone number. Wrong guesses lock the counter after five tries.
+- **Scan a slip:** with **Print slips** open on a laptop, point a phone's camera at a slip's QR code and open the link. Sign in on the phone as the **vendor** and it lands on that voucher, ready to redeem part of it. The shop never sees the farmer's name or phone number.
+- **Or type it:** as the vendor, enter a code and the last four digits of the farmer's phone (shown on the farmer's page to staff). Wrong guesses lock the counter after five tries.
+- As **admin**, **Vendors** has the switch that makes a scan also ask for the phone digits.
 
 > **The point:** farmers get inputs from approved shops, not cash, and every shop is paid only for what it supplied.
 

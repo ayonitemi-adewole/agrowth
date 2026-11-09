@@ -53,7 +53,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Funding | Trustee-confirmed deposits; full refunds if a cycle misses its deadline or is cancelled | Done |
 | Field verification | GPS check-in inside the boundary, checklist, photos; a failed visit blocks the money | Done |
 | Disbursement | Staged releases per milestone, 20% cash cap, trustee-confirmed payments | Done |
-| Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter; vendors paid on redemption | Done |
+| Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter, by scanning the slip's QR code or typing its code; vendors paid on redemption | Done |
 | Ledger | Double-entry, append-only, balanced, no money moving between cycles | Done |
 | Trustee bank files | Bulk-payment files for the trustee's bank; statement imports that confirm payments and pledge payments by reference and flag the rest | Done |
 | Insurance claims | Losses reported with weather and field-visit evidence, the insurer notified, the assessment and approved amount recorded, and the payout received against the claim | Done |
@@ -66,7 +66,7 @@ How the platform reaches the market is still open. It could be operated directly
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 299 automated tests: 224 run the real database migrations and the identity, payment and weather provider code and prove the rules; 75 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 306 automated tests: 229 run the real database migrations and the identity, payment and weather provider code and prove the rules; 77 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -233,7 +233,9 @@ Sign in at the app's address. On the demo there's a button per account and a **D
   - **Heat:** a forecast high of 40 °C or more.
 - The weather updates daily. **Refresh weather** fetches it now.
 - Every day's reading is kept, so an insurance claim or a disputed harvest has the season's weather on record.
-4. **Vouchers** tab → **Print slips** to hand each farmer their voucher code. Close expired or unused vouchers; unused value returns to the cycle.
+4. **Vouchers** tab → **Print slips** to hand each farmer their voucher. Each slip has the code and a QR code the shop can scan. Close expired or unused vouchers; unused value returns to the cycle.
+
+**Scanning without the phone digits** (admin): by default, scanning a slip's QR code is enough to use the voucher, which is quicker at the counter, but whoever holds the slip can spend it. If slips start going astray, switch on **Vendors → Ask for the farmer's phone digits after scanning a voucher**. The slips' instructions to farmers change to match. Typed codes always need the phone digits.
 5. When the last load is in: **Harvest** tab → **Complete harvest**. This is refused while any milestone, voucher or vendor payment is outstanding.
 
 **Insurance claims:** **Offtake & insurance** tab → **Insurance claims**. Claims can be made while a cycle is funded, under way or harvested.
@@ -305,10 +307,12 @@ Every list, cycle, ledger and programme dashboard is visible, and nothing can be
 
 ### Vendor (agro-dealer counter): redeeming vouchers
 
-1. **Redeem vouchers**: enter the code from the farmer's slip and the **last four digits of the farmer's phone**, then **Check voucher**.
+1. Find the voucher, either way:
+   - **Scan it** with a phone. Point the phone's camera at the QR code on the farmer's slip and open the link: it goes straight to the voucher on **Redeem vouchers**. On Android in Chrome, **Scan the voucher's QR code** on that page also opens the camera. If the shop isn't signed in on that phone, it signs in first and lands back on the voucher. A scan alone is enough, unless an admin has switched on asking for the phone digits too.
+   - **Type it**: enter the code from the slip and the **last four digits of the farmer's phone**, then **Check voucher**.
 2. You see only the value left and what it's for, never the farmer's full name or phone. Enter what you supplied and the amount (up to the value left), then **Redeem**.
 3. A voucher can be used in parts, over several visits or shops.
-4. Wrong details only ever say "nothing matches". After 5 wrong tries in 15 minutes the counter is locked for 15 minutes.
+4. Wrong details only ever say "nothing matches". After 5 wrong tries in 15 minutes the counter is locked for 15 minutes. Wrong scans count towards the same limit.
 5. The trustee then pays your shop's registered account.
 
 ### Investor: investing in farm cycles
@@ -367,7 +371,7 @@ These are enforced by the database itself. They hold even if the web app has a b
   - every farmer KYC-verified.
 - **Separation of duties.** The cycle's own manager can never approve it, and whoever registers a vendor can't approve it.
 - **Money follows verification.** A milestone is released only after every farm passes a visit, milestones go in order, and at most 20% may go to farmers as cash.
-- **Inputs, not cash.** Vouchers are redeemable only at approved vendors, with a code plus the farmer's phone digits. Guessing is locked out. Vendors are paid only to their registered account, and new bank details need a fresh approval.
+- **Inputs, not cash.** Vouchers are redeemable only at approved vendors, with a code plus the farmer's phone digits, or by scanning the slip's QR code. The QR holds a secret token that can't be worked out from the printed code, and an admin can require the phone digits after a scan too. Guessing is locked out. Vendors are paid only to their registered account, and new bank details need a fresh approval.
 - **The ledger is append-only and balanced.** There are no edits or deletions, only reversing entries. Every entry sums to zero, and no money moves between cycles.
 - **One farmer, one record; one piece of land, one farm.** Duplicate NIN/BVN and overlapping boundaries are refused. Identity numbers are stored only as keyed hashes.
 - **Identity checks can't be faked.** A check is only of the number on record, by someone allowed to check that person, and only the identity service can record the answer. Only match or no-match per field is kept, never the provider's copy of the person's details. Verifying KYC needs a match, or a written reason.
@@ -392,7 +396,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 299, with no database server needed.
+- **Tests:** `npm test` runs all 306, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
