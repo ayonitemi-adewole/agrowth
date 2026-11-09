@@ -125,7 +125,7 @@ export function HarvestTab({ data, reload }: TabProps) {
             : 'Deliveries are recorded once the season is under way.'}
         </EmptyState>
       ) : (
-        <Table head={['Delivered', 'Farm', 'Waybill', 'Weight', 'Grade', 'Moisture', '']}>
+        <Table head={['Delivered', 'Farm', 'Waybill', 'Weight', 'Grade', 'Moisture', 'Buyer', '']}>
           {deliveries.map((d) => {
             const farm = farms.find((f) => f.id === d.farm_id);
             return (
@@ -144,6 +144,26 @@ export function HarvestTab({ data, reload }: TabProps) {
                 </td>
                 <td className="text-zinc-600 tabular-nums">
                   {d.moisture_pct !== null ? `${d.moisture_pct}%` : '—'}
+                </td>
+                <td className="min-w-36">
+                  {d.voided_at ? (
+                    '—'
+                  ) : d.buyer_confirmed_at ? (
+                    <Badge tone="green" dot>
+                      Confirmed
+                    </Badge>
+                  ) : d.buyer_disputed_at ? (
+                    <>
+                      <Badge tone="red" dot>
+                        Disputed
+                      </Badge>
+                      <span className="mt-1 block text-xs text-zinc-500">
+                        {d.buyer_dispute} Void and re-record the load if the buyer is right.
+                      </span>
+                    </>
+                  ) : (
+                    <Badge tone="neutral">Not confirmed</Badge>
+                  )}
                 </td>
                 <td className="text-right">
                   {d.voided_at ? (

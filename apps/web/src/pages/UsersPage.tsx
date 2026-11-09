@@ -27,6 +27,34 @@ export function UsersPage() {
     return data as Profile[];
   }, []);
 
+  // Offtaker accounts are linked to the buyer they work for.
+  const buyers = useAsync(async () => {
+    const [list, links] = await Promise.all([
+      supabase.from('offtakers').select('id, name').order('name'),
+      supabase.from('offtaker_users').select('user_id, offtaker_id'),
+    ]);
+    if (list.error) throw list.error;
+    if (links.error) throw links.error;
+    return {
+      list: list.data as { id: string; name: string }[],
+      linked: new Map(
+        (links.data as { user_id: string; offtaker_id: string }[]).map((l) => [
+          l.user_id,
+          l.offtaker_id,
+        ]),
+      ),
+    };
+  }, []);
+  const linkBuyer = async (u: Profile, offtakerId: string) => {
+    await run(u.id, () =>
+      supabase.rpc('link_offtaker_account', {
+        p_user_id: u.id,
+        p_offtaker_id: offtakerId || null,
+      }),
+    );
+    buyers.reload();
+  };
+
   const run = async (userId: string, call: () => PromiseLike<{ error: unknown }>) => {
     setBusyId(userId);
     setError(null);
@@ -95,6 +123,22 @@ export function UsersPage() {
                       </option>
                     ))}
                   </Select>
+                  {u.role === 'offtaker' && buyers.data && (
+                    <Select
+                      value={buyers.data.linked.get(u.id) ?? ''}
+                      disabled={busyId === u.id}
+                      onChange={(e) => void linkBuyer(u, e.target.value)}
+                      aria-label={`Buyer that ${u.email} works for`}
+                      className="mt-2 min-w-44"
+                    >
+                      <option value="">Works for: not linked</option>
+                      {buyers.data.list.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          Works for {b.name}
+                        </option>
+                      ))}
+                    </Select>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {u.is_active ? (

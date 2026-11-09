@@ -27,6 +27,7 @@ const FieldVisitPage = page(() => import('./pages/FieldVisitPage'), 'FieldVisitP
 const LedgerPage = page(() => import('./pages/LedgerPage'), 'LedgerPage');
 const VendorsPage = page(() => import('./pages/VendorsPage'), 'VendorsPage');
 const RedeemPage = page(() => import('./pages/RedeemPage'), 'RedeemPage');
+const BuyerPortalPage = page(() => import('./pages/BuyerPortalPage'), 'BuyerPortalPage');
 const VoucherSlipsPage = page(() => import('./pages/VoucherSlipsPage'), 'VoucherSlipsPage');
 const MarketplacePage = page(() => import('./pages/invest/MarketplacePage'), 'MarketplacePage');
 const ListingPage = page(() => import('./pages/invest/ListingPage'), 'ListingPage');
@@ -151,6 +152,14 @@ export function App() {
                       }
                     />
                     <Route
+                      path="buyer"
+                      element={
+                        <RoleGate allow={can.useBuyerPortal}>
+                          <BuyerPortalPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
                       path="redeem"
                       element={
                         <RoleGate allow={can.redeemVouchers}>
@@ -270,7 +279,12 @@ export function App() {
 function Home() {
   const role = useAuth().profile?.role;
   if (can.useStaffApp(role)) return <OverviewPage />;
-  return <Navigate to={can.invest(role) ? '/invest' : '/redeem'} replace />;
+  return (
+    <Navigate
+      to={can.invest(role) ? '/invest' : can.useBuyerPortal(role) ? '/buyer' : '/redeem'}
+      replace
+    />
+  );
 }
 
 function SetupNeeded() {

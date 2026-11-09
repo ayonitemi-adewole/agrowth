@@ -23,7 +23,9 @@ export type StaffKey =
   | 'programmeManager'
   | 'trustee'
   | 'auditor'
-  | 'vendor';
+  | 'vendor'
+  | 'buyerMaize'
+  | 'buyerRice';
 
 export const STAFF: StaffSpec[] = [
   { key: 'admin', role: 'admin', fullName: 'Ngozi Adeyemi', email: 'admin@agrowth.test' },
@@ -61,6 +63,20 @@ export const STAFF: StaffSpec[] = [
   { key: 'auditor', role: 'auditor', fullName: 'Ibrahim Musa', email: 'auditor@agrowth.test' },
   // Counter staff at Zaria Agro Inputs, who redeem farmers' input vouchers.
   { key: 'vendor', role: 'vendor', fullName: 'Bala Sule', email: 'vendor@agrowth.test' },
+  // Buyers' staff on the offtaker portal: Northern Mills (maize) and Kura Rice Mills.
+  { key: 'buyerMaize', role: 'offtaker', fullName: 'Aisha Lawal', email: 'buyer@agrowth.test' },
+  {
+    key: 'buyerRice',
+    role: 'offtaker',
+    fullName: 'Musa Danjuma',
+    email: 'buyer.rice@agrowth.test',
+  },
+];
+
+/** Which buyer each buyer account works for. */
+export const BUYER_ACCOUNTS: { key: 'buyerMaize' | 'buyerRice'; buyer: string }[] = [
+  { key: 'buyerMaize', buyer: 'Northern Mills Ltd' },
+  { key: 'buyerRice', buyer: 'Kura Rice Mills Ltd' },
 ];
 
 export interface VendorSpec {

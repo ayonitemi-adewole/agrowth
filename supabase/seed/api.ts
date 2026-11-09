@@ -20,6 +20,7 @@ export type Role =
   | 'auditor'
   | 'trustee'
   | 'vendor'
+  | 'offtaker'
   | 'investor';
 
 /** A signed-in user. */

@@ -26,6 +26,8 @@ Every account uses the one demo password you were given.
 | `trustee@agrowth.test` | Trustee | Kemi Adebayo: the custodian who confirms every movement of money |
 | `auditor@agrowth.test` | Auditor | Ibrahim Musa: reads everything, changes nothing |
 | `vendor@agrowth.test` | Agro-dealer counter | Bala Sule at Zaria Agro Inputs: redeems farmers' vouchers |
+| `buyer@agrowth.test` | Offtaker | Aisha Lawal at Northern Mills: the maize buyer |
+| `buyer.rice@agrowth.test` | Offtaker | Musa Danjuma at Kura Rice Mills: the rice buyer, with a load to check |
 | `investor@agrowth.test` | Investor | Adaeze Okoro, high-net-worth: one investment paid out, one live |
 | `investor.retail@agrowth.test` | Investor | Funmilayo Adeleke, retail: a pledge in its 48-hour cooling-off |
 | `investor.new@agrowth.test` | Investor | Emeka Obi: waiting for KYC approval |
@@ -107,7 +109,7 @@ npm run preview:phone # the production build on your Wi-Fi, which includes offli
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | its publishable key |
 | `VITE_DEMO_MODE` | `true` |
 | `VITE_DEMO_PASSWORD` | the demo password |
-| `VITE_DEMO_ACCOUNTS` | `cycle_manager:manager@agrowth.test,programme_manager:programme@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test,investor:investor@agrowth.test,investor:investor.retail@agrowth.test,investor:investor.new@agrowth.test` |
+| `VITE_DEMO_ACCOUNTS` | `cycle_manager:manager@agrowth.test,programme_manager:programme@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test,offtaker:buyer@agrowth.test,offtaker:buyer.rice@agrowth.test,investor:investor@agrowth.test,investor:investor.retail@agrowth.test,investor:investor.new@agrowth.test` |
 
 Demo mode keeps the role buttons and simulated GPS, hides public sign-up, and shows the sample-data banner.
 
@@ -207,6 +209,8 @@ Then the cycle's **Weather** tab. This is real weather at those farms: the last 
 5. Open **Bank files** in the menu. Under **Waiting to be paid** is the agro-dealer's latest voucher payment. Select it, then **Make payment file** for the CSV a trustee would upload to its bank's bulk payments (each narration starts with the payment's AGP reference), or **Pay through Paystack**.
 6. If you made a file: **Simulated bank statement** downloads the statement the bank would send back. It shows the payment made and Funmilayo's pledge payment received. Under **Statements**, **Choose CSV** → **Import and match** confirms the payment under the bank's reference. Funmilayo's pledge lands in **Needs attention**: her cooling-off hasn't ended, so it can't be added yet.
 
+Before settling, the buyer's side: switch to `buyer.rice@agrowth.test` (Kura Rice Mills). **Buyer portal** shows the rice agreement, what's been accepted and paid, and every load with its farm, waybill, weight and grade, but no farmer names. One load is **Disputed**: the mill's weighbridge read less. **Confirm** another load, or **Dispute** one with a reason. Back as **trustee** or **manager**, the cycle's **Harvest** tab shows each load's **Buyer** answer, and the dispute's reason for the field team. `buyer@agrowth.test` (Northern Mills) has every load on its settled maize confirmed.
+
 > **The point:** the platform never holds money. The trustee pays from its bank or its own Paystack balance, and the bank's statement or Paystack's report confirms each payment.
 
 ### Scene 7 — Investor Edition (6 min)
@@ -242,7 +246,7 @@ Then **Farmers** and filter by KYC pending: one farmer's NIN came back **Partial
 
 ### Closing (2 min)
 
-- **What's built:** the core platform, both editions, the offline field app, automated NIN/BVN identity checks (simulated on the demo, ready for a live provider), and the trustee's bank files: payment files out, statements back in.
+- **What's built:** the core platform, both editions, the offline field app, automated NIN/BVN identity checks (simulated on the demo, ready for a live provider), the trustee's bank files (payment files out, statements back in), online payments and payouts through Paystack, weather per farm, insurance claims, and a portal where buyers confirm or dispute each load.
 - **What's next:** a payments integration for collections and payouts, then a pilot season with one cooperative, a real trustee, offtaker and insurer. The farmer USSD/SMS channel and an independent security audit follow in a later phase.
 - The [Platform Guide](platform-guide.md) lists the full status.
 

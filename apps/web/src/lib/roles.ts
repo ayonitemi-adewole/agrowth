@@ -31,10 +31,12 @@ const REGISTRY_READERS: Role[] = [
 ];
 
 export const can = {
-  /** Anyone working the platform (not investors, vendors or offtakers). */
+  /** Anyone working the platform (not investors, vendors or buyers). */
   useStaffApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee']),
-  /** Who can sign in at all: staff, vendors at their shop counter, and investors. */
-  useApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee', 'vendor', 'investor']),
+  /** Who can sign in at all: staff, vendors at their shop counter, investors and buyers. */
+  useApp: (r?: Role) => has(r, [...REGISTRY_READERS, 'trustee', 'vendor', 'investor', 'offtaker']),
+  /** The offtaker portal: a buyer's agreements, loads and payments. */
+  useBuyerPortal: (r?: Role) => has(r, ['offtaker']),
   /** The investor portal: marketplace, pledges, portfolio, KYC. */
   invest: (r?: Role) => has(r, ['investor']),
   /** See a cycle's investor listing: investors, and staff previewing it. */

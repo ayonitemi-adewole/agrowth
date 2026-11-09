@@ -5,6 +5,7 @@ import {
   BookOpenCheck,
   BriefcaseBusiness,
   FileSpreadsheet,
+  Handshake,
   Landmark,
   LandPlot,
   TrendingUp,
@@ -65,6 +66,10 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
       { to: '/portfolio', label: 'My investments', icon: BriefcaseBusiness, show: can.invest },
       { to: '/profile', label: 'Profile and KYC', icon: BadgeCheck, show: can.invest },
     ],
+  },
+  {
+    title: 'Buyer',
+    items: [{ to: '/buyer', label: 'Buyer portal', icon: Handshake, show: can.useBuyerPortal }],
   },
   {
     title: 'Shop counter',
