@@ -4,7 +4,7 @@ import type { CheckStatus, Claimed, FieldResults, ProviderRecord } from './types
 export function nameWords(name: string | null | undefined): string[] {
   return (name ?? '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z\s]/g, ' ')
     .split(/\s+/)

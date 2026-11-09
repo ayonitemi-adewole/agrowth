@@ -26,7 +26,7 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | Accounts and roles: sign-up, admin assigns staff roles, deactivation                                                                                                               | Done  |
-| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review                                                                                                            | Done  |
+| Registry: cooperatives, farmer enrolment with NIN/BVN dedup, KYC review, payout accounts in the farmer's own name                                                                  | Done  |
 | Identity checks: NIN and BVN looked up with an identity provider (Dojah adapter, or simulated), KYC verification needs a match or a written reason                                 | Done  |
 | Farm mapping: draw or GPS-walk boundaries, PostGIS validation, ghost-farm overlap check                                                                                            | Done  |
 | Cycle builder: budget, yield and price ranges, farms, milestones, offtake, insurance, documents                                                                                    | Done  |
@@ -37,6 +37,7 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Ledger: double-entry, append-only, balanced, no money moving between cycles                                                                                                        | Done  |
 | Insurance claims: losses reported with weather and field-visit evidence, insurer notified, assessed and paid against the claim                                                     | Done  |
 | Weather per farm: daily rainfall and temperatures from Open-Meteo for every farm in a live cycle, against the 10-year normal; dry, wet, heavy-rain and heat flags                  | Done  |
+| Payouts through Paystack: the trustee pays settlements, vendors and releases from its Paystack balance, each account checked before sending                                        | Done  |
 | Online payments: investors pay pledges through Paystack (or a simulated gateway), settled to the trustee and confirmed by webhook                                                  | Done  |
 | Trustee bank files: bulk-payment files for the trustee's bank, statement imports that confirm payments and pledge payments by reference                                            | Done  |
 | Harvest: weighed and graded deliveries per farm, voids with a reason                                                                                                               | Done  |
@@ -96,6 +97,13 @@ npx supabase functions deploy payments-webhook --no-verify-jwt
 ```
 
 The gateway's fee is added on top of the pledge, so the trustee receives it in full.
+
+**Payouts through Paystack** (optional) let the trustee pay settlements, vendors and releases from its Paystack balance instead of its bank. They use the same gateway, and stay off until `PAYOUTS_ENABLED=true`. The Paystack account must be **the trustee's own**, with transfers enabled and the OTP on each transfer switched off in Paystack's settings. The trustee tops its balance up from the escrow account. The webhook above also reports transfers.
+
+```bash
+npx supabase secrets set PAYOUTS_ENABLED=true
+npx supabase functions deploy payouts
+```
 
 **Weather** for every farm in a live cycle comes from [Open-Meteo](https://open-meteo.com), which needs no key or sign-up:
 
@@ -158,12 +166,13 @@ Every record goes through the same database functions and security rules as the 
 
 1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
 2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
-3. Create the tables, rules and functions, and deploy the Edge Functions. On the demo, identity checks and online payments run simulated, so visitors can try them without any keys; the weather is real:
+3. Create the tables, rules and functions, and deploy the Edge Functions. On the demo, identity checks, online payments and payouts run simulated, so visitors can try them without any keys; the weather is real:
    ```bash
    npm run demo:push
-   npx supabase secrets set PAYMENTS_PROVIDER=mock --project-ref DEMO_PROJECT_ID
+   npx supabase secrets set PAYMENTS_PROVIDER=mock PAYOUTS_ENABLED=true --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy identity-check --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy payments --project-ref DEMO_PROJECT_ID
+   npx supabase functions deploy payouts --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy payments-webhook --no-verify-jwt --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy weather-sync --project-ref DEMO_PROJECT_ID
    ```
@@ -176,7 +185,7 @@ Every record goes through the same database functions and security rules as the 
 
 The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer), `programme@agrowth.test` (programme manager for the Kano wheat programme) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
 
-Three investor accounts use the Investor Edition portal. `investor@agrowth.test` (Adaeze Okoro, high-net-worth) invested in both Zaria maize cycles through the portal, so she has a paid-out statement and a live cycle to track. `investor.retail@agrowth.test` (Funmilayo Adeleke, retail, capped at 10% of income) has a pledge to the open soybean cycle that is still in its 48-hour cooling-off. `investor.new@agrowth.test` (Emeka Obi) is waiting for compliance to check his KYC.
+Three investor accounts use the Investor Edition portal. `investor@agrowth.test` (Adaeze Okoro, high-net-worth) invested in both Zaria maize cycles and the Kura rice cycle through the portal, so she has a paid-out statement, a live cycle to track, and a rice payout the trustee can pay through Paystack. `investor.retail@agrowth.test` (Funmilayo Adeleke, retail, capped at 10% of income) has a pledge to the open soybean cycle that is still in its 48-hour cooling-off. `investor.new@agrowth.test` (Emeka Obi) is waiting for compliance to check his KYC.
 
 Dates are relative to the day you seed, so the demo always looks current. Business dates (deposits, deliveries, receipts, planned dates) tell a realistic season; the History tab shows when the seed ran. To start again: `npm run demo:reset` (it asks you to type `reset`), then `npm run seed:demo`. After adding a migration, `npm run demo:push` applies it to the demo project. These commands only ever touch the demo project; never use `--linked` or `--remote` on their own for the demo, because they point at your development project.
 
@@ -501,9 +510,9 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, by typed code or by scan (secret tokens, the optional phone check, the shared lock-out), investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), insurance claims (only within a policy's cover, evidence frozen when reported, approvals within the cover left, payouts only through an assessed claim), weather (one reading per 11 km square, written only by the weather service, flags against the 10-year normal), online payments (only the payments service records a result, the first report counts, late or wrong payments flagged for refund, simulated payments refused unless allowed), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, by typed code or by scan (secret tokens, the optional phone check, the shared lock-out), investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), payouts through the gateway (account checked first, held on a name mismatch, never in a file and a transfer at once, confirmed only on the gateway's report, back in the queue on failure), insurance claims (only within a policy's cover, evidence frozen when reported, approvals within the cover left, payouts only through an assessed claim), weather (one reading per 11 km square, written only by the weather service, flags against the 10-year normal), online payments (only the payments service records a result, the first report counts, late or wrong payments flagged for refund, simulated payments refused unless allowed), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
-- **Provider tests** — identity matching and the Dojah adapter, and the Paystack adapter (fees, checkout, verification, webhook signatures), against canned responses.
+- **Provider tests** — identity matching and the Dojah adapter, and the Paystack adapters (fees, checkout, verification, account look-up, transfers, webhook signatures), against canned responses.
 - **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check, weather, claim and CSV export helpers, the payment gateway's return, reading voucher QR scans, reading bank statements in the usual layouts, and the offline sync queue.
 
 ## Repository layout
@@ -517,8 +526,8 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments, weather, insurance claims, voucher QR codes
-  functions/           Edge Functions: identity-check, payments, payments-webhook and weather-sync, and _shared/ (identity, payment and weather providers) used by them, the seed and the tests
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments, weather, insurance claims, voucher QR codes, gateway payouts
+  functions/           Edge Functions: identity-check, payments, payouts, payments-webhook and weather-sync, and _shared/ (identity, payment and weather providers) used by them, the seed and the tests
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings
@@ -546,6 +555,7 @@ npx supabase db push
 - **Identity numbers are never stored.** BVN and NIN are kept only as keyed hashes (key held in Supabase Vault) plus the last four digits. The hashes are in a schema the API can't reach.
 - **Identity checks can't be faked.** A check can only be opened for the number on record (it must hash to the stored fingerprint), by someone allowed to check that person, and only the identity service (service role) can record the answer. Only match or no-match per field is kept, never the provider's copy of the person's details. Verifying KYC needs a matching check of every number on record, or a written reason.
 - **Insurance pays out through claims.** A payout is recorded only against an assessed claim, and never for more than the insurer approved; approvals can't exceed the cover left on the policy. The weather and field-visit evidence is copied into a claim when it's reported, and doesn't change after.
+- **Paying out through Paystack sends only to the payee.** Each account is looked up first and the transfer held if the bank holds it for someone else. A farmer's payout account must be in the farmer's own name, set only by field agents or compliance, and every change is recorded. A payment can be in a bank file or a Paystack transfer, never both, and a transfer is confirmed in the books only on Paystack's report, as the trustee who sent it.
 - **Online payments can't be faked.** Only the payments service (service role) records a gateway's answer, after checking the gateway's signature or asking the gateway itself. The first answer counts, and a payment for a closed pledge or of the wrong amount is flagged for the trustee rather than applied. Simulated payments are refused unless an admin allows them.
 - **A bank statement confirms only what it proves.** A statement line confirms a payment only if it quotes that payment's reference and the exact amount, and it goes through the same checks as the trustee confirming by hand, under the bank's own reference. A payment can be in only one live payment file, a second debit for something already paid is flagged, and statement lines are kept, with re-imported lines skipped.
 - **One farmer, one record; one piece of land, one farm.** Enrolment needs a NIN or BVN, and a repeat is refused. A boundary that overlaps a registered farm by more than 5% of the smaller farm is refused.

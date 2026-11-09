@@ -104,15 +104,36 @@ describe('trustee bank files', () => {
     expect((await pgError(payments(manager))).code).toBe('PT403');
   });
 
-  it('marks settlement payouts with no bank account on file for paying by hand', async () => {
+  it('pays settlement payouts to the account on file, and marks those with none for paying by hand', async () => {
     const { id } = await one<{ id: string }>(
       `select id from public.cycles where status = 'harvested'`,
     );
+    // One of the cycle's farmers has no account on file.
+    const { farmer } = await one<{ farmer: string }>(
+      `select f.id as farmer from public.cycle_farms cf join public.farms fa on fa.id = cf.farm_id
+         join public.farmers f on f.id = fa.farmer_id where cf.cycle_id = $1 limit 1`,
+      [id],
+    );
+    await db.query(
+      `update public.farmers set bank_name = null, account_number = null, account_name = null where id = $1`,
+      [farmer],
+    );
     await as(trustee, `select public.settle_cycle($1)`, [id]);
-    const fee = (await payments()).find(
-      (p) => p.kind === 'settlement_payout' && p.payee_name.startsWith('Platform operator'),
-    )!;
-    expect(fee.problem).toMatch(/No bank account on file/);
+    const payouts = (await payments()).filter((p) => p.kind === 'settlement_payout');
+    const fee = payouts.find((p) => p.payee_name.startsWith('Platform operator'))!;
+    expect(fee).toMatchObject({ problem: null, account_name: 'Agrowth Operations Ltd' });
+    const farmerName = await one<{ n: string }>(
+      `select full_name as n from public.farmers where id = $1`,
+      [farmer],
+    );
+    expect(payouts.find((p) => p.payee_name === farmerName.n)!.problem).toMatch(
+      /No bank account on file for this farmer/,
+    );
+    // The fund that came in outside the portal is paid to the account the trustee gave.
+    expect(payouts.find((p) => p.payee_name === 'Riverbend Agri Fund I')).toMatchObject({
+      problem: null,
+      account_name: 'Riverbend Agri Fund I',
+    });
   });
 
   it('puts payments in a payment file once, and refuses ones it cannot pay', async () => {

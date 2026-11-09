@@ -51,6 +51,11 @@ export interface Farmer {
   /** Compliance's note on the KYC decision, e.g. why it verified without a matching check. */
   kyc_note: string | null;
   kyc_reviewed_at: string | null;
+  /** Where the farmer's harvest surplus is paid; null when none is on file. */
+  bank_name: string | null;
+  account_number: string | null;
+  account_name: string | null;
+  bank_updated_at: string | null;
   state: string;
   lga: string;
   ward: string | null;
@@ -229,6 +234,12 @@ export interface FundingContribution {
   trustee_reference: string;
   received_on: string;
   refund_entry_id: string | null;
+  /** Set for funders who came through the portal; they're paid to their profile's account. */
+  investor_id: string | null;
+  /** Where a funder outside the portal is paid back. */
+  payout_bank_name: string | null;
+  payout_account_number: string | null;
+  payout_account_name: string | null;
   created_at: string;
 }
 

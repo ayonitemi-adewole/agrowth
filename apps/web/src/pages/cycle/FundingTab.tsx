@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
 import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../../components/Toast';
+import { EditBankAccount } from '../../components/BankAccountForm';
 import {
   Alert,
   Badge,
@@ -80,7 +81,31 @@ export function FundingTab({ data, reload }: TabProps) {
         <Table head={['Funder', 'Type', 'Received', 'Trustee reference', 'Amount', '']}>
           {data.contributions.map((c) => (
             <tr key={c.id}>
-              <td className="font-medium text-zinc-900">{c.funder_name}</td>
+              <td>
+                <span className="font-medium text-zinc-900">{c.funder_name}</span>
+                <span className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-500">
+                  {c.investor_id
+                    ? 'Paid back to the account in their investor profile'
+                    : c.payout_account_number
+                      ? `Paid back to ${c.payout_bank_name} ${c.payout_account_number}`
+                      : 'No payout account on file'}
+                  {!c.investor_id && !c.refund_entry_id && can.actAsTrustee(role) && (
+                    <EditBankAccount
+                      title={`Where ${c.funder_name} is paid back`}
+                      description="The account their capital and returns are paid to at settlement."
+                      current={{
+                        bank_name: c.payout_bank_name,
+                        account_number: c.payout_account_number,
+                        account_name: c.payout_account_name,
+                      }}
+                      defaultName={c.funder_name}
+                      rpc="set_contribution_payout_account"
+                      args={{ p_contribution_id: c.id }}
+                      onSaved={reload}
+                    />
+                  )}
+                </span>
+              </td>
               <td className="text-zinc-600">
                 {c.funder_kind === 'programme' ? 'Programme' : 'Investor'}
               </td>

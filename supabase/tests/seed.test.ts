@@ -143,10 +143,12 @@ describe('demo seed', () => {
         order by pr.email, p.pledged_at`,
     );
     const by = (email: string) => rows.filter((r) => r.email === email);
-    // Adaeze: the settled maize cycle (paid out), the one in progress, and a pledge to the
-    // open soybean cycle that's past its cooling-off, ready to pay online.
+    // Adaeze: the settled maize cycle (paid out), the harvested rice cycle (to settle live),
+    // the maize cycle in progress, and a pledge to the open soybean cycle that's past its
+    // cooling-off, ready to pay online.
     expect(by('investor@agrowth.test').map((r) => [r.status, r.payouts])).toEqual([
       ['paid', 1],
+      ['paid', 0],
       ['paid', 0],
       ['pending', 0],
     ]);

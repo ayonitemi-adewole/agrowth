@@ -95,6 +95,41 @@ const BANKS: [code: string, pattern: RegExp][] = [
   ['215', /\bunity\b/],
   ['035', /\bwema\b|\balat\b/],
   ['057', /\bzenith\b/],
+  // Mobile money and digital banks, where many farmers keep their money.
+  ['999992', /\bopay\b|\bpaycom\b/],
+  ['999991', /\bpalm ?pay\b/],
+  ['50515', /\bmoniepoint\b/],
+  ['50211', /\bkuda\b/],
+];
+
+/** Banks and mobile-money providers to choose from when entering a payout account. */
+export const BANK_CHOICES = [
+  'Access Bank',
+  'Citibank',
+  'Ecobank',
+  'FCMB',
+  'Fidelity Bank',
+  'First Bank',
+  'GTBank',
+  'Heritage Bank',
+  'Jaiz Bank',
+  'Keystone Bank',
+  'Kuda',
+  'Moniepoint',
+  'OPay',
+  'PalmPay',
+  'Polaris Bank',
+  'Providus Bank',
+  'Stanbic IBTC',
+  'Standard Chartered',
+  'Sterling Bank',
+  'SunTrust Bank',
+  'Titan Trust Bank',
+  'UBA',
+  'Union Bank',
+  'Unity Bank',
+  'Wema Bank',
+  'Zenith Bank',
 ];
 
 export function bankCode(bankName: string | null | undefined): string {
