@@ -4,7 +4,7 @@ import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireStaff, RoleGate } from './components/Guards';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
-import { Spinner } from './components/ui';
+import { SplashScreen } from './components/SplashScreen';
 import { can } from './lib/roles';
 import { OfflineProvider } from './lib/offline/OfflineProvider';
 import { isConfigured } from './lib/supabase';
@@ -51,7 +51,7 @@ export function App() {
       <OfflineProvider>
         <ToastProvider>
           <BrowserRouter>
-            <Suspense fallback={<Spinner />}>
+            <Suspense fallback={<SplashScreen />}>
               <Routes>
                 <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
                 <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />

@@ -5,14 +5,15 @@ import { useAuth } from '../auth/AuthProvider';
 import { can } from '../lib/roles';
 import type { Role } from '../lib/types';
 import { Logo } from './Layout';
-import { Button, Card, Spinner } from './ui';
+import { SplashScreen } from './SplashScreen';
+import { Button, Card } from './ui';
 
 /** Sends signed-out visitors to sign in; holds non-staff on a waiting page. */
 export function RequireStaff() {
   const { session, profile, loading, offline, signOut } = useAuth();
   const location = useLocation();
 
-  if (loading) return <Spinner />;
+  if (loading) return <SplashScreen />;
   if (!session && !(offline && profile)) {
     return <Navigate to="/sign-in" replace state={{ from: location }} />;
   }
