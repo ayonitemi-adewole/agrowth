@@ -20,6 +20,7 @@ import {
   INVESTORS,
   PROGRAMMES,
   STAFF,
+  BUYER_ACCOUNTS,
   UNASSIGNED_REJECTED,
   VENDORS,
   type CoopKey,
@@ -978,6 +979,41 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         p_insurer_claim_number: `${spec.insurer.prefix}-C-${code.slice(-4)}`,
       });
     }
+  }
+
+  // Buyers on the offtaker portal --------------------------------------------------------------
+  log('Linking buyers to the offtaker portal');
+  for (const b of BUYER_ACCOUNTS) {
+    const [row] = await as('admin').select('offtakers', 'id', { name: b.buyer });
+    await as('admin').rpc('link_offtaker_account', {
+      p_user_id: ids[b.key],
+      p_offtaker_id: row.id,
+    });
+  }
+  type PortalLoad = { id: string; voided: boolean; grade: string; weight_kg: number };
+  const portal = async (key: 'buyerMaize' | 'buyerRice') =>
+    (
+      await as(key).rpc<{ contracts: { cycle_status: string; deliveries: PortalLoad[] }[] }>(
+        'offtaker_portal',
+        {},
+      )
+    ).contracts;
+  // Northern Mills confirmed every load of the settled maize season.
+  for (const c of await portal('buyerMaize')) {
+    if (c.cycle_status !== 'settled') continue;
+    for (const d of c.deliveries) {
+      if (!d.voided)
+        await as('buyerMaize').rpc('confirm_harvest_delivery', { p_delivery_id: d.id });
+    }
+  }
+  // Kura Rice Mills has the harvested rice season's loads to check, and has disputed one.
+  const rice = (await portal('buyerRice')).find((c) => c.cycle_status === 'harvested');
+  const disputed = rice?.deliveries.find((d) => !d.voided && d.grade !== 'rejected');
+  if (disputed) {
+    await as('buyerRice').rpc('dispute_harvest_delivery', {
+      p_delivery_id: disputed.id,
+      p_reason: `Our weighbridge ticket shows ${(disputed.weight_kg - 120).toLocaleString('en-NG')} kg, not ${disputed.weight_kg.toLocaleString('en-NG')} kg.`,
+    });
   }
 
   // Investments still in progress -------------------------------------------------------------

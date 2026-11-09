@@ -61,13 +61,14 @@ How the platform reaches the market is still open. It could be operated directly
 | Payouts through Paystack | The trustee pays settlements, vendors and releases from its Paystack balance, each account checked first, confirmed by Paystack's report; bank files and confirming by hand stay | Done |
 | Online payments | Investors pay pledges through Paystack (or a simulated gateway on the demo), settled to the trustee and confirmed by webhook; problem payments flagged for refund | Done |
 | Harvest and settlement | Weighed and graded deliveries, buyer and insurance receipts, payout waterfall, statements | Done |
+| Buyer portal | Offtakers see their agreements, loads, payments and what they still owe, and confirm or dispute each load | Done |
 | Portfolio dashboard | Staff overview: money raised, released and repaid, pipeline, map, what needs attention | Done |
 | **Investor Edition** | Investor KYC and classification, retail cap, risk disclosure, marketplace, pledges with cooling-off, live tracker, statements, certificates | Done |
 | **Government Edition** | Programmes with eligibility and budgets, dashboards by state/LGA/ward/commodity/cooperative, repayment, agent visit record, audit and open-data exports | Done |
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 324 automated tests: 245 run the real database migrations and the identity, payment and weather provider code and prove the rules; 79 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 330 automated tests: 251 run the real database migrations and the identity, payment and weather provider code and prove the rules; 79 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -122,7 +123,7 @@ Everyone who signs up starts as an **investor**. Only an **admin** can give an a
 
 | Role | Who it is | Can do | Cannot do |
 | --- | --- | --- | --- |
-| **Admin** | The operator's system administrator | Assign roles, deactivate accounts, link a shop's counter account to its vendor, edit investor settings (caps, cooling-off, escrow account, risk disclosure); everything a manager, agent or compliance officer can do | Confirm money (that's the trustee only); change their own role |
+| **Admin** | The operator's system administrator | Assign roles, deactivate accounts, link a shop's counter account to its vendor and a buyer's account to its company, edit investor settings (caps, cooling-off, escrow account, risk disclosure); everything a manager, agent or compliance officer can do | Confirm money (that's the trustee only); change their own role |
 | **Field agent** | Extension officer in the field | Create cooperatives, enrol farmers, map farms, register vendors, record verification visits (online or offline), record harvest deliveries | Verify KYC, approve anything, touch money |
 | **Compliance officer** | The operator's compliance team | Verify or reject farmer KYC and investor KYC (and classify investors), approve or return cycles, approve or suspend vendors, void a wrong redemption, read the ledger | Build cycles, confirm money, approve a vendor they registered |
 | **Cycle manager** | Runs cycles for the operator | Build and edit draft cycles, submit them, request field verification, instruct milestone releases, complete the harvest, close vouchers, cancel cycles | Approve their own cycle, confirm money |
@@ -131,7 +132,7 @@ Everyone who signs up starts as an **investor**. Only an **admin** can give an a
 | **Auditor** | Internal or external auditor, donor monitor | Read everything: registry, cycles, ledger, investors, programme dashboards, audit exports | Change anything |
 | **Vendor** | Counter staff at an approved agro-dealer | Check and redeem farmers' input vouchers at their shop | See anything else |
 | **Investor** | Retail, high-net-worth or institutional investor | Complete KYC, browse open cycles, pledge, withdraw before payment is confirmed, track their cycles, see statements and certificates | See farmer names, account numbers, other investors, or any cycle they haven't funded (except open listings) |
-| _Offtaker_ | _The harvest buyer_ | _Role exists; no portal yet_ | — |
+| **Offtaker** | Staff at a company buying the harvest | See its own agreements, each load weighed and graded for it, what it has paid and still owes; confirm or dispute each load | See other buyers' agreements, farmer names or phones, investors, the ledger, or any cycle it isn't buying from |
 
 ### Demo accounts
 
@@ -148,6 +149,8 @@ The demo project (`npm run seed:demo`) creates these accounts, all with the one 
 | `trustee@agrowth.test` | Trustee | Kemi Adebayo | A harvested cycle to settle, deposits and pledges to confirm |
 | `auditor@agrowth.test` | Auditor | Ibrahim Musa | Read-only view of everything |
 | `vendor@agrowth.test` | Vendor | Bala Sule | The counter at Zaria Agro Inputs |
+| `buyer@agrowth.test` | Offtaker | Aisha Lawal | Northern Mills: a settled maize agreement with every load confirmed, and this season's maize |
+| `buyer.rice@agrowth.test` | Offtaker | Musa Danjuma | Kura Rice Mills: the harvested rice, one load disputed and the rest to confirm |
 | `investor@agrowth.test` | Investor (high-net-worth) | Adaeze Okoro | One paid-out investment, one live cycle to track |
 | `investor.retail@agrowth.test` | Investor (retail) | Funmilayo Adeleke | A pledge still in its 48-hour cooling-off |
 | `investor.new@agrowth.test` | Investor (KYC pending) | Emeka Obi | Waiting for compliance |
@@ -323,6 +326,15 @@ Every list, cycle, ledger and programme dashboard is visible, and nothing can be
 4. Wrong details only ever say "nothing matches". After 5 wrong tries in 15 minutes the counter is locked for 15 minutes. Wrong scans count towards the same limit.
 5. The trustee then pays your shop's registered account.
 
+### Offtaker (buyer): confirming loads
+
+An admin first links the account to the buyer: **Users** → give the account the Offtaker role → **Works for** the buyer named on its agreements. Buyers are created from the names on offtake agreements.
+
+1. **Buyer portal** shows what the buyer has contracted, delivered and accepted, paid, and an estimate of what it still owes (accepted tonnes at the fixed or floor price; none for a formula price).
+2. Each agreement lists its loads: date, farm, waybill, weight, moisture and grade. Farms are named; farmers aren't.
+3. **Confirm** a load that matches the buyer's own weighbridge and grading. A confirmed load can't be changed.
+4. **Dispute** one that doesn't, saying what's wrong. The cycle's **Harvest** tab shows the dispute to the field team, who void and re-record the load if the buyer is right. A disputed load can still be confirmed once it's sorted out (**Confirm after all**).
+
 ### Investor: investing in farm cycles
 
 1. **Sign up**, then **Profile and KYC**. Enter:
@@ -404,7 +416,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 324, with no database server needed.
+- **Tests:** `npm test` runs all 330, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -443,7 +455,6 @@ Moved out of Phase 2 and skipped for now.
 | Investor Edition | The Settlement tab doesn't yet show an investor's payout bank account next to their payout (it's on the Investors page). |
 | Investor Edition | Operator features from the concept: AML monitoring, SEC regulatory returns, white-label branding. A secondary market is a later phase, if the operator's licence allows it. |
 | Government Edition | Extension-agent assignments and training records; a public, signed-out open-data page (today it's a CSV download). |
-| Offtaker | The role exists but has no portal (e.g. to confirm deliveries and see contracted volumes). |
 | Notifications | No email or SMS notifications yet for any role (deposit confirmed, visit due, release on hold, payout made). |
 | Offline app | Map imagery isn't available offline (the tile providers' terms don't allow bulk copies). Assigning farms to specific agents, and storage limits for very large photo queues, aren't handled yet. |
 | Satellite monitoring | Sentinel-2 crop-health (NDVI) checks per farm, alongside agent visits. In the concept, not built. |

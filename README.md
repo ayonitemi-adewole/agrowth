@@ -21,7 +21,7 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks, the trustee's bank files, online pledge payments and weather per farm are built. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks, the trustee's bank files, online pledge payments and weather per farm are built, and buyers have their own portal to confirm or dispute each load. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
 
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -183,7 +183,7 @@ Every record goes through the same database functions and security rules as the 
    ```
    It asks you to confirm, takes a few minutes, and prints the accounts and the lines to paste into `apps/web/.env.local` for one-click sign-in.
 
-The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer), `programme@agrowth.test` (programme manager for the Kano wheat programme) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
+The demo accounts are `manager@agrowth.test` (cycle manager), `agent@agrowth.test` and `agent.benue@agrowth.test` (field agents), `compliance@agrowth.test`, `trustee@agrowth.test`, `auditor@agrowth.test`, `vendor@agrowth.test` (the counter at Zaria Agro Inputs, an approved agro-dealer), `programme@agrowth.test` (programme manager for the Kano wheat programme), `buyer@agrowth.test` and `buyer.rice@agrowth.test` (offtakers at Northern Mills and Kura Rice Mills, in the buyer portal) and `admin@agrowth.test`. Five agro-dealers are registered; one is waiting for compliance approval.
 
 Three investor accounts use the Investor Edition portal. `investor@agrowth.test` (Adaeze Okoro, high-net-worth) invested in both Zaria maize cycles and the Kura rice cycle through the portal, so she has a paid-out statement, a live cycle to track, and a rice payout the trustee can pay through Paystack. `investor.retail@agrowth.test` (Funmilayo Adeleke, retail, capped at 10% of income) has a pledge to the open soybean cycle that is still in its 48-hour cooling-off. `investor.new@agrowth.test` (Emeka Obi) is waiting for compliance to check his KYC.
 
@@ -195,13 +195,13 @@ The field visit photos are labelled illustrations with the visit's GPS stamp, no
 
 To give prospects a link they can open themselves, deploy the web app against the demo project. The repo includes a `vercel.json`, so on [Vercel](https://vercel.com): **Add New → Project**, import this repository, and set these environment variables:
 
-| Variable                        | Value                                                                                                                                                                                               |
-| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                                              |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                                           |
-| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                                              |
-| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                                                         |
-| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test` |
+| Variable                        | Value                                                                                                                                                                                                                           |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `VITE_SUPABASE_URL`             | The demo project's URL                                                                                                                                                                                                          |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | The demo project's publishable key (never the secret key)                                                                                                                                                                       |
+| `VITE_DEMO_MODE`                | `true`                                                                                                                                                                                                                          |
+| `VITE_DEMO_PASSWORD`            | The demo accounts' password                                                                                                                                                                                                     |
+| `VITE_DEMO_ACCOUNTS`            | `cycle_manager:manager@agrowth.test,field_agent:agent@agrowth.test,compliance_officer:compliance@agrowth.test,trustee:trustee@agrowth.test,auditor:auditor@agrowth.test,vendor:vendor@agrowth.test,offtaker:buyer@agrowth.test` |
 
 `VITE_DEMO_MODE=true` makes a production build keep the role buttons and **Simulate GPS at this farm**, lead the sign-in page with "Explore the demo", hide self sign-up, and show a "sample portfolio" banner. A build without it contains no demo accounts or passwords.
 
@@ -526,7 +526,7 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments, weather, insurance claims, voucher QR codes, gateway payouts
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments, weather, insurance claims, voucher QR codes, gateway payouts, the offtaker portal
   functions/           Edge Functions: identity-check, payments, payouts, payments-webhook and weather-sync, and _shared/ (identity, payment and weather providers) used by them, the seed and the tests
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule

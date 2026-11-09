@@ -295,6 +295,10 @@ export interface HarvestDelivery {
   created_at: string;
   voided_at: string | null;
   void_reason: string | null;
+  /** The buyer's answer on the offtaker portal. */
+  buyer_confirmed_at: string | null;
+  buyer_disputed_at: string | null;
+  buyer_dispute: string | null;
 }
 
 export type ReceiptKind = 'offtake_payment' | 'insurance_payout';
