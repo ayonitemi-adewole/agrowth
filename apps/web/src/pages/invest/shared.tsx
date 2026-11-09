@@ -2,7 +2,15 @@ import { CalendarClock, MapPin, ShieldCheck, Wheat } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { useToast } from '../../components/Toast';
-import { Alert, Badge, Button, Card, Modal, Progress, cx } from '../../components/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  Modal,
+  Progress,
+  cx,
+} from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, formatHectares, titleCase } from '../../lib/format';
 import {
@@ -26,7 +34,11 @@ export function RiskBadge({ listing }: { listing: Listing }) {
   );
 }
 
-export function PledgeStatusBadge({ pledge }: { pledge: Pick<MyPledge, 'status' | 'refunded'> }) {
+export function PledgeStatusBadge({
+  pledge,
+}: {
+  pledge: Pick<MyPledge, 'status' | 'refunded'>;
+}) {
   const s = PLEDGE_STATUS[pledge.refunded ? 'refunded' : pledge.status];
   return (
     <Badge tone={s.tone} dot>
@@ -36,7 +48,13 @@ export function PledgeStatusBadge({ pledge }: { pledge: Pick<MyPledge, 'status' 
 }
 
 /** Low / expected / high return for funders, from the cycle's own assumptions. */
-export function ReturnRange({ listing, large = false }: { listing: Listing; large?: boolean }) {
+export function ReturnRange({
+  listing,
+  large = false,
+}: {
+  listing: Listing;
+  large?: boolean;
+}) {
   const labels = { low: 'Low', expected: 'Expected', high: 'High' };
   return (
     <div className="grid grid-cols-3 gap-2 text-center">
@@ -45,7 +63,9 @@ export function ReturnRange({ listing, large = false }: { listing: Listing; larg
           key={p.scenario}
           className={cx(
             'rounded-xl px-2 py-2.5',
-            p.scenario === 'expected' ? 'bg-brand-50 ring-1 ring-brand-600/15' : 'bg-zinc-50',
+            p.scenario === 'expected'
+              ? 'bg-brand-50 ring-1 ring-brand-600/15'
+              : 'bg-zinc-50'
           )}
         >
           <p className="text-[11px] font-medium tracking-wide text-zinc-500 uppercase">
@@ -55,7 +75,7 @@ export function ReturnRange({ listing, large = false }: { listing: Listing; larg
             className={cx(
               'mt-0.5 font-semibold tabular-nums',
               large ? 'text-xl' : 'text-base',
-              p.returnPct < 0 ? 'text-red-700' : 'text-zinc-950',
+              p.returnPct < 0 ? 'text-red-700' : 'text-zinc-950'
             )}
           >
             {formatReturn(p.returnPct)}
@@ -91,11 +111,15 @@ export function ListingCard({ listing, to }: { listing: Listing; to: string }) {
           <li className="flex items-center gap-2">
             <Wheat className="size-4 text-zinc-400" aria-hidden />
             {listing.farm_count} farms · {formatHectares(listing.hectares)}
-            {listing.offtakers.length > 0 && ` · sold to ${listing.offtakers.join(', ')}`}
+            {listing.offtakers.length > 0 &&
+              ` · sold to ${listing.offtakers.join(', ')}`}
           </li>
           <li className="flex items-center gap-2">
             <ShieldCheck className="size-4 text-zinc-400" aria-hidden />
-            Insured{listing.insurers.length ? ` by ${listing.insurers.join(', ')}` : ''}
+            Insured
+            {listing.insurers.length
+              ? ` by ${listing.insurers.join(', ')}`
+              : ''}
           </li>
           <li className="flex items-center gap-2">
             <CalendarClock className="size-4 text-zinc-400" aria-hidden />
@@ -105,16 +129,22 @@ export function ListingCard({ listing, to }: { listing: Listing; to: string }) {
           </li>
         </ul>
         <div className="mt-5">
-          <p className="mb-2 text-xs font-medium text-zinc-500">Projected return to funders</p>
+          <p className="mb-2 text-xs font-medium text-zinc-500">
+            Projected return to funders
+          </p>
           <ReturnRange listing={listing} />
         </div>
         <div className="mt-5">
           <div className="mb-1.5 flex justify-between text-xs text-zinc-500">
             <span>
-              <span className="font-medium text-zinc-900">{Math.round(taken * 100)}%</span>{' '}
+              <span className="font-medium text-zinc-900">
+                {Math.round(taken * 100)}%
+              </span>{' '}
               subscribed
             </span>
-            <span>{formatNaira(listing.target_kobo, { compact: true })} target</span>
+            <span>
+              {formatNaira(listing.target_kobo, { compact: true })} target
+            </span>
           </div>
           <Progress value={taken} />
         </div>
@@ -129,7 +159,12 @@ export function PaymentInstructions({
   pledge,
 }: {
   escrow: { bank_name: string; account_name: string; account_number: string };
-  pledge: { reference: string; amount_kobo: string; pay_by: string; cooling_off_ends_at: string };
+  pledge: {
+    reference: string;
+    amount_kobo: string;
+    pay_by: string;
+    cooling_off_ends_at: string;
+  };
 }) {
   const rows: [string, string, boolean?][] = [
     ['Amount', formatNaira(pledge.amount_kobo)],
@@ -145,27 +180,43 @@ export function PaymentInstructions({
         {rows.map(([label, value, mono]) => (
           <div key={label} className="flex justify-between gap-4 py-2.5">
             <dt className="text-zinc-500">{label}</dt>
-            <dd className={cx('text-right font-medium text-zinc-950', mono && 'font-mono')}>
+            <dd
+              className={cx(
+                'text-right font-medium text-zinc-950',
+                mono && 'font-mono'
+              )}
+            >
               {value}
             </dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-zinc-500">
-        Pay the trustee's escrow account, never a person. Quote the reference so the trustee can
-        match your payment. Your money is added to the cycle after your cooling-off period ends (
+      <p className="text-xs bg-amber-50 text-amber-800 ring-amber-600/20 ring-1 ring-inset rounded-xl p-3">
+        - Pay the trustee's escrow account, never a person.
+        <br />
+        - Quote the reference so the trustee can match your payment.
+        <br />
+        - Your money is added to the cycle after your cooling-off period ends (
         {new Date(pledge.cooling_off_ends_at).toLocaleString('en-NG', {
           dateStyle: 'medium',
           timeStyle: 'short',
         })}
-        ); until the trustee confirms it, you can withdraw.
+        );
+        <br />
+        - Until the trustee confirms it, you can withdraw.
       </p>
     </div>
   );
 }
 
 /** The investor withdraws a pledge the trustee hasn't confirmed payment for. */
-export function WithdrawButton({ pledge, onDone }: { pledge: MyPledge; onDone: () => void }) {
+export function WithdrawButton({
+  pledge,
+  onDone,
+}: {
+  pledge: MyPledge;
+  onDone: () => void;
+}) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -174,7 +225,9 @@ export function WithdrawButton({ pledge, onDone }: { pledge: MyPledge; onDone: (
   const withdraw = async () => {
     setBusy(true);
     setError(null);
-    const { error } = await supabase.rpc('withdraw_pledge', { p_pledge_id: pledge.id });
+    const { error } = await supabase.rpc('withdraw_pledge', {
+      p_pledge_id: pledge.id,
+    });
     setBusy(false);
     if (error) {
       setError(errorMessage(error));
