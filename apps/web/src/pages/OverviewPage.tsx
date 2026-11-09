@@ -7,6 +7,7 @@ import {
   Landmark,
   Lock,
   Scale,
+  ShieldAlert,
   ShieldCheck,
   Sprout,
   Store,
@@ -249,6 +250,13 @@ async function loadTodo(role: Role | undefined): Promise<Todo[]> {
       '/cycles?stage=active',
     );
     add(
+      ShieldAlert,
+      'Insurance claims to receive',
+      supabase.from('insurance_claims').select('cycle_id').eq('status', 'assessed'),
+      'contracts',
+      '/cycles?stage=active',
+    );
+    add(
       Coins,
       'Cycles raising funds',
       cyclesIn('open_for_funding'),
@@ -263,6 +271,13 @@ async function loadTodo(role: Role | undefined): Promise<Todo[]> {
       'Milestones verified, ready to release',
       supabase.from('milestones').select('cycle_id').eq('status', 'verified'),
       'milestones',
+      '/cycles?stage=active',
+    );
+    add(
+      ShieldAlert,
+      'Insurance claims to take forward',
+      supabase.from('insurance_claims').select('cycle_id').in('status', ['reported', 'notified']),
+      'contracts',
       '/cycles?stage=active',
     );
     add(

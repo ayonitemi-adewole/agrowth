@@ -127,7 +127,7 @@ describe('harvest and settlement', () => {
          sum_insured_kobo, premium_kobo, loss_payee, cover_start, cover_end, document_path)
        values ($1, 'Pula Assurance', $2, 'area_yield', 90000000, 2700000,
                'Trustee on behalf of funders', $3, $4, $5) returning id`,
-      [cycleId, `POL-${code}`, day(20), day(150), `${cycleId}/policy.pdf`],
+      [cycleId, `POL-${code}`, day(-10), day(150), `${cycleId}/policy.pdf`],
     );
 
     await as(manager, `select public.submit_cycle($1)`, [cycleId]);
@@ -311,8 +311,27 @@ describe('harvest and settlement', () => {
         (await pgError(receipt(manager, built, 'offtake_payment', 100_000_000, 'RCV-1'))).code,
       ).toBe('PT403');
       await receipt(trustee, built, 'offtake_payment', 100_000_000, 'RCV-1');
-      await receipt(trustee, built, 'insurance_payout', 10_000_001, 'RCV-2');
-      expect((await pgError(receipt(trustee, built, 'insurance_payout', 1, 'RCV-1'))).code).toBe(
+      // Insurance pays out through a claim: reported, notified, assessed, then paid.
+      expect((await pgError(receipt(trustee, built, 'insurance_payout', 1, 'RCV-9'))).code).toBe(
+        'PT400',
+      );
+      const [{ id: claim }] = await as<{ id: string }>(
+        manager,
+        `select public.report_insurance_claim($1, 'pests', $2,
+           'Stem borer damage across the farms at tasselling.', $3) as id`,
+        [built.cycleId, day(-1), JSON.stringify([{ farm_id: built.farms[0], loss_pct: 10 }])],
+      );
+      await as(manager, `select public.notify_insurance_claim($1, $2)`, [claim, day(0)]);
+      await as(manager, `select public.record_claim_assessment($1, $2, 'Assessor', 10000001)`, [
+        claim,
+        day(0),
+      ]);
+      await as(trustee, `select public.record_claim_payout($1, 10000001, 'RCV-2', $2)`, [
+        claim,
+        day(0),
+      ]);
+      // A bank reference is used once.
+      expect((await pgError(receipt(trustee, built, 'offtake_payment', 1, 'RCV-1'))).code).toBe(
         'PT409',
       );
       expect(await balance(built.cycleId, 'TRUSTEE_CASH')).toBe(110_000_001n);

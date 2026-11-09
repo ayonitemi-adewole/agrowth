@@ -191,19 +191,18 @@ export function PaymentInstructions({
           </div>
         ))}
       </dl>
-      <p className="text-xs bg-amber-50 text-amber-800 ring-amber-600/20 ring-1 ring-inset rounded-xl p-3">
-        - Pay the trustee's escrow account, never a person.
-        <br />
-        - Quote the reference so the trustee can match your payment.
-        <br />
+      <p className="text-xs bg-amber-50 text-amber-800 ring-amber-600/20 ring-1 ring-inset rounded-xl p-3 flex flex-col gap-0.5">
+        <span>- Pay the trustee's escrow account, never a person.</span>
+        <span>
+          - Quote the reference so the trustee can match your payment.
+        </span>
         - Your money is added to the cycle after your cooling-off period ends (
         {new Date(pledge.cooling_off_ends_at).toLocaleString('en-NG', {
           dateStyle: 'medium',
           timeStyle: 'short',
         })}
         );
-        <br />
-        - Until the trustee confirms it, you can withdraw.
+        <span>- Until the trustee confirms it, you can withdraw.</span>
       </p>
     </div>
   );

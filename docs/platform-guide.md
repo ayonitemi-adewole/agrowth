@@ -56,6 +56,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter; vendors paid on redemption | Done |
 | Ledger | Double-entry, append-only, balanced, no money moving between cycles | Done |
 | Trustee bank files | Bulk-payment files for the trustee's bank; statement imports that confirm payments and pledge payments by reference and flag the rest | Done |
+| Insurance claims | Losses reported with weather and field-visit evidence, the insurer notified, the assessment and approved amount recorded, and the payout received against the claim | Done |
 | Weather per farm | Daily rainfall and temperatures for every farm in a live cycle, from Open-Meteo, against the 10-year normal; a Weather tab per cycle, and dry-spell, very-wet, heavy-rain and heat flags on the overview | Done |
 | Online payments | Investors pay pledges through Paystack (or a simulated gateway on the demo), settled to the trustee and confirmed by webhook; problem payments flagged for refund | Done |
 | Harvest and settlement | Weighed and graded deliveries, buyer and insurance receipts, payout waterfall, statements | Done |
@@ -65,7 +66,7 @@ How the platform reaches the market is still open. It could be operated directly
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 290 automated tests: 217 run the real database migrations and the identity, payment and weather provider code and prove the rules; 73 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 299 automated tests: 224 run the real database migrations and the identity, payment and weather provider code and prove the rules; 75 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -235,6 +236,23 @@ Sign in at the app's address. On the demo there's a button per account and a **D
 4. **Vouchers** tab → **Print slips** to hand each farmer their voucher code. Close expired or unused vouchers; unused value returns to the cycle.
 5. When the last load is in: **Harvest** tab → **Complete harvest**. This is refused while any milestone, voucher or vendor payment is outstanding.
 
+**Insurance claims:** **Offtake & insurance** tab → **Insurance claims**. Claims can be made while a cycle is funded, under way or harvested.
+
+1. **Report a loss** as soon as it's seen. Field agents can report too. Give:
+   - the cause (drought, flood, storm, pests, disease, fire, theft);
+   - when it began, and when it ended if it has;
+   - what happened;
+   - each farm hit, with the share of its crop thought lost.
+
+   The claim goes against whichever of the cycle's policies covers the day the loss began. Two kinds of evidence are copied into the claim when it's reported, and they don't change afterwards:
+   - the weather at those farms over the loss period: rain against the usual, the longest run of dry days and the hottest day;
+   - the farms' latest field visits.
+2. **Tell the insurer**, and record the date and the insurer's claim number. Notice more than 14 days after the loss began is flagged, because most policies ask for it sooner.
+3. **Record the assessment:** what the insurer's loss assessor found, and the amount the insurer approves. That can't be more than the cover left on the policy.
+4. The trustee records the insurer's payment on the claim when it arrives, for up to the approved amount. It goes into the cycle's cash and the settlement waterfall.
+
+If the insurer declines, record it as **rejected** with its reason. If there turns out to be no claim, **withdraw** it. Photos of the damage, the assessor's report and letters can be added to a claim while it's open.
+
 You can also **Cancel** a cycle with a reason. If money was raised, the trustee then refunds everyone.
 
 ### Programme manager: government programmes
@@ -278,7 +296,7 @@ Confirming by hand on the cycle still works, for anything paid outside a file:
 - **Refunds:** if a cycle misses its deadline or is cancelled, **Refund all funders**. Every deposit is reversed in the ledger.
 - **Releases:** **Milestones** tab → confirm each payment line as paid. For a voucher line, **Issue vouchers**: one per farm, split by area, with the money ring-fenced.
 - **Paying dealers:** **Vouchers** tab → **Pay vendor** for each redemption. The vendor's registered account is shown, and only that account is paid.
-- **Receipts:** **Settlement** tab → **Record receipt** for the buyer's payment, and any insurance payout.
+- **Receipts:** **Settlement** tab → **Record receipt** for the buyer's payment. An insurance payout is recorded on its claim instead (**Offtake & insurance → Insurance claims → Record the insurer's payment**), once the claim has been assessed.
 - **Settlement:** the **Settlement** tab previews the waterfall. **Run settlement** fixes the payouts; **Confirm payment** on each. After the last one the cycle is _Settled_. Investors' payout bank accounts are on the **Investors** page.
 
 ### Auditor: read everything
@@ -374,7 +392,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 290, with no database server needed.
+- **Tests:** `npm test` runs all 299, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -392,7 +410,8 @@ Outside parties are simulated today: a person confirms in the app instead of a l
 | **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | **Built, as bank files.** Payment files for the bank's bulk-payment upload, and statement imports that confirm payments and pledge payments by reference (see the trustee section). Works with any bank and needs no keys. Still to do: check the file layout against the pilot trustee's bank template; a bank API, if the trustee's bank offers one, would call the same database functions. |
 | **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | **Collections built.** Investors pay pledges online through Paystack; it settles to the trustee's escrow account and its webhook confirms the pledge at once. A simulated gateway runs on the demo. Payouts stay with the trustee's bank files, so custody never moves. Still to do: a Paystack business account (with the trustee's account for settlement) and a test with its test keys; matching Paystack's daily settlement credit on the bank statement. |
 | **Weather** | **Built.** Daily rainfall and temperatures for every farm in a live cycle from Open-Meteo (free, no keys; a subscription for commercial use), with flags against the 10-year normal. Kept day by day, so a claim has the weather behind it. |
-| **Insurance and satellite data** | To do |
+| **Insurance** | **Claims built.** A loss is reported with the weather and field visits as evidence, then the insurer notified, the claim assessed and the payout received against it. The insurer is dealt with by the cycle manager and recorded here; a direct link to an insurer's systems, if one offers it, is still to do. |
+| **Satellite data** | To do |
 
 SMS and USSD are part of Phase 3 below.
 
@@ -416,7 +435,6 @@ Moved out of Phase 2 and skipped for now.
 | Notifications | No email or SMS notifications yet for any role (deposit confirmed, visit due, release on hold, payout made). |
 | Offline app | Map imagery isn't available offline (the tile providers' terms don't allow bulk copies). Assigning farms to specific agents, and storage limits for very large photo queues, aren't handled yet. |
 | Satellite monitoring | Sentinel-2 crop-health (NDVI) checks per farm, alongside agent visits. In the concept, not built. |
-| Insurance claims flow | Insurance payouts are recorded as receipts. A guided claim (damage flagged → insurer notified → loss assessed) isn't built. |
 
 ### Next stages
 

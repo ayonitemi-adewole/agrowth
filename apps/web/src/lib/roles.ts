@@ -68,6 +68,11 @@ export const can = {
   recordHarvest: (r?: Role) =>
     has(r, ['admin', 'cycle_manager', 'programme_manager', 'field_agent']),
   readLedger: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
+  /** Report a crop loss for an insurance claim: managers, and agents who see the farms. */
+  reportClaims: (r?: Role) =>
+    has(r, ['admin', 'cycle_manager', 'programme_manager', 'field_agent']),
+  /** Deal with the insurer on a claim: notice, assessment, rejection, withdrawal. */
+  manageClaims: (r?: Role) => has(r, ['admin', 'cycle_manager', 'programme_manager']),
   /** Payment files and bank statements: the trustee works them, ledger readers look. */
   readBankFiles: (r?: Role) => has(r, ['admin', 'auditor', 'compliance_officer', 'trustee']),
 };

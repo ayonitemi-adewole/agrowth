@@ -881,14 +881,41 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         const fee = target * (spec.feePct / 100);
         const claim = roundTo(target * h.insuranceTopUpTo + fee - proceeds, 1_000);
         if (claim > 0) {
-          await trustee.rpc('record_cycle_receipt', {
+          // The claim runs its course: reported in the drought, the insurer told, assessed
+          // after the harvest, and paid to the trustee. Its dates are the season's real ones.
+          await api.adminUpdate(
+            'insurance_policies',
+            { id: policyId },
+            { cover_start: day(spec.start), cover_end: day(spec.harvest + 20) },
+          );
+          const lossFrom = spec.harvest - 75;
+          const claimId = await manager.rpc<string>('report_insurance_claim', {
             p_cycle_id: cycleId,
-            p_kind: 'insurance_payout',
-            p_source_id: policyId,
+            p_cause: 'drought',
+            p_loss_from: day(lossFrom),
+            p_loss_to: day(spec.harvest - 30),
+            p_description:
+              'Rains failed through pod-filling: barely any rain for six weeks. Pods are small and many are empty on every farm.',
+            p_farms: farms.map((f) => ({ farm_id: f.farmId, loss_pct: 55 })),
+            p_estimated_loss_kobo: kobo(roundTo(claim * 1.1, 10_000)),
+          });
+          await manager.rpc('notify_insurance_claim', {
+            p_claim_id: claimId,
+            p_notified_on: day(lossFrom + 5),
+            p_insurer_claim_number: `${spec.insurer.prefix}-C-${code.slice(-4)}`,
+          });
+          await manager.rpc('record_claim_assessment', {
+            p_claim_id: claimId,
+            p_assessed_on: day(h.receiptDay),
+            p_assessor: 'Harvest-time crop cut, Sahel Loss Adjusters',
+            p_approved_kobo: kobo(claim),
+            p_notes: `Area-yield cover: ${h.yieldPerHa} t/ha measured against a ${spec.yields[0]} t/ha trigger.`,
+          });
+          await trustee.rpc('record_claim_payout', {
+            p_claim_id: claimId,
             p_amount_kobo: kobo(claim),
             p_trustee_reference: `CLM-${code}-01`,
             p_received_on: day(h.insuranceDay ?? h.receiptDay),
-            p_notes: `Area-yield claim: ${h.yieldPerHa} t/ha measured against a ${spec.yields[0]} t/ha trigger`,
           });
         }
       }
@@ -906,6 +933,28 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     }
 
     await restoreDates();
+
+    // A claim under way on the live maize cycle: reported and the insurer told, waiting
+    // for its loss assessor, so a demo can record the assessment.
+    if (spec.key === 'maize-in-progress' && policyId) {
+      const claimId = await manager.rpc<string>('report_insurance_claim', {
+        p_cycle_id: cycleId,
+        p_cause: 'pests',
+        p_loss_from: day(-6),
+        p_description:
+          'Fall armyworm found in the whorls on two farms at the mid-season visit; leaves shredded on about a third of the plants.',
+        p_farms: [
+          { farm_id: farms[0].farmId, loss_pct: 30 },
+          { farm_id: farms[1].farmId, loss_pct: 15 },
+        ],
+        p_estimated_loss_kobo: kobo(roundTo(target * 0.08, 10_000)),
+      });
+      await manager.rpc('notify_insurance_claim', {
+        p_claim_id: claimId,
+        p_notified_on: day(-4),
+        p_insurer_claim_number: `${spec.insurer.prefix}-C-${code.slice(-4)}`,
+      });
+    }
   }
 
   // Investments still in progress -------------------------------------------------------------
