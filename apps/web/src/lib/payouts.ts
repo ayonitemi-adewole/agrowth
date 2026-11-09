@@ -123,14 +123,22 @@ export function useGatewayPayouts(enabled: boolean, cycleId?: string) {
     const live = new Map(
       all.filter((t) => isLive(t.status)).map((t) => [`${t.kind}:${t.item_id}`, t]),
     );
+    const waiting = (payments.data as TrusteePayment[]).filter(
+      (p) => !cycleId || p.cycle_id === cycleId,
+    );
+    const byKey = new Map(waiting.map((p) => [`${p.kind}:${p.item_id}`, p]));
     return {
       provider: config.provider,
       balance: config.balance_kobo,
-      payable: (payments.data as TrusteePayment[]).filter(
-        (p) => !p.problem && (!cycleId || p.cycle_id === cycleId),
+      // What can go through the gateway now: an account on file, and not already on its
+      // way in a bank payment file or a transfer.
+      payable: waiting.filter(
+        (p) => !p.problem && !p.batch_id && !live.has(`${p.kind}:${p.item_id}`),
       ),
       transfers: all,
       liveFor: (kind: PaymentKind, id: string) => live.get(`${kind}:${id}`) ?? null,
+      /** A payment still to make, with its account, file and any problem; null once paid. */
+      paymentFor: (kind: PaymentKind, id: string) => byKey.get(`${kind}:${id}`) ?? null,
     };
   }, [enabled, cycleId]);
 }

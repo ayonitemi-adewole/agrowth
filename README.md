@@ -441,7 +441,7 @@ Milestone 1 is now _Released_ and the cycle is _In progress_. The cycle has a ne
 
 > Enter the wrong phone digits: the shop is told only that nothing matches, not which part was wrong. After 5 wrong tries in 15 minutes the counter is locked for 15 minutes. A voucher can also be used in parts, across several visits or shops.
 
-**Step 19 — Trustee: pay the agro-dealer.** Cycle → Vouchers tab → **Pay vendor** for each redemption, with references `VEN-DEMO-001` to `VEN-DEMO-003`. The confirmation shows the vendor's registered account; the trustee pays only that account.
+**Step 19 — Trustee: pay the agro-dealer.** Cycle → Vouchers tab → **Record bank payment** on each redemption, with references `VEN-DEMO-001` to `VEN-DEMO-003` (or **Pay through Paystack**, where payouts through the gateway are on). The form shows the vendor's registered account; the trustee pays only that account.
 
 > Any voucher value left unused can be returned to the cycle with **Close** (or **Close expired** once vouchers pass their expiry date). The harvest can't be completed while a voucher is open or a vendor is unpaid.
 

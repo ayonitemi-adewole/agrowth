@@ -23,12 +23,11 @@ import { can } from '../../lib/roles';
 import { supabase } from '../../lib/supabase';
 import type { Voucher } from '../../lib/types';
 import { formatVoucherCode } from '../../lib/vouchers';
+import { PaymentActions, PaymentStatus } from '../../components/PaymentCells';
+import { useGatewayPayouts } from '../../lib/payouts';
 import type { RedemptionRow, TabProps } from './useCycleData';
 
-type Action =
-  | { kind: 'close'; voucher: Voucher }
-  | { kind: 'pay'; redemption: RedemptionRow }
-  | { kind: 'void'; redemption: RedemptionRow };
+type Action = { kind: 'close'; voucher: Voucher } | { kind: 'void'; redemption: RedemptionRow };
 
 export function VouchersTab({ data, reload }: TabProps) {
   const role = useAuth().profile?.role;
@@ -38,6 +37,14 @@ export function VouchersTab({ data, reload }: TabProps) {
   const { vouchers, redemptions, farms, milestones } = data;
 
   const live = redemptions.filter((r) => !r.voided_at);
+  const unpaid = live.filter((r) => !r.paid_at);
+  // Where each vendor payment stands (in a payment file, out through Paystack), and paying
+  // it, the same as settlement payouts.
+  const gateway = useGatewayPayouts(can.readBankFiles(role) && unpaid.length > 0, data.cycle.id);
+  const refresh = () => {
+    gateway.reload();
+    reload();
+  };
   const issued = vouchers.reduce((s, v) => s + toKobo(v.value_kobo), 0n);
   const redeemed = live.reduce((s, r) => s + toKobo(r.amount_kobo), 0n);
   const paid = live.filter((r) => r.paid_at).reduce((s, r) => s + toKobo(r.amount_kobo), 0n);
@@ -174,7 +181,7 @@ export function VouchersTab({ data, reload }: TabProps) {
       <section>
         <SectionTitle
           title="Redemptions"
-          description="What vendors supplied against vouchers. The trustee pays each vendor's registered account."
+          description={`What vendors supplied against vouchers. The trustee pays each vendor's registered account${gateway.data?.provider ? ', through Paystack or from the bank' : ' from the bank'}; payments in a bank payment file are confirmed from the bank statement.`}
         />
         {redemptions.length === 0 ? (
           <EmptyState icon={<Store />}>No vouchers have been redeemed yet.</EmptyState>
@@ -195,26 +202,41 @@ export function VouchersTab({ data, reload }: TabProps) {
                   </td>
                   <td className="max-w-xs">{r.items}</td>
                   <td className="tabular-nums">{formatNaira(r.amount_kobo)}</td>
-                  <td>
-                    {r.voided_at ? (
-                      <span className="text-xs no-underline">Voided: {r.void_reason}</span>
-                    ) : r.paid_at ? (
-                      <Badge tone="green" dot>
-                        Paid · {r.trustee_reference}
-                      </Badge>
-                    ) : r.vendors.status !== 'approved' ? (
-                      <Badge tone="red" dot>
-                        On hold: vendor {r.vendors.status}
-                      </Badge>
-                    ) : (
-                      <Badge tone="amber" dot>
-                        Owed
-                      </Badge>
-                    )}
+                  <td className="min-w-48 no-underline">
+                    <PaymentStatus
+                      kind="vendor_payment"
+                      id={r.id}
+                      paidAt={r.paid_at}
+                      reference={r.trustee_reference}
+                      gateway={gateway.data}
+                      voided={r.voided_at ? (r.void_reason ?? 'Voided') : null}
+                      onHold={
+                        r.vendors.status !== 'approved'
+                          ? `${r.vendors.name} is ${r.vendors.status}, so its payments are held`
+                          : null
+                      }
+                    />
                   </td>
                   <td className="text-right whitespace-nowrap">
                     {!r.voided_at && !r.paid_at && (
-                      <div className="flex justify-end gap-1">
+                      <PaymentActions
+                        kind="vendor_payment"
+                        id={r.id}
+                        gateway={gateway.data}
+                        trustee={can.actAsTrustee(role)}
+                        reload={refresh}
+                        record={
+                          r.vendors.status === 'approved'
+                            ? {
+                                rpc: 'confirm_redemption_payment',
+                                args: { p_redemption_id: r.id },
+                                amountKobo: r.amount_kobo,
+                                payee: r.vendors.name,
+                                account: `${r.vendors.account_name}, ${r.vendors.bank_name} ${r.vendors.account_number}`,
+                              }
+                            : undefined
+                        }
+                      >
                         {can.voidRedemptions(role) && (
                           <Button
                             variant="ghost"
@@ -224,15 +246,7 @@ export function VouchersTab({ data, reload }: TabProps) {
                             Void
                           </Button>
                         )}
-                        {can.actAsTrustee(role) && r.vendors.status === 'approved' && (
-                          <Button
-                            size="sm"
-                            onClick={() => setAction({ kind: 'pay', redemption: r })}
-                          >
-                            Pay vendor
-                          </Button>
-                        )}
-                      </div>
+                      </PaymentActions>
                     )}
                   </td>
                 </tr>
@@ -245,13 +259,7 @@ export function VouchersTab({ data, reload }: TabProps) {
       <Modal
         open={action !== null}
         onClose={() => setAction(null)}
-        title={
-          action?.kind === 'close'
-            ? 'Close voucher'
-            : action?.kind === 'pay'
-              ? 'Pay vendor'
-              : 'Void redemption'
-        }
+        title={action?.kind === 'close' ? 'Close voucher' : 'Void redemption'}
         description={action ? describe(action) : undefined}
       >
         {action && (
@@ -261,7 +269,7 @@ export function VouchersTab({ data, reload }: TabProps) {
               setAction(null);
               if (message) {
                 toast.success(message);
-                reload();
+                refresh();
               }
             }}
           />
@@ -277,12 +285,10 @@ function describe(action: Action) {
     return `The farmer can no longer use voucher ${formatVoucherCode(action.voucher.code)}. Its unused ${formatNaira(left)} goes back to the cycle's cash.`;
   }
   const r = action.redemption;
-  if (action.kind === 'pay') {
-    return `Confirm you have paid ${formatNaira(r.amount_kobo)} to ${r.vendors.account_name}, ${r.vendors.bank_name} ${r.vendors.account_number}. This posts to the ledger and cannot be undone.`;
-  }
   return `Cancel ${r.vendors.name}'s claim of ${formatNaira(r.amount_kobo)}, for example if the goods were never handed over. The value goes back on the farmer's voucher.`;
 }
 
+/** Closing a voucher or voiding a redemption, with the reason. */
 function ActionForm({
   action,
   onDone,
@@ -301,44 +307,31 @@ function ActionForm({
     const { error } =
       action.kind === 'close'
         ? await supabase.rpc('close_voucher', { p_voucher_id: action.voucher.id, p_reason: value })
-        : action.kind === 'pay'
-          ? await supabase.rpc('confirm_redemption_payment', {
-              p_redemption_id: action.redemption.id,
-              p_trustee_reference: value,
-            })
-          : await supabase.rpc('void_redemption', {
-              p_redemption_id: action.redemption.id,
-              p_reason: value,
-            });
+        : await supabase.rpc('void_redemption', {
+            p_redemption_id: action.redemption.id,
+            p_reason: value,
+          });
     setBusy(false);
     if (error) {
       setError(errorMessage(error));
       return;
     }
-    onDone(
-      action.kind === 'close'
-        ? 'Voucher closed'
-        : action.kind === 'pay'
-          ? `Payment to ${action.redemption.vendors.name} confirmed`
-          : 'Redemption voided',
-    );
+    onDone(action.kind === 'close' ? 'Voucher closed' : 'Redemption voided');
   };
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label={action.kind === 'pay' ? 'Bank transaction reference' : 'Reason'}>
+      <Field label="Reason">
         <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           required
           autoFocus
-          maxLength={action.kind === 'pay' ? 120 : 300}
+          maxLength={300}
           placeholder={
             action.kind === 'close'
               ? 'e.g. Farmer left the cooperative'
-              : action.kind === 'void'
-                ? 'e.g. Goods not handed over'
-                : undefined
+              : 'e.g. Goods not handed over'
           }
         />
       </Field>
@@ -347,12 +340,8 @@ function ActionForm({
         <Button variant="ghost" onClick={() => onDone(null)}>
           Back
         </Button>
-        <Button type="submit" busy={busy} variant={action.kind === 'pay' ? undefined : 'danger'}>
-          {action.kind === 'close'
-            ? 'Close voucher'
-            : action.kind === 'pay'
-              ? 'Confirm payment'
-              : 'Void redemption'}
+        <Button type="submit" busy={busy} variant="danger">
+          {action.kind === 'close' ? 'Close voucher' : 'Void redemption'}
         </Button>
       </div>
     </form>

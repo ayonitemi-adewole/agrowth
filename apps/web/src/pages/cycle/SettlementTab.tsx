@@ -1,4 +1,4 @@
-import { Banknote, CheckCircle2, Landmark, Plus, Scale } from 'lucide-react';
+import { Banknote, Plus, Scale } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
 import { useToast } from '../../components/Toast';
@@ -24,8 +24,8 @@ import { formatNaira, parseNaira, toKobo } from '../../lib/money';
 import { can } from '../../lib/roles';
 import { supabase } from '../../lib/supabase';
 import type { ReceiptKind, SettlementPayout } from '../../lib/types';
-import { GatewayPayButton } from '../../components/GatewayPayButton';
-import { GATEWAY_NAME, TRANSFER_STATUS, useGatewayPayouts } from '../../lib/payouts';
+import { PaymentActions, PaymentStatus } from '../../components/PaymentCells';
+import { useGatewayPayouts } from '../../lib/payouts';
 import type { CycleData, TabProps } from './useCycleData';
 
 interface FunderLine {
@@ -113,8 +113,9 @@ export function SettlementTab({ data, reload }: TabProps) {
   const canReceive =
     trustee && ['in_progress', 'harvested'].includes(cycle.status) && !cycle.settlement_started_at;
   const pending = data.payouts.filter((p) => p.status === 'instructed');
-  // The trustee can pay a payout through the gateway when its account is on file.
-  const gateway = useGatewayPayouts(trustee && pending.length > 0, cycle.id);
+  // Where each unpaid payout stands (in a payment file, out through Paystack, no account),
+  // for those who can see the trustee's payments; and the trustee pays from it.
+  const gateway = useGatewayPayouts(can.readBankFiles(role) && pending.length > 0, cycle.id);
   const refresh = () => {
     gateway.reload();
     reload();
@@ -176,7 +177,7 @@ export function SettlementTab({ data, reload }: TabProps) {
             title="Payouts"
             description={
               pending.length > 0
-                ? `${pending.length} still to pay. The trustee pays each from the bank and confirms it with the bank's reference${gateway.data?.provider ? ", or pays it through Paystack where the payee's account is on file" : ''}.`
+                ? `${pending.length} still to pay. ${gateway.data?.provider ? "Pay through Paystack where the payee's account is on file, or pay from the bank and record it with the bank's reference." : "Pay each from the bank, then record it with the bank's reference."} Payments in a bank payment file are confirmed from the bank statement.`
                 : 'All paid.'
             }
           />
@@ -197,20 +198,30 @@ export function SettlementTab({ data, reload }: TabProps) {
                   <td className="font-medium text-zinc-900 tabular-nums">
                     {formatNaira(p.amount_kobo)}
                   </td>
-                  <td>
-                    {p.status === 'executed' ? (
-                      <Badge tone="green" dot>
-                        Paid · <span className="font-mono">{p.trustee_reference}</span>
-                      </Badge>
-                    ) : (
-                      <Badge tone="amber" dot>
-                        To pay
-                      </Badge>
-                    )}
+                  <td className="min-w-48">
+                    <PaymentStatus
+                      kind="settlement_payout"
+                      id={p.id}
+                      paidAt={p.status === 'executed' ? p.paid_at : null}
+                      reference={p.trustee_reference}
+                      gateway={gateway.data}
+                    />
                   </td>
                   <td className="text-right">
-                    {p.status === 'instructed' && trustee && (
-                      <PayoutActions payout={p} gateway={gateway.data} reload={refresh} />
+                    {p.status === 'instructed' && (
+                      <PaymentActions
+                        kind="settlement_payout"
+                        id={p.id}
+                        gateway={gateway.data}
+                        trustee={trustee}
+                        reload={refresh}
+                        record={{
+                          rpc: 'confirm_settlement_payout',
+                          args: { p_payout_id: p.id },
+                          amountKobo: p.amount_kobo,
+                          payee: p.payee_name,
+                        }}
+                      />
                     )}
                   </td>
                 </tr>
@@ -538,127 +549,6 @@ function RunSettlementButton({ data, w, reload }: TabProps & { w: Waterfall }) {
             </Button>
           </div>
         </div>
-      </Modal>
-    </>
-  );
-}
-
-/**
- * A payout still to pay: confirm it with the bank's reference, or (where its account is
- * on file and payouts are on) pay it through the gateway. While a transfer is out, it shows
- * that instead.
- */
-function PayoutActions({
-  payout,
-  gateway,
-  reload,
-}: {
-  payout: SettlementPayout;
-  gateway: ReturnType<typeof useGatewayPayouts>['data'];
-  reload: () => void;
-}) {
-  const live = gateway?.liveFor('settlement_payout', payout.id) ?? null;
-  if (live) {
-    return (
-      <span className="inline-flex flex-col items-end gap-1">
-        <Badge tone={TRANSFER_STATUS[live.status].tone} dot>
-          {GATEWAY_NAME[live.provider] ?? live.provider}: {TRANSFER_STATUS[live.status].label}
-        </Badge>
-        {live.status === 'needs_review' && (
-          <span className="max-w-64 text-left text-xs text-zinc-500">
-            {live.message} See Bank files to let it go.
-          </span>
-        )}
-      </span>
-    );
-  }
-  const payable = gateway?.payable.find(
-    (p) => p.kind === 'settlement_payout' && p.item_id === payout.id,
-  );
-  // Paying through the gateway is the main action where it can be used; recording a payment
-  // made from the bank stays as the alternative.
-  const viaGateway = Boolean(gateway?.provider && payable);
-  return (
-    <span className="inline-flex flex-wrap justify-end gap-2">
-      {viaGateway && (
-        <GatewayPayButton
-          size="sm"
-          payments={[payable!]}
-          provider={gateway!.provider!}
-          balance={gateway!.balance}
-          onDone={reload}
-        />
-      )}
-      <ConfirmPayoutButton payout={payout} reload={reload} secondary={viaGateway} />
-    </span>
-  );
-}
-
-function ConfirmPayoutButton({
-  payout,
-  reload,
-  secondary = false,
-}: {
-  payout: SettlementPayout;
-  reload: () => void;
-  /** Beside "Pay through Paystack": a quieter button, named for what it does. */
-  secondary?: boolean;
-}) {
-  const toast = useToast();
-  const [open, setOpen] = useState(false);
-  const [reference, setReference] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    const { error } = await supabase.rpc('confirm_settlement_payout', {
-      p_payout_id: payout.id,
-      p_trustee_reference: reference,
-    });
-    setBusy(false);
-    if (error) {
-      setError(errorMessage(error));
-      return;
-    }
-    toast.success(`${formatNaira(payout.amount_kobo)} to ${payout.payee_name} confirmed`);
-    setOpen(false);
-    reload();
-  };
-
-  return (
-    <>
-      <Button size="sm" variant={secondary ? 'secondary' : 'primary'} onClick={() => setOpen(true)}>
-        <CheckCircle2 aria-hidden /> {secondary ? 'Record bank payment' : 'Confirm payment'}
-      </Button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={`Confirm ${formatNaira(payout.amount_kobo)} to ${payout.payee_name}`}
-        description="Confirm only once the bank transfer has gone out."
-      >
-        <form onSubmit={submit} className="space-y-4">
-          <Field label="Bank reference">
-            <Input
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-              required
-              maxLength={120}
-              autoFocus
-            />
-          </Field>
-          {error && <Alert>{error}</Alert>}
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" busy={busy}>
-              <Landmark aria-hidden /> Confirm payment
-            </Button>
-          </div>
-        </form>
       </Modal>
     </>
   );
