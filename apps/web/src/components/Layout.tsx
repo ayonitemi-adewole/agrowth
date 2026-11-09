@@ -4,6 +4,7 @@ import {
   CloudUpload,
   BookOpenCheck,
   BriefcaseBusiness,
+  FileSpreadsheet,
   Landmark,
   LandPlot,
   TrendingUp,
@@ -90,6 +91,7 @@ const SECTIONS: { title?: string; items: NavItem[] }[] = [
     title: 'Oversight',
     items: [
       { to: '/investors', label: 'Investors', icon: Landmark, show: can.readInvestors },
+      { to: '/bank', label: 'Bank files', icon: FileSpreadsheet, show: can.readBankFiles },
       { to: '/ledger', label: 'Ledger', icon: BookOpenCheck, show: can.readLedger },
       { to: '/users', label: 'Users', icon: Users, show: can.manageUsers },
     ],

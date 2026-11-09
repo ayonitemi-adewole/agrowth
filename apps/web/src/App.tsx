@@ -37,6 +37,7 @@ const InvestorProfilePage = page(
   'InvestorProfilePage',
 );
 const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
+const BankFilesPage = page(() => import('./pages/BankFilesPage'), 'BankFilesPage');
 const ProgrammesPage = page(() => import('./pages/programme/ProgrammesPage'), 'ProgrammesPage');
 const ProgrammeDetailPage = page(
   () => import('./pages/programme/ProgrammeDetailPage'),
@@ -214,6 +215,14 @@ export function App() {
                       element={
                         <RoleGate allow={can.doFieldVisits}>
                           <FieldVisitPage />
+                        </RoleGate>
+                      }
+                    />
+                    <Route
+                      path="bank"
+                      element={
+                        <RoleGate allow={can.readBankFiles}>
+                          <BankFilesPage />
                         </RoleGate>
                       }
                     />

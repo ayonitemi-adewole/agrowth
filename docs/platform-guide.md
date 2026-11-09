@@ -55,6 +55,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Disbursement | Staged releases per milestone, 20% cash cap, trustee-confirmed payments | Done |
 | Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter; vendors paid on redemption | Done |
 | Ledger | Double-entry, append-only, balanced, no money moving between cycles | Done |
+| Trustee bank files | Bulk-payment files for the trustee's bank; statement imports that confirm payments and pledge payments by reference and flag the rest | Done |
 | Harvest and settlement | Weighed and graded deliveries, buyer and insurance receipts, payout waterfall, statements | Done |
 | Portfolio dashboard | Staff overview: money raised, released and repaid, pipeline, map, what needs attention | Done |
 | **Investor Edition** | Investor KYC and classification, retail cap, risk disclosure, marketplace, pledges with cooling-off, live tracker, statements, certificates | Done |
@@ -62,7 +63,7 @@ How the platform reaches the market is still open. It could be operated directly
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 244 automated tests: 183 run the real database migrations and the identity-provider code and prove the rules; 61 cover the web app's logic. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 262 automated tests: 193 run the real database migrations and the identity-provider code and prove the rules; 69 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -241,7 +242,20 @@ You can also **Cancel** a cycle with a reason. If money was raised, the trustee 
 
 ### Trustee: every movement of money
 
-The platform only records what the trustee confirms. The trustee always enters its own bank reference, and can never pay out more than it holds for that cycle.
+The platform only records what the trustee confirms, always under the bank's own reference, and the trustee can never pay out more than it holds for that cycle.
+
+**Bank files** (in the menu) connects to the trustee's bank the way trustees work: bulk-payment files out, statements back in.
+
+- **Payments:** every outstanding payment to a bank account is listed with a payment reference (AGP-…): release payments, voucher payments to dealers and settlement payouts. Choose payments → **Make payment file** downloads a CSV for the bank's bulk-payment upload, with the reference at the start of each narration. A payment in a file can't go in another, so it can't be paid twice by mistake. If the bank rejects one, **Withdraw** it, with the reason, and it goes back to waiting. Payments with no bank account on file (farmers' surplus, the platform fee, programme funders) are listed under **Pay by hand** and confirmed on the cycle as before.
+- **Statements:** **Choose CSV** with the trustee account's statement, exported from internet banking. The usual layouts are read: a date, a narration, and Debit and Credit or a signed Amount. **Import and match** then works through each line:
+  - Money out quoting an AGP reference, for the right amount, confirms that payment.
+  - Money in quoting a pledge reference (AGR-…), for the pledged amount, confirms the pledge payment.
+  - Each is confirmed under the bank's reference, with the same checks as confirming by hand.
+  - Everything else waits under **Needs attention**: a wrong amount, a pledge still in cooling-off, a second payment of something already paid, or a deposit with no reference. Record a deposit or receipt on its cycle with the bank reference, then **Try again**, or **Dismiss** the line with a note (bank charges, for example).
+  - Importing overlapping statements is safe: lines already imported are skipped.
+- **Simulated bank statement** (demo and development only) makes the statement a bank would send after paying what's with the bank and receiving pending pledges, so the whole flow can be tried without a bank.
+
+Confirming by hand on the cycle still works, for anything paid outside a file:
 
 - **Deposits:** cycle → **Funding** tab.
   - **Investor pledges** lists portal investors' pledges. Once a matching transfer arrives, press **Confirm payment**. It's disabled during the investor's cooling-off period.
@@ -344,7 +358,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 244, with no database server needed.
+- **Tests:** `npm test` runs all 262, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -359,8 +373,8 @@ Outside parties are simulated today: a person confirms in the app instead of a l
 | Integration | State |
 | --- | --- |
 | **Identity:** BVN and NIN checks | **Built.** The `identity-check` Edge Function looks numbers up and records the outcome, at enrolment, at investor KYC and on demand. The provider is **Dojah**; its adapter is built. Until its keys are set it runs a simulated provider, and the app marks those answers _Simulated_. Still to do: get Dojah keys and test against the sandbox; liveness (a selfie matched to the ID photo). Paystack was considered and ruled out: it can't check NINs, it doesn't return the BVN record, and it needs a bank account, which most farmers don't give. |
-| **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | Next |
-| **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | To do |
+| **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | **Built, as bank files.** Payment files for the bank's bulk-payment upload, and statement imports that confirm payments and pledge payments by reference (see the trustee section). Works with any bank and needs no keys. Still to do: check the file layout against the pilot trustee's bank template; a bank API, if the trustee's bank offers one, would call the same database functions. |
+| **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | Next |
 | **Insurance, weather and satellite data** | To do |
 
 SMS and USSD are part of Phase 3 below.
