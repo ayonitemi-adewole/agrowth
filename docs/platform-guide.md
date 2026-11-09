@@ -56,6 +56,7 @@ How the platform reaches the market is still open. It could be operated directly
 | Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter; vendors paid on redemption | Done |
 | Ledger | Double-entry, append-only, balanced, no money moving between cycles | Done |
 | Trustee bank files | Bulk-payment files for the trustee's bank; statement imports that confirm payments and pledge payments by reference and flag the rest | Done |
+| Weather per farm | Daily rainfall and temperatures for every farm in a live cycle, from Open-Meteo, against the 10-year normal; a Weather tab per cycle, and dry-spell, very-wet, heavy-rain and heat flags on the overview | Done |
 | Online payments | Investors pay pledges through Paystack (or a simulated gateway on the demo), settled to the trustee and confirmed by webhook; problem payments flagged for refund | Done |
 | Harvest and settlement | Weighed and graded deliveries, buyer and insurance receipts, payout waterfall, statements | Done |
 | Portfolio dashboard | Staff overview: money raised, released and repaid, pipeline, map, what needs attention | Done |
@@ -64,7 +65,7 @@ How the platform reaches the market is still open. It could be operated directly
 | **Offline agent app** | Installs on a phone's home screen; visits recorded with no signal and sent later | Done |
 | USSD / SMS farmer channel | Farmers without smartphones check vouchers and status; SMS alerts | Phase 3 (on hold) |
 
-**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 277 automated tests: 206 run the real database migrations and the identity and payment provider code and prove the rules; 71 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
+**Code and tests.** The web app is React + TypeScript; the database is Supabase (PostgreSQL + PostGIS), where every business rule lives. There are 290 automated tests: 217 run the real database migrations and the identity, payment and weather provider code and prove the rules; 73 cover the web app's logic, including reading bank statements. A demo seed builds a lived-in portfolio through the same rules.
 
 **Code.** Phases 1 and 2 are merged into `main`. The demo Supabase project has every migration applied.
 
@@ -220,6 +221,17 @@ Sign in at the app's address. On the demo there's a button per account and a **D
    - **input vouchers** for farmers,
    - cash to farmers, which can be at most 20% of the milestone.
 3. Repeat for each milestone in order.
+
+**Watch the weather:** each cycle has a **Weather** tab from submission until settlement.
+- It shows daily rainfall at the farms for the last 60 days and the coming week, against the usual for the time of year (the 10-year average). Farms within about 11 km share a reading.
+- It also shows the season's rain so far, the last 30 days against normal, and the week's forecast with highs and lows.
+- Flags appear at the top of the tab, and on the **Overview** under **Weather to watch**:
+  - **Dry spell:** under half the usual rain in the last 30 days.
+  - **Very wet:** double the usual rain, and at least 150 mm.
+  - **Heavy rain forecast:** a day of 50 mm or more.
+  - **Heat:** a forecast high of 40 °C or more.
+- The weather updates daily. **Refresh weather** fetches it now.
+- Every day's reading is kept, so an insurance claim or a disputed harvest has the season's weather on record.
 4. **Vouchers** tab → **Print slips** to hand each farmer their voucher code. Close expired or unused vouchers; unused value returns to the cycle.
 5. When the last load is in: **Harvest** tab → **Complete harvest**. This is refused while any milestone, voucher or vendor payment is outstanding.
 
@@ -362,7 +374,7 @@ The [Demo Guide](demo-guide.md) has step-by-step setup for the demo, and the [RE
   2. `npm run seed:demo` fills it with the portfolio and accounts in section 4.
   3. To start again: `npm run demo:reset`, then seed again.
 - **Hosted demo link:** deploy to Vercel against the demo project with `VITE_DEMO_MODE=true`. Leave the admin account off a public demo.
-- **Tests:** `npm test` runs all 277, with no database server needed.
+- **Tests:** `npm test` runs all 290, with no database server needed.
 - **Phones and GPS:** `npm run dev:phone` serves the development app over HTTPS on your Wi-Fi, so a phone can share precise GPS. `npm run preview:phone` serves the production build, which includes offline support.
 - **Installing on a phone:** on Android, open the site in Chrome → **Install app** (or **Add to Home screen**). On an iPhone, Safari → Share → **Add to Home Screen**. It opens full-screen with the Agrowth icon.
 
@@ -379,7 +391,8 @@ Outside parties are simulated today: a person confirms in the app instead of a l
 | **Identity:** BVN and NIN checks | **Built.** The `identity-check` Edge Function looks numbers up and records the outcome, at enrolment, at investor KYC and on demand. The provider is **Dojah**; its adapter is built. Until its keys are set it runs a simulated provider, and the app marks those answers _Simulated_. Still to do: get Dojah keys and test against the sandbox; liveness (a selfie matched to the ID photo). Paystack was considered and ruled out: it can't check NINs, it doesn't return the BVN record, and it needs a bank account, which most farmers don't give. |
 | **Trustee / bank:** release instructions and confirmations, instead of keyed-in references | **Built, as bank files.** Payment files for the bank's bulk-payment upload, and statement imports that confirm payments and pledge payments by reference (see the trustee section). Works with any bank and needs no keys. Still to do: check the file layout against the pilot trustee's bank template; a bank API, if the trustee's bank offers one, would call the same database functions. |
 | **Payments:** collections, vendor payouts and investor payouts (e.g. Paystack, Flutterwave, NIBSS) | **Collections built.** Investors pay pledges online through Paystack; it settles to the trustee's escrow account and its webhook confirms the pledge at once. A simulated gateway runs on the demo. Payouts stay with the trustee's bank files, so custody never moves. Still to do: a Paystack business account (with the trustee's account for settlement) and a test with its test keys; matching Paystack's daily settlement credit on the bank statement. |
-| **Insurance, weather and satellite data** | To do |
+| **Weather** | **Built.** Daily rainfall and temperatures for every farm in a live cycle from Open-Meteo (free, no keys; a subscription for commercial use), with flags against the 10-year normal. Kept day by day, so a claim has the weather behind it. |
+| **Insurance and satellite data** | To do |
 
 SMS and USSD are part of Phase 3 below.
 

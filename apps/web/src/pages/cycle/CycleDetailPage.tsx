@@ -16,6 +16,7 @@ import { OverviewTab } from './OverviewTab';
 import { SettlementTab } from './SettlementTab';
 import { useCycleData } from './useCycleData';
 import { VouchersTab } from './VouchersTab';
+import { WeatherTab } from './WeatherTab';
 
 const TABS = [
   'overview',
@@ -26,6 +27,7 @@ const TABS = [
   'vouchers',
   'harvest',
   'settlement',
+  'weather',
   'history',
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -61,6 +63,15 @@ export function CycleDetailPage() {
   const { cycle } = data;
   const props = { data, reload: state.reload };
   const underway = ['in_progress', 'harvested', 'settled'].includes(cycle.status);
+  // Weather is watched from submission until the season is settled.
+  const watched = [
+    'pending_approval',
+    'open_for_funding',
+    'funded',
+    'in_progress',
+    'harvested',
+    'settled',
+  ].includes(cycle.status);
   const usesVouchers =
     data.vouchers.length > 0 || data.disbursements.some((d) => d.payee_kind === 'input_voucher');
 
@@ -124,6 +135,7 @@ export function CycleDetailPage() {
                 { id: 'settlement' as const, label: 'Settlement', count: data.payouts.length },
               ]
             : []),
+          ...(watched ? [{ id: 'weather' as const, label: 'Weather' }] : []),
           { id: 'history', label: 'History', count: data.events.length },
         ]}
       />
@@ -137,6 +149,7 @@ export function CycleDetailPage() {
         {tab === 'vouchers' && <VouchersTab {...props} />}
         {tab === 'harvest' && <HarvestTab {...props} />}
         {tab === 'settlement' && <SettlementTab {...props} />}
+        {tab === 'weather' && <WeatherTab {...props} />}
         {tab === 'history' && <HistoryTab {...props} />}
       </div>
     </>

@@ -21,7 +21,7 @@ The browser talks to Supabase directly. That's safe because **every rule lives i
 
 ## Status
 
-Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks, the trustee's bank files and online pledge payments are built. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
+Phase 1 (core platform) is feature-complete: a demo cycle runs from draft through harvest to a settled, closed ledger. Phase 2 has added the vendor network, input vouchers, the Investor Edition portal, the Government Edition's programmes and dashboards, and an installable agent app that records field visits offline. Live integrations are under way: identity checks, the trustee's bank files, online pledge payments and weather per farm are built. USSD/SMS and the security audit have moved to Phase 3, which is on hold.
 
 | Area                                                                                                                                                                               | State |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
@@ -35,6 +35,7 @@ Phase 1 (core platform) is feature-complete: a demo cycle runs from draft throug
 | Field verification: GPS check-in inside the boundary, checklist, photos; failures block release                                                                                    | Done  |
 | Disbursement: staged release instructions, 20% cash cap, trustee-confirmed payments                                                                                                | Done  |
 | Ledger: double-entry, append-only, balanced, no money moving between cycles                                                                                                        | Done  |
+| Weather per farm: daily rainfall and temperatures from Open-Meteo for every farm in a live cycle, against the 10-year normal; dry, wet, heavy-rain and heat flags                  | Done  |
 | Online payments: investors pay pledges through Paystack (or a simulated gateway), settled to the trustee and confirmed by webhook                                                  | Done  |
 | Trustee bank files: bulk-payment files for the trustee's bank, statement imports that confirm payments and pledge payments by reference                                            | Done  |
 | Harvest: weighed and graded deliveries per farm, voids with a reason                                                                                                               | Done  |
@@ -95,6 +96,14 @@ npx supabase functions deploy payments-webhook --no-verify-jwt
 
 The gateway's fee is added on top of the pledge, so the trustee receives it in full.
 
+**Weather** for every farm in a live cycle comes from [Open-Meteo](https://open-meteo.com), which needs no key or sign-up:
+
+```bash
+npx supabase functions deploy weather-sync
+```
+
+Then refresh it daily. In Supabase, open **Integrations → Cron → Create job**, run it once a day (e.g. `0 5 * * *`), and choose **Supabase Edge Function** → `weather-sync` (POST, body `{}`). Staff can also press **Refresh weather** on a cycle's Weather tab. Open-Meteo's free API is for non-commercial use: for a commercial operation, take a subscription and set `OPEN_METEO_API_KEY` as a secret.
+
 ### 3. Connect the web app
 
 ```bash
@@ -148,14 +157,16 @@ Every record goes through the same database functions and security rules as the 
 
 1. Create a new Supabase project (see [Getting started](#getting-started)). Don't `supabase link` it: the CLI stays linked to your development project, and the demo commands below find the demo project from its own settings.
 2. Copy `supabase/.env.demo.example` to `supabase/.env.demo` and fill in the demo project's URL, publishable key and **secret key** (Project Settings → API Keys), its **session pooler URL** (Connect → Connection String → Session pooler, with the database password filled in), and a password for the demo accounts. The file is git-ignored; never commit it.
-3. Create the tables, rules and functions, and deploy the Edge Functions. On the demo they run simulated, so visitors can try identity checks and online payments without any keys:
+3. Create the tables, rules and functions, and deploy the Edge Functions. On the demo, identity checks and online payments run simulated, so visitors can try them without any keys; the weather is real:
    ```bash
    npm run demo:push
    npx supabase secrets set PAYMENTS_PROVIDER=mock --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy identity-check --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy payments --project-ref DEMO_PROJECT_ID
    npx supabase functions deploy payments-webhook --no-verify-jwt --project-ref DEMO_PROJECT_ID
+   npx supabase functions deploy weather-sync --project-ref DEMO_PROJECT_ID
    ```
+   After seeding, open any live cycle's **Weather** tab and press **Refresh weather** once (or set up the daily job described under Getting started).
 4. Run:
    ```bash
    npm run seed:demo
@@ -489,10 +500,10 @@ npm test
 
 This runs:
 
-- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), online payments (only the payments service records a result, the first report counts, late or wrong payments flagged for refund, simulated payments refused unless allowed), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
+- **Database tests** (`supabase/tests`) — the real migrations on an in-memory PostgreSQL with PostGIS ([PGlite](https://pglite.dev)). They sign in as different roles and prove the rules: who can see what, duplicate farmers and overlapping farms refused, a full cycle from draft to released funds, harvest and settlement (profit and loss), vouchers redeemed and vendors paid, investor KYC, identity checks (only the number on record, results written only by the identity service, verification needing a match or a reason), bank files (a payment in one file at a time, statements confirming payments and pledges by reference, wrong amounts and second payments flagged, re-imports skipped), weather (one reading per 11 km square, written only by the weather service, flags against the 10-year normal), online payments (only the payments service records a result, the first report counts, late or wrong payments flagged for refund, simulated payments refused unless allowed), caps, pledges and cooling-off, programme eligibility, budgets and dashboard figures, offline visits sent twice, guessing locked out, the ledger can't be edited or unbalanced, and so on. No database server needed.
 - **Demo seed test** — runs the whole demo seed through the migrations and checks every cycle reaches its stage and the books close.
 - **Provider tests** — identity matching and the Dojah adapter, and the Paystack adapter (fees, checkout, verification, webhook signatures), against canned responses.
-- **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check and CSV export helpers, the payment gateway's return, reading bank statements in the usual layouts, and the offline sync queue.
+- **Web tests** (`apps/web`) — money, map, error, return-projection, identity-check, weather and CSV export helpers, the payment gateway's return, reading bank statements in the usual layouts, and the offline sync queue.
 
 ## Repository layout
 
@@ -505,8 +516,8 @@ apps/
       auth/            Sign-in state
       lib/             Supabase client, types, roles, geometry helpers
 supabase/
-  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments
-  functions/           Edge Functions: identity-check, payments and payments-webhook, and _shared/ (identity and payment providers) used by them, the seed and the tests
+  migrations/          The database, in order: foundation, registry, ledger, cycle builder, funding and disbursement, harvest and settlement, vouchers, investor edition, government edition, offline visits, identity checks, bank files, online payments, weather
+  functions/           Edge Functions: identity-check, payments, payments-webhook and weather-sync, and _shared/ (identity, payment and weather providers) used by them, the seed and the tests
   seed/                The demo portfolio and the `npm run seed:demo` command
   tests/               Tests that run the migrations and check every rule
   config.toml          Supabase CLI settings

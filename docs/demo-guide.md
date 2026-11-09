@@ -174,7 +174,9 @@ Now open the **Ikara sorghum** cycle, which is awaiting approval. The cycle mana
 
 Back as the **cycle manager**, open the **Zaria maize, dry season** cycle → Milestones. One release is **blocked** because an agent checked in 270 m from the farm. It stays blocked until a passing revisit.
 
-> **The point:** money only moves after someone has stood on every farm, and the phone proves where they were.
+Then the cycle's **Weather** tab. This is real weather at those farms: the last 60 days of rain against the usual for the time of year, and the coming week. Any dry spell, heavy rain or heat shows at the top of the tab and on the Overview. If the tab says there's no weather yet, press **Refresh weather**.
+
+> **The point:** money only moves after someone has stood on every farm, and the phone proves where they were. Between visits, the weather keeps watch, and its record is there if a claim is ever made.
 
 ### Scene 5 — Inputs, not cash (4 min)
 
