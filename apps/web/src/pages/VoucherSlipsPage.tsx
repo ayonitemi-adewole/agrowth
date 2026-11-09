@@ -9,7 +9,8 @@ import { formatNaira, toKobo } from '../lib/money';
 import { supabase } from '../lib/supabase';
 import type { Voucher } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
-import { formatVoucherCode } from '../lib/vouchers';
+import { formatVoucherCode, voucherScanUrl } from '../lib/vouchers';
+import { QrCode } from '../components/QrCode';
 
 type SlipVoucher = Voucher & {
   farms: { name: string | null; farmers: { full_name: string } };
@@ -22,7 +23,7 @@ export function VoucherSlipsPage() {
   const [milestone, setMilestone] = useState('');
 
   const state = useAsync(async () => {
-    const [cycle, vouchers] = await Promise.all([
+    const [cycle, vouchers, tokens, settings] = await Promise.all([
       supabase
         .from('cycles')
         .select('code, crop, season, cooperatives(name)')
@@ -35,10 +36,20 @@ export function VoucherSlipsPage() {
         .eq('status', 'active')
         .order('issued_at')
         .order('code'),
+      supabase.rpc('voucher_slip_tokens', { p_cycle_id: id! }),
+      supabase.from('voucher_settings').select('scan_needs_phone').maybeSingle(),
     ]);
     if (cycle.error) throw cycle.error;
     if (vouchers.error) throw vouchers.error;
+    if (tokens.error) throw tokens.error;
     return {
+      tokens: new Map(
+        (tokens.data as { voucher_id: string; token: string }[]).map((t) => [
+          t.voucher_id,
+          t.token,
+        ]),
+      ),
+      scanNeedsPhone: Boolean(settings.data?.scan_needs_phone),
       cycle: cycle.data as unknown as {
         code: string;
         crop: string;
@@ -51,7 +62,7 @@ export function VoucherSlipsPage() {
 
   if (state.loading) return <Spinner />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
-  const { cycle, vouchers } = state.data!;
+  const { cycle, vouchers, tokens, scanNeedsPhone } = state.data!;
   const milestones = [
     ...new Map(vouchers.map((v) => [v.milestone_id, v.milestones])).entries(),
   ].sort((a, b) => a[1].sequence - b[1].sequence);
@@ -116,22 +127,41 @@ export function VoucherSlipsPage() {
               <p className="mt-3 text-sm text-zinc-700">
                 {titleCase(cycle.crop)} {cycle.season} · {v.milestones.name}: {v.purpose}
               </p>
-              <div className="mt-4 rounded-lg bg-zinc-100 px-4 py-3 text-center print:bg-white print:ring-1 print:ring-zinc-300">
-                <p className="font-mono text-2xl font-semibold tracking-widest text-zinc-950">
-                  {formatVoucherCode(v.code)}
-                </p>
-                <p className="mt-1 text-sm text-zinc-700">
-                  Worth up to{' '}
-                  <span className="font-semibold">
-                    {formatNaira(toKobo(v.value_kobo) - toKobo(v.redeemed_kobo))}
-                  </span>{' '}
-                  · valid until {formatDate(v.expires_on)}
-                </p>
+              <div className="mt-4 flex items-center gap-4 rounded-lg bg-zinc-100 px-4 py-3 print:bg-white print:ring-1 print:ring-zinc-300">
+                {tokens.get(v.id) && (
+                  <QrCode
+                    value={voucherScanUrl(tokens.get(v.id)!, window.location.origin)}
+                    size={112}
+                    label={`QR code for voucher ${formatVoucherCode(v.code)}`}
+                    className="shrink-0"
+                  />
+                )}
+                <div className="min-w-0 flex-1 text-center">
+                  <p className="font-mono text-xl font-semibold tracking-widest text-zinc-950 sm:text-2xl">
+                    {formatVoucherCode(v.code)}
+                  </p>
+                  <p className="mt-1 text-sm text-zinc-700">
+                    Worth up to{' '}
+                    <span className="font-semibold">
+                      {formatNaira(toKobo(v.value_kobo) - toKobo(v.redeemed_kobo))}
+                    </span>{' '}
+                    · valid until {formatDate(v.expires_on)}
+                  </p>
+                </div>
               </div>
               <ul className="mt-4 list-disc space-y-1 pl-5 text-xs text-zinc-600">
                 <li>Use it at any Agrowth-approved agro-dealer, in one visit or several.</li>
-                <li>The shop will ask for the last 4 digits of your registered phone number.</li>
-                <li>It can't be exchanged for cash. Keep the code private.</li>
+                <li>
+                  {scanNeedsPhone
+                    ? 'The shop scans the QR code or types the code, then asks for the last 4 digits of your registered phone number.'
+                    : 'The shop scans the QR code. If it types the code instead, it will ask for the last 4 digits of your registered phone number.'}
+                </li>
+                <li>
+                  It can't be exchanged for cash.{' '}
+                  {scanNeedsPhone
+                    ? 'Keep the code private.'
+                    : 'Keep the slip safe: whoever has it can use it, like cash.'}
+                </li>
               </ul>
             </article>
           ))}

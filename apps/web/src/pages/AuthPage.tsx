@@ -1,6 +1,6 @@
 import { MapPinned, ShieldCheck, Sprout, Wallet } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { Link, Navigate } from 'react-router';
+import { Link, Navigate, useLocation } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { DemoSignIn } from '../components/DemoSignIn';
 import { Logo } from '../components/Layout';
@@ -35,8 +35,13 @@ export function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmSent, setConfirmSent] = useState(false);
+  // Back to where the user was going (e.g. a voucher slip's QR link), not always home.
+  const from = (useLocation().state as { from?: { pathname: string; search?: string } } | null)
+    ?.from;
 
-  if (session) return <Navigate to="/" replace />;
+  if (session) {
+    return <Navigate to={from ? `${from.pathname}${from.search ?? ''}` : '/'} replace />;
+  }
 
   // A hosted demo leads with the role picker; nobody signs up there.
   const showcase = demo.hosted && demo.accounts.length > 0;

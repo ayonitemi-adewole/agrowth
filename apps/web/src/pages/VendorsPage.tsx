@@ -6,6 +6,7 @@ import {
   Alert,
   Badge,
   Button,
+  Card,
   DescriptionList,
   EmptyState,
   Field,
@@ -55,6 +56,8 @@ export function VendorsPage() {
           ) : null
         }
       />
+
+      {role === 'admin' && <ScanSetting />}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <Input
@@ -452,5 +455,65 @@ function VendorForm({ vendor, onDone }: { vendor?: Vendor; onDone: (saved: boole
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Admin only: whether a scanned voucher also needs the farmer's phone digits. Off, a scan
+ * alone is enough, so whoever holds a slip can spend it; on, a lost slip is useless alone.
+ */
+function ScanSetting() {
+  const toast = useToast();
+  const setting = useAsync(async () => {
+    const { data, error } = await supabase
+      .from('voucher_settings')
+      .select('scan_needs_phone, updated_at')
+      .single();
+    if (error) throw error;
+    return data as { scan_needs_phone: boolean; updated_at: string };
+  }, []);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (needsPhone: boolean) => {
+    setBusy(true);
+    const { error } = await supabase
+      .from('voucher_settings')
+      .update({ scan_needs_phone: needsPhone })
+      .eq('id', true);
+    setBusy(false);
+    if (error) toast.error(errorMessage(error));
+    else {
+      toast.success(
+        needsPhone
+          ? 'Scanned vouchers now also need the phone digits'
+          : 'A scan alone now verifies a voucher',
+      );
+      setting.reload();
+    }
+  };
+
+  if (!setting.data) return null;
+  return (
+    <Card className="mb-6">
+      <label className="flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          className="mt-1 size-4 rounded text-brand-600"
+          checked={setting.data.scan_needs_phone}
+          disabled={busy}
+          onChange={(e) => void toggle(e.target.checked)}
+        />
+        <span>
+          <span className="block text-sm font-medium text-zinc-900">
+            Ask for the farmer's phone digits after scanning a voucher
+          </span>
+          <span className="block text-sm text-zinc-500">
+            {setting.data.scan_needs_phone
+              ? 'On: the shop scans the slip, then asks for the last 4 digits of the farmer’s phone. A lost slip can’t be used by whoever finds it.'
+              : 'Off: scanning the slip’s QR code is enough, which is quicker at the counter, but whoever holds a slip can spend it. Typed codes always need the phone digits.'}
+          </span>
+        </span>
+      </label>
+    </Card>
   );
 }
