@@ -8,9 +8,9 @@ _The demo runs on sample data: the farmers, farms, cycles, investors and amounts
 
 ## 1. Opening the demo
 
-**The quickest way** is a hosted demo link, if you've been given one. Open it in a browser; the sign-in page shows a button for each demo role, and once you're in, the sidebar has a **Demo: switch account** menu to jump between roles. A banner reminds you it's sample data. Other visitors share the same environment, so you may see their changes.
+**The quickest way** is a [hosted demo link](https://agrowth-web.vercel.app). Open it in a browser; the sign-in page shows a button for each demo role, and once you're in, the sidebar has a **Demo: switch account** menu to jump between roles. A banner reminds you it's sample data. Other visitors share the same environment, so you may see their changes.
 
-**On a phone**, the same link works, and you can install it like an app: on Android, Chrome → **Install app**; on an iPhone, Safari → Share → **Add to Home Screen**. Field visits need a phone (or the demo's simulated GPS), because a visit passes only if the GPS fix is within 20 m of the farm.
+**On a phone**, the same [link](https://agrowth-web.vercel.app) works, and you can install it like an app: on Android, Chrome → **Install app**; on an iPhone, Safari → Share → **Add to Home Screen**. Field visits need a phone (or the demo's simulated GPS), because a visit passes only if the GPS fix is within 20 m of the farm.
 
 ### Demo accounts
 
