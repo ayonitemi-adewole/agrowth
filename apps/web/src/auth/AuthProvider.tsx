@@ -144,6 +144,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** The auth state where there is one: public pages also render without a provider. */
+export function useOptionalAuth(): AuthState | null {
+  return useContext(AuthContext);
+}
+
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');

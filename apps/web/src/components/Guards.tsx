@@ -15,6 +15,8 @@ export function RequireStaff() {
 
   if (loading) return <SplashScreen />;
   if (!session && !(offline && profile)) {
+    // A visitor arriving at the front door gets the welcome page; deep links go to sign-in.
+    if (location.pathname === '/') return <Navigate to="/welcome" replace />;
     return <Navigate to="/sign-in" replace state={{ from: location }} />;
   }
 

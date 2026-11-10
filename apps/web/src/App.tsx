@@ -43,6 +43,7 @@ const InvestorProfilePage = page(
 );
 const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
 const BankFilesPage = page(() => import('./pages/BankFilesPage'), 'BankFilesPage');
+const LandingPage = page(() => import('./pages/LandingPage'), 'LandingPage');
 const ProgrammesPage = page(() => import('./pages/programme/ProgrammesPage'), 'ProgrammesPage');
 const ProgrammeDetailPage = page(
   () => import('./pages/programme/ProgrammeDetailPage'),
@@ -50,7 +51,19 @@ const ProgrammeDetailPage = page(
 );
 
 export function App() {
-  if (!isConfigured) return <SetupNeeded />;
+  // The welcome page needs no backend, so it shows even before Supabase is set up.
+  if (!isConfigured) {
+    return (
+      <BrowserRouter>
+        <Suspense fallback={<SplashScreen />}>
+          <Routes>
+            <Route path="/welcome" element={<LandingPage />} />
+            <Route path="*" element={<SetupNeeded />} />
+          </Routes>
+        </Suspense>
+      </BrowserRouter>
+    );
+  }
   return (
     <AuthProvider>
       <OfflineProvider>
@@ -58,6 +71,7 @@ export function App() {
           <BrowserRouter>
             <Suspense fallback={<SplashScreen />}>
               <Routes>
+                <Route path="/welcome" element={<LandingPage />} />
                 <Route path="/sign-in" element={<AuthPage mode="sign-in" />} />
                 <Route path="/sign-up" element={<AuthPage mode="sign-up" />} />
                 <Route element={<RequireStaff />}>
