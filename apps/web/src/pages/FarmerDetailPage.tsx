@@ -13,7 +13,8 @@ import {
   Field,
   KycBadge,
   PageHeader,
-  Spinner,
+  PageSkeleton,
+  Skeleton,
   Textarea,
 } from '../components/ui';
 import { errorMessage } from '../lib/errors';
@@ -77,7 +78,7 @@ export function FarmerDetailPage() {
     }
   };
 
-  if (farmer.loading && !farmer.data) return <Spinner />;
+  if (farmer.loading && (!farmer.data || farmer.stale)) return <PageSkeleton variant="detail" />;
   if (farmer.error) return <Alert>{errorMessage(farmer.error)}</Alert>;
   const f = farmer.data;
   if (!f) return <EmptyState>Farmer not found, or you don't have access.</EmptyState>;
@@ -185,8 +186,8 @@ export function FarmerDetailPage() {
             <p className="text-sm font-medium text-zinc-700">Identity checks</p>
             {checks.error ? (
               <Alert>{errorMessage(checks.error)}</Alert>
-            ) : checks.loading && !checks.data ? (
-              <Spinner />
+            ) : checks.loading && (!checks.data || checks.stale) ? (
+              <Skeleton className="h-16 rounded-xl" />
             ) : (
               <IdentityChecks
                 subject="farmer"
@@ -272,8 +273,8 @@ export function FarmerDetailPage() {
               </span>
             )}
           </div>
-          {farms.loading ? (
-            <Spinner />
+          {farms.loading && (!farms.data || farms.stale) ? (
+            <Skeleton className="h-40 rounded-xl" />
           ) : farms.error ? (
             <Alert>{errorMessage(farms.error)}</Alert>
           ) : farms.data!.length === 0 ? (

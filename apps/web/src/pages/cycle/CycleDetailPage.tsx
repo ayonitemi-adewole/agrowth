@@ -1,7 +1,7 @@
 import { Link, useParams, useSearchParams } from 'react-router';
 import { useAuth } from '../../auth/AuthProvider';
 import { CycleStatusBadge } from '../../components/StatusBadges';
-import { Alert, EmptyState, PageHeader, Skeleton, Tabs } from '../../components/ui';
+import { Alert, EmptyState, PageHeader, PageSkeleton, Tabs } from '../../components/ui';
 import { FUNDING_SOURCE } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
 import { titleCase } from '../../lib/format';
@@ -45,14 +45,7 @@ export function CycleDetailPage() {
   const setTab = (t: Tab) =>
     setParams(t === 'overview' ? {} : { tab: t }, { replace: true, preventScrollReset: true });
 
-  if (state.loading && !state.data) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-72" />
-        <Skeleton className="h-64 rounded-2xl" />
-      </div>
-    );
-  }
+  if (state.loading && (!state.data || state.stale)) return <PageSkeleton variant="detail" />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const data = state.data;
   if (!data)

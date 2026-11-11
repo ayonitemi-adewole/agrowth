@@ -8,7 +8,7 @@ import {
   EmptyState,
   SectionTitle,
   Select,
-  Spinner,
+  Skeleton,
   Stat,
   Table,
   cx,
@@ -59,7 +59,7 @@ export function WeatherTab({ data }: TabProps) {
     }
   };
 
-  if (weather.loading && !weather.data) return <Spinner />;
+  if (weather.loading && !weather.data) return <Skeleton className="h-80 rounded-2xl" />;
   if (weather.error) return <Alert>{errorMessage(weather.error)}</Alert>;
   const { cells, today } = weather.data!;
   const refreshButton = can.readCycles(role) ? (

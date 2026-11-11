@@ -14,10 +14,10 @@ import {
   Input,
   Modal,
   PageHeader,
+  PageSkeleton,
   Progress,
   SectionTitle,
   Skeleton,
-  Spinner,
   Table,
   cx,
 } from '../../components/ui';
@@ -80,7 +80,7 @@ export function ListingPage() {
     };
   }, [id, investor]);
 
-  if (state.loading && !state.data) return <Spinner />;
+  if (state.loading && (!state.data || state.stale)) return <PageSkeleton variant="detail" />;
   if (state.error) {
     return (
       <div className="space-y-4">
@@ -240,10 +240,7 @@ export function ListingPage() {
 
 function BackLink({ investor }: { investor: boolean }) {
   return (
-    <Link
-      to={investor ? '/invest' : '/cycles'}
-      className="link-back"
-    >
+    <Link to={investor ? '/invest' : '/cycles'} className="link-back">
       <ArrowLeft className="size-4" aria-hidden /> {investor ? 'Marketplace' : 'Cycles'}
     </Link>
   );

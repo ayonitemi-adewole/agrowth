@@ -11,10 +11,10 @@ import {
   EmptyState,
   Field,
   Input,
+  ListSkeleton,
   Modal,
   SectionTitle,
   Select,
-  Spinner,
   Textarea,
   cx,
 } from '../../components/ui';
@@ -67,7 +67,7 @@ export function ClaimsSection({ data, reload }: TabProps) {
         }
       />
       {claims.loading && !claims.data ? (
-        <Spinner />
+        <ListSkeleton rows={3} />
       ) : claims.error ? (
         <Alert>{errorMessage(claims.error)}</Alert>
       ) : claims.data!.length === 0 ? (

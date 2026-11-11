@@ -1,7 +1,7 @@
 import { Printer } from 'lucide-react';
 import { Link, useParams } from 'react-router';
 import { Logo } from '../../components/Layout';
-import { Alert, Button, Spinner } from '../../components/ui';
+import { Alert, Button, PageSkeleton } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, formatHectares, titleCase } from '../../lib/format';
 import { formatBps } from '../../lib/cycles';
@@ -24,7 +24,7 @@ export function CertificatePage() {
     return { pledge, profile };
   }, [pledgeId]);
 
-  if (state.loading) return <Spinner />;
+  if (state.loading && (!state.data || state.stale)) return <PageSkeleton variant="detail" />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const { pledge: p, profile } = state.data!;
   if (!p || p.status !== 'paid' || p.refunded || !profile) {

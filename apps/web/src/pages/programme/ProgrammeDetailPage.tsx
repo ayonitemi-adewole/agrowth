@@ -13,9 +13,9 @@ import {
   EmptyState,
   Modal,
   PageHeader,
+  PageSkeleton,
   Progress,
   SectionTitle,
-  Spinner,
   Stat,
   Table,
   Tabs,
@@ -62,7 +62,7 @@ export function ProgrammeDetailPage() {
     return data as ProgrammeDashboard;
   }, [id]);
 
-  if (state.loading && !state.data) return <Spinner />;
+  if (state.loading && (!state.data || state.stale)) return <PageSkeleton variant="detail" />;
   if (state.error) {
     return (
       <div className="space-y-4">
@@ -259,10 +259,7 @@ export function ProgrammeDetailPage() {
 
 function BackLink() {
   return (
-    <Link
-      to="/programmes"
-      className="link-back"
-    >
+    <Link to="/programmes" className="link-back">
       <ArrowLeft className="size-4" aria-hidden /> Programmes
     </Link>
   );

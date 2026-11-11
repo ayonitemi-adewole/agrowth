@@ -1,74 +1,72 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { Suspense } from 'react';
+import { Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
 import { RequireStaff, RoleGate } from './components/Guards';
 import { Layout } from './components/Layout';
 import { ToastProvider } from './components/Toast';
-import { SplashScreen } from './components/SplashScreen';
+import { AuthTransitionScreen, SplashScreen } from './components/SplashScreen';
 import { can } from './lib/roles';
 import { OfflineProvider } from './lib/offline/OfflineProvider';
+import { AppRouter, RouteProgress, ScrollToTop } from './lib/routing';
 import { isConfigured } from './lib/supabase';
 import { AuthPage } from './pages/AuthPage';
+import {
+  BankFilesPage,
+  BuyerPortalPage,
+  CertificatePage,
+  CooperativesPage,
+  CycleDetailPage,
+  CyclesPage,
+  FarmerDetailPage,
+  FarmersPage,
+  FieldVisitPage,
+  FieldWorkPage,
+  homePath,
+  InvestorProfilePage,
+  InvestorsPage,
+  LandingPage,
+  LedgerPage,
+  ListingPage,
+  MapFarmPage,
+  MarketplacePage,
+  PortfolioPage,
+  ProgrammeDetailPage,
+  ProgrammesPage,
+  RedeemPage,
+  RegisterFarmerPage,
+  SimulatedCheckoutPage,
+  UsersPage,
+  VendorsPage,
+  VoucherSlipsPage,
+} from './pages/lazy';
 import { OverviewPage } from './pages/OverviewPage';
-
-// Pages load on demand, so the map library is only downloaded when a map is shown.
-const page = <K extends string>(load: () => Promise<Record<K, React.ComponentType>>, name: K) =>
-  lazy(() => load().then((m) => ({ default: m[name] })));
-const CooperativesPage = page(() => import('./pages/CooperativesPage'), 'CooperativesPage');
-const FarmersPage = page(() => import('./pages/FarmersPage'), 'FarmersPage');
-const FarmerDetailPage = page(() => import('./pages/FarmerDetailPage'), 'FarmerDetailPage');
-const RegisterFarmerPage = page(() => import('./pages/RegisterFarmerPage'), 'RegisterFarmerPage');
-const MapFarmPage = page(() => import('./pages/MapFarmPage'), 'MapFarmPage');
-const UsersPage = page(() => import('./pages/UsersPage'), 'UsersPage');
-const CyclesPage = page(() => import('./pages/CyclesPage'), 'CyclesPage');
-const CycleDetailPage = page(() => import('./pages/cycle/CycleDetailPage'), 'CycleDetailPage');
-const FieldWorkPage = page(() => import('./pages/FieldWorkPage'), 'FieldWorkPage');
-const FieldVisitPage = page(() => import('./pages/FieldVisitPage'), 'FieldVisitPage');
-const LedgerPage = page(() => import('./pages/LedgerPage'), 'LedgerPage');
-const VendorsPage = page(() => import('./pages/VendorsPage'), 'VendorsPage');
-const RedeemPage = page(() => import('./pages/RedeemPage'), 'RedeemPage');
-const BuyerPortalPage = page(() => import('./pages/BuyerPortalPage'), 'BuyerPortalPage');
-const VoucherSlipsPage = page(() => import('./pages/VoucherSlipsPage'), 'VoucherSlipsPage');
-const MarketplacePage = page(() => import('./pages/invest/MarketplacePage'), 'MarketplacePage');
-const ListingPage = page(() => import('./pages/invest/ListingPage'), 'ListingPage');
-const PortfolioPage = page(() => import('./pages/invest/PortfolioPage'), 'PortfolioPage');
-const CertificatePage = page(() => import('./pages/invest/CertificatePage'), 'CertificatePage');
-const SimulatedCheckoutPage = page(
-  () => import('./pages/invest/SimulatedCheckoutPage'),
-  'SimulatedCheckoutPage',
-);
-const InvestorProfilePage = page(
-  () => import('./pages/invest/InvestorProfilePage'),
-  'InvestorProfilePage',
-);
-const InvestorsPage = page(() => import('./pages/InvestorsPage'), 'InvestorsPage');
-const BankFilesPage = page(() => import('./pages/BankFilesPage'), 'BankFilesPage');
-const LandingPage = page(() => import('./pages/LandingPage'), 'LandingPage');
-const ProgrammesPage = page(() => import('./pages/programme/ProgrammesPage'), 'ProgrammesPage');
-const ProgrammeDetailPage = page(
-  () => import('./pages/programme/ProgrammeDetailPage'),
-  'ProgrammeDetailPage',
-);
 
 export function App() {
   // The welcome page needs no backend, so it shows even before Supabase is set up.
   if (!isConfigured) {
     return (
-      <BrowserRouter>
+      <AppRouter>
+        <RouteProgress />
+        <ScrollToTop />
         <Suspense fallback={<SplashScreen />}>
           <Routes>
             <Route path="/welcome" element={<LandingPage />} />
             <Route path="*" element={<SetupNeeded />} />
           </Routes>
         </Suspense>
-      </BrowserRouter>
+      </AppRouter>
     );
   }
+  // The router sits outside the auth provider, so signing out can move to the sign-in page
+  // in the same step as clearing the session.
   return (
-    <AuthProvider>
-      <OfflineProvider>
-        <ToastProvider>
-          <BrowserRouter>
+    <AppRouter>
+      <AuthProvider>
+        <OfflineProvider>
+          <ToastProvider>
+            <RouteProgress />
+            <ScrollToTop />
+            <AuthTransitionScreen />
             <Suspense fallback={<SplashScreen />}>
               <Routes>
                 <Route path="/welcome" element={<LandingPage />} />
@@ -282,10 +280,10 @@ export function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
-          </BrowserRouter>
-        </ToastProvider>
-      </OfflineProvider>
-    </AuthProvider>
+          </ToastProvider>
+        </OfflineProvider>
+      </AuthProvider>
+    </AppRouter>
   );
 }
 
@@ -293,12 +291,7 @@ export function App() {
 function Home() {
   const role = useAuth().profile?.role;
   if (can.useStaffApp(role)) return <OverviewPage />;
-  return (
-    <Navigate
-      to={can.invest(role) ? '/invest' : can.useBuyerPortal(role) ? '/buyer' : '/redeem'}
-      replace
-    />
-  );
+  return <Navigate to={homePath(role)} replace />;
 }
 
 function SetupNeeded() {

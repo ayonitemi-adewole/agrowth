@@ -10,11 +10,15 @@ import { Button, Card } from './ui';
 
 /** Sends signed-out visitors to sign in; holds non-staff on a waiting page. */
 export function RequireStaff() {
-  const { session, profile, loading, offline, signOut } = useAuth();
+  const { session, profile, loading, offline, signOut, transition } = useAuth();
   const location = useLocation();
 
   if (loading) return <SplashScreen />;
   if (!session && !(offline && profile)) {
+    // Signing out or switching: the loading screen is up and the auth step is already
+    // moving to the right page. Redirecting from here too would send the old page along
+    // as the place to "return to".
+    if (transition) return null;
     // A visitor arriving at the front door gets the welcome page; deep links go to sign-in.
     if (location.pathname === '/') return <Navigate to="/welcome" replace />;
     return <Navigate to="/sign-in" replace state={{ from: location }} />;

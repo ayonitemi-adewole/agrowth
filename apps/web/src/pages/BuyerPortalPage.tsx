@@ -12,9 +12,9 @@ import {
   Field,
   Modal,
   PageHeader,
+  PageSkeleton,
   Progress,
   SectionTitle,
-  Spinner,
   Stat,
   Table,
   Textarea,
@@ -88,7 +88,7 @@ export function BuyerPortalPage() {
     return data as { offtaker: { name: string } | null; contracts: Agreement[] };
   }, []);
 
-  if (portal.loading && !portal.data) return <Spinner />;
+  if (portal.loading && !portal.data) return <PageSkeleton variant="detail" />;
   if (portal.error) return <Alert>{errorMessage(portal.error)}</Alert>;
   const { offtaker, contracts } = portal.data!;
 

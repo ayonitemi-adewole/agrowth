@@ -11,9 +11,9 @@ import {
   Input,
   KycBadge,
   PageHeader,
+  PageSkeleton,
   SectionTitle,
   Select,
-  Spinner,
 } from '../../components/ui';
 import { formatBps, uploadFile } from '../../lib/cycles';
 import { errorMessage } from '../../lib/errors';
@@ -30,7 +30,7 @@ export function InvestorProfilePage() {
   const state = useAsync(() => Promise.all([loadMyInvestorProfile(), loadInvestorSettings()]), []);
   const [editing, setEditing] = useState(false);
 
-  if (state.loading && !state.data) return <Spinner />;
+  if (state.loading && !state.data) return <PageSkeleton variant="detail" />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const [profile, settings] = state.data!;
   const showForm = !profile || editing || profile.kyc_status === 'rejected';

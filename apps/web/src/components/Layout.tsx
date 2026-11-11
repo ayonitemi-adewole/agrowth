@@ -23,13 +23,14 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { demo } from '../lib/demo';
 import { useOffline } from '../lib/offline/OfflineProvider';
 import { can, ROLE_LABELS } from '../lib/roles';
 import type { Role } from '../lib/types';
+import { preloadRoute } from '../pages/lazy';
 import { SplashScreen } from './SplashScreen';
 import { DemoSwitcher } from './DemoSignIn';
 import { Avatar, cx } from './ui';
@@ -110,6 +111,21 @@ export function Layout() {
   const [open, setOpen] = useState(false);
   const role = profile?.role;
 
+  // Fetch the code for every screen in this person's menu once the browser is idle, so
+  // moving between them doesn't wait on a download. Hovering a link fetches it sooner.
+  useEffect(() => {
+    const paths = SECTIONS.flatMap((s) => s.items)
+      .filter((item) => item.show(role))
+      .map((item) => item.to);
+    const run = () => paths.forEach((path) => void preloadRoute(path));
+    if ('requestIdleCallback' in window) {
+      const id = window.requestIdleCallback(run, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const t = setTimeout(run, 1500);
+    return () => clearTimeout(t);
+  }, [role]);
+
   const sidebar = (
     <div className="flex h-full flex-col bg-brand-950 px-4 py-5">
       <div className="px-2">
@@ -133,6 +149,9 @@ export function Layout() {
                     to={to}
                     end={to === '/'}
                     onClick={() => setOpen(false)}
+                    onMouseEnter={() => void preloadRoute(to)}
+                    onFocus={() => void preloadRoute(to)}
+                    onTouchStart={() => void preloadRoute(to)}
                     className={({ isActive }) =>
                       cx(
                         'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',

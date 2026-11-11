@@ -8,9 +8,9 @@ import {
   Card,
   EmptyState,
   PageHeader,
+  PageSkeleton,
   Progress,
   SectionTitle,
-  Spinner,
   Stat,
 } from '../../components/ui';
 import { demo } from '../../lib/demo';
@@ -61,7 +61,7 @@ export function PortfolioPage() {
   }, [check.data]);
   const gateway = useAsync(() => paymentGateway(), []);
 
-  if (state.loading && !state.data) return <Spinner />;
+  if (state.loading && !state.data) return <PageSkeleton variant="cards" />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const { pledges, cap, escrow } = state.data!;
 
@@ -228,10 +228,7 @@ function PositionHeader({ p, onChange }: { p: Position; onChange: () => void }) 
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
-        <Link
-          to={`/invest/${p.cycle_id}`}
-          className="link font-semibold"
-        >
+        <Link to={`/invest/${p.cycle_id}`} className="link font-semibold">
           {titleCase(p.cycle.crop)} · {p.cycle.season}
         </Link>
         <p className="mt-0.5 text-xs text-zinc-500">

@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { demo, type DemoAccount } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
@@ -131,8 +130,7 @@ export function DemoSignIn({ detailed = false }: { detailed?: boolean }) {
 
 /** Sidebar control to jump straight to another demo account. */
 export function DemoSwitcher() {
-  const { profile, signIn, signOut } = useAuth();
-  const navigate = useNavigate();
+  const { profile, switchAccount } = useAuth();
   const [busy, setBusy] = useState(false);
 
   if (demo.accounts.length === 0) return null;
@@ -144,12 +142,11 @@ export function DemoSwitcher() {
     const account = demo.accounts.find((a) => a.email === email);
     if (!account) return;
     setBusy(true);
-    await signOut();
     try {
-      await signIn(account.email, account.password);
-      navigate('/');
+      // Signs out and in behind the loading screen, landing on the new account's home.
+      await switchAccount(account);
     } catch {
-      navigate('/sign-in');
+      // Already back on the sign-in page, where the account can be picked again.
     } finally {
       setBusy(false);
     }

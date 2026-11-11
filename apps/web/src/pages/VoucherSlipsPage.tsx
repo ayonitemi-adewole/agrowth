@@ -2,7 +2,7 @@ import { Printer } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Logo } from '../components/Layout';
-import { Alert, Button, Select, Spinner } from '../components/ui';
+import { Alert, Button, PageSkeleton, Select } from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { formatDate, titleCase } from '../lib/format';
 import { formatNaira, toKobo } from '../lib/money';
@@ -60,7 +60,7 @@ export function VoucherSlipsPage() {
     };
   }, [id]);
 
-  if (state.loading) return <Spinner />;
+  if (state.loading && (!state.data || state.stale)) return <PageSkeleton variant="cards" />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const { cycle, vouchers, tokens, scanNeedsPhone } = state.data!;
   const milestones = [

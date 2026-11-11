@@ -7,18 +7,19 @@ import {
   Badge,
   Button,
   Card,
-  cx,
   EmptyState,
   Field,
   Input,
   KycBadge,
   Modal,
   PageHeader,
+  PageSkeleton,
   SectionTitle,
   Spinner,
   Table,
   Tabs,
   Textarea,
+  cx,
 } from '../components/ui';
 import { formatBps, openFile } from '../lib/cycles';
 import { IdentityChecks } from '../components/IdentityChecks';
@@ -47,7 +48,7 @@ export function InvestorsPage() {
     return { investors: investors.data as InvestorProfile[], settings };
   }, []);
 
-  if (state.loading && !state.data) return <Spinner />;
+  if (state.loading && !state.data) return <PageSkeleton />;
   if (state.error) return <Alert>{errorMessage(state.error)}</Alert>;
   const { investors, settings } = state.data!;
   const pending = investors.filter((i) => i.kyc_status === 'pending');

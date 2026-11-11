@@ -10,10 +10,10 @@ import {
   Card,
   EmptyState,
   Field,
+  ListSkeleton,
   Modal,
   PageHeader,
   SectionTitle,
-  Spinner,
   Table,
   Tabs,
   Textarea,
@@ -134,7 +134,7 @@ export function BankFilesPage() {
       />
       {tab === 'payments' ? (
         payments.loading && !payments.data ? (
-          <Spinner />
+          <ListSkeleton />
         ) : payments.error ? (
           <Alert>{errorMessage(payments.error)}</Alert>
         ) : (
@@ -511,7 +511,7 @@ function Statements({
         {error ? (
           <Alert>{errorMessage(error)}</Alert>
         ) : !lines ? (
-          <Spinner />
+          <ListSkeleton rows={3} />
         ) : lines.length === 0 ? (
           <EmptyState>Every imported line is accounted for.</EmptyState>
         ) : (
@@ -552,7 +552,7 @@ function Statements({
       <section>
         <SectionTitle title="Recent imports" />
         {imports.loading && !imports.data ? (
-          <Spinner />
+          <ListSkeleton rows={3} />
         ) : imports.error ? (
           <Alert>{errorMessage(imports.error)}</Alert>
         ) : imports.data!.length === 0 ? (

@@ -11,10 +11,10 @@ import {
   EmptyState,
   Field,
   Input,
+  ListSkeleton,
   Modal,
   PageHeader,
   Select,
-  Spinner,
   Table,
 } from '../components/ui';
 import { VENDOR_KIND, VENDOR_STATUS } from '../lib/cycles';
@@ -83,8 +83,8 @@ export function VendorsPage() {
         </Select>
       </div>
 
-      {list.loading ? (
-        <Spinner />
+      {list.loading && !list.data ? (
+        <ListSkeleton />
       ) : list.error ? (
         <Alert>{errorMessage(list.error)}</Alert>
       ) : list.data!.length === 0 ? (

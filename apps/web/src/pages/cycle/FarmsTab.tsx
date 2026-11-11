@@ -10,8 +10,8 @@ import {
   EmptyState,
   Input,
   KycBadge,
+  ListSkeleton,
   Modal,
-  Spinner,
   Table,
 } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
@@ -193,8 +193,8 @@ function AddFarms({
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
-      {farms.loading ? (
-        <Spinner />
+      {farms.loading && !farms.data ? (
+        <ListSkeleton />
       ) : farms.error ? (
         <Alert>{errorMessage(farms.error)}</Alert>
       ) : shown.length === 0 ? (

@@ -6,8 +6,8 @@ import {
   Badge,
   EmptyState,
   PageHeader,
+  PageSkeleton,
   SectionTitle,
-  Spinner,
   Table,
 } from '../components/ui';
 import { VENDOR_STATUS } from '../lib/cycles';
@@ -49,7 +49,7 @@ export function RedeemPage() {
     };
   }, []);
 
-  if (shop.loading && !shop.data) return <Spinner />;
+  if (shop.loading && !shop.data) return <PageSkeleton variant="detail" />;
   if (shop.error) return <Alert>{errorMessage(shop.error)}</Alert>;
   const { vendor, redemptions } = shop.data!;
 

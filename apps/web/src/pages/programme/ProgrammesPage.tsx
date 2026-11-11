@@ -12,7 +12,7 @@ import {
   Modal,
   PageHeader,
   Progress,
-  Spinner,
+  Skeleton,
 } from '../../components/ui';
 import { errorMessage } from '../../lib/errors';
 import { formatDate, formatHectares, titleCase } from '../../lib/format';
@@ -47,7 +47,11 @@ export function ProgrammesPage() {
         }
       />
       {state.loading && !state.data ? (
-        <Spinner />
+        <div className="grid animate-fade-in-late gap-4 lg:grid-cols-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-64 rounded-2xl" />
+          ))}
+        </div>
       ) : state.error ? (
         <Alert>{errorMessage(state.error)}</Alert>
       ) : state.data!.length === 0 ? (

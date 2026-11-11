@@ -9,8 +9,8 @@ import {
   Field,
   Input,
   PageHeader,
+  PageSkeleton,
   Select,
-  Spinner,
   Textarea,
 } from '../components/ui';
 import { errorMessage, overlappingFarms, type OverlappingFarm } from '../lib/errors';
@@ -128,16 +128,13 @@ export function MapFarmPage() {
     navigate(`/farmers/${farmerId}`);
   };
 
-  if (data.loading) return <Spinner />;
+  if (data.loading && (!data.data || data.stale)) return <PageSkeleton variant="detail" />;
   if (data.error) return <Alert>{errorMessage(data.error)}</Alert>;
   if (!data.data?.farmer) return <Alert>Farmer not found, or you don't have access.</Alert>;
 
   return (
     <>
-      <Link
-        to={`/farmers/${farmerId}`}
-        className="link-back mb-2"
-      >
+      <Link to={`/farmers/${farmerId}`} className="link-back mb-2">
         ← {data.data.farmer.full_name}
       </Link>
       <PageHeader
@@ -243,7 +240,10 @@ export function MapFarmPage() {
                   <ul className="mt-2 list-disc pl-5">
                     {error.clashes.map((c) => (
                       <li key={c.farm_id}>
-                        <Link to={`/farmers/${c.farmer_id}`} className="font-medium underline underline-offset-2 hover:decoration-2">
+                        <Link
+                          to={`/farmers/${c.farmer_id}`}
+                          className="font-medium underline underline-offset-2 hover:decoration-2"
+                        >
                           Overlaps a registered farm by {formatHectares(c.overlap_hectares)}
                         </Link>
                       </li>

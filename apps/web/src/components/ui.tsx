@@ -249,9 +249,13 @@ export function KycBadge({ status }: { status: 'pending' | 'verified' | 'rejecte
   );
 }
 
+/** A small "Loading…" line. It fades in after a beat, so quick loads don't flash it. */
 export function Spinner({ label = 'Loading…' }: { label?: string }) {
   return (
-    <div className="flex items-center gap-2 py-10 text-sm text-zinc-500">
+    <div
+      className="flex animate-fade-in-late items-center gap-2 py-10 text-sm text-zinc-500"
+      role="status"
+    >
       <Loader2 className="size-4 animate-spin" aria-hidden />
       {label}
     </div>
@@ -260,6 +264,74 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
 
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cx('animate-pulse rounded-lg bg-zinc-200/70', className)} />;
+}
+
+/** Placeholder rows in the shape of a table or list, while it loads. */
+export function ListSkeleton({ rows = 6 }: { rows?: number }) {
+  return (
+    <div
+      className="animate-fade-in-late overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-zinc-950/5"
+      role="status"
+    >
+      <span className="sr-only">Loading…</span>
+      <div className="border-b border-zinc-950/5 bg-zinc-50/80 px-6 py-3.5">
+        <Skeleton className="h-3 w-40" />
+      </div>
+      <div className="divide-y divide-zinc-950/5">
+        {Array.from({ length: rows }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 px-6 py-4">
+            <Skeleton className="size-8 shrink-0 rounded-full" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton
+                className={cx('h-3.5', i % 3 === 0 ? 'w-2/5' : i % 3 === 1 ? 'w-1/3' : 'w-1/2')}
+              />
+              <Skeleton className="h-3 w-1/4" />
+            </div>
+            <Skeleton className="hidden h-6 w-20 rounded-full sm:block" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A whole screen's placeholder while its first data loads, in the rough shape of what's
+ * coming (a page header, then a list, a grid of cards, or a record's details), so the
+ * content settles into place instead of jumping in under a "Loading…" line.
+ */
+export function PageSkeleton({ variant = 'list' }: { variant?: 'list' | 'cards' | 'detail' }) {
+  return (
+    <div className="animate-fade-in-late" role="status">
+      <span className="sr-only">Loading…</span>
+      <div className="mb-8 space-y-3">
+        <Skeleton className="h-3.5 w-24" />
+        <Skeleton className="h-8 w-72 max-w-full" />
+        <Skeleton className="h-4 w-[28rem] max-w-full" />
+      </div>
+      {variant === 'list' && <ListSkeleton />}
+      {variant === 'cards' && (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-52 rounded-2xl" />
+          ))}
+        </div>
+      )}
+      {variant === 'detail' && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-28 rounded-2xl" />
+            ))}
+          </div>
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+            <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
+            <Skeleton className="h-80 rounded-2xl" />
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export function EmptyState({

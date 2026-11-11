@@ -18,8 +18,8 @@ import {
   Card,
   Field,
   PageHeader,
+  PageSkeleton,
   SectionTitle,
-  Spinner,
   Textarea,
   cx,
 } from '../components/ui';
@@ -190,7 +190,7 @@ export function FieldVisitPage() {
 
   const previews = usePreviews(photos);
 
-  if (info.loading) return <Spinner />;
+  if (info.loading && (!info.data || info.stale)) return <PageSkeleton variant="detail" />;
   if (info.error) return <Alert>{errorMessage(info.error)}</Alert>;
   const { farm, milestone, fromPhone } = info.data!;
   if (!farm || !milestone)

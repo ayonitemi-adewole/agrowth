@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthProvider';
-import { Alert, Badge, Button, Input, PageHeader, Select, Spinner, Table } from '../components/ui';
+import {
+  Alert,
+  Badge,
+  Button,
+  Input,
+  ListSkeleton,
+  PageHeader,
+  Select,
+  Table,
+} from '../components/ui';
 import { errorMessage } from '../lib/errors';
 import { formatDate } from '../lib/format';
 import { ALL_ROLES, ROLE_LABELS } from '../lib/roles';
@@ -96,7 +105,7 @@ export function UsersPage() {
         </div>
       )}
       {users.loading && !users.data ? (
-        <Spinner />
+        <ListSkeleton rows={8} />
       ) : users.error ? (
         <Alert>{errorMessage(users.error)}</Alert>
       ) : (

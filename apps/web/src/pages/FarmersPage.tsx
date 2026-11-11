@@ -8,9 +8,9 @@ import {
   EmptyState,
   Input,
   KycBadge,
+  ListSkeleton,
   PageHeader,
   Select,
-  Spinner,
   Table,
 } from '../components/ui';
 import { errorMessage } from '../lib/errors';
@@ -121,7 +121,7 @@ export function FarmersPage() {
       </div>
 
       {farmers.loading && !farmers.data ? (
-        <Spinner />
+        <ListSkeleton rows={8} />
       ) : farmers.error ? (
         <Alert>{errorMessage(farmers.error)}</Alert>
       ) : farmers.data!.items.length === 0 ? (

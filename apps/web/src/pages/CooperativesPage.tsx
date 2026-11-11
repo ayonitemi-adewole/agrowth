@@ -9,8 +9,8 @@ import {
   EmptyState,
   Field,
   Input,
+  ListSkeleton,
   PageHeader,
-  Spinner,
   Table,
 } from '../components/ui';
 import { errorMessage } from '../lib/errors';
@@ -70,8 +70,8 @@ export function CooperativesPage() {
         />
       </div>
 
-      {list.loading ? (
-        <Spinner />
+      {list.loading && !list.data ? (
+        <ListSkeleton />
       ) : list.error ? (
         <Alert>{errorMessage(list.error)}</Alert>
       ) : list.data!.length === 0 ? (
