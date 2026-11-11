@@ -23,6 +23,40 @@
   --animate-fade-in: fade-in 160ms ease-out;
   --animate-slide-up: slide-up 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
 
+  /* Landing page motion. Always used behind `motion-safe:`. */
+  --animate-ken-burns: ken-burns 24s ease-in-out infinite alternate;
+  --animate-hero-in: hero-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-float-delayed: float 6s ease-in-out 3s infinite;
+
+  @keyframes ken-burns {
+    from {
+      transform: scale(1.02);
+    }
+    to {
+      transform: scale(1.12) translate(-1.5%, -1%);
+    }
+  }
+  @keyframes hero-in {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
   @keyframes fade-in {
     from {
       opacity: 0;
@@ -94,6 +128,25 @@ body {
   /* "← Back" style links: brand colour, underline on hover. The arrow already shows they go somewhere. */
   .link-back {
     @apply inline-flex items-center gap-1 text-sm font-medium text-brand-700 transition-colors hover:text-brand-800 hover:underline hover:underline-offset-[3px];
+  }
+}
+
+/*
+ * Scroll reveal on the landing page: blocks marked [data-reveal] fade up as they enter the
+ * viewport. Content is only hidden once the page script has started watching (`.reveal-on`
+ * on the root), so nothing stays invisible if that script never runs.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-on [data-reveal] {
+    opacity: 0;
+    transform: translateY(24px);
+    transition:
+      opacity 700ms ease-out,
+      transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .reveal-on [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
   }
 }
 

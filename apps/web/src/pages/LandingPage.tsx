@@ -33,7 +33,7 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useOptionalAuth } from '../auth/AuthProvider';
 import { Logo } from '../components/Layout';
@@ -63,9 +63,10 @@ export function LandingPage() {
   useEffect(() => {
     document.title = 'Agrowth: farm finance you can verify';
   }, []);
+  const root = useReveal();
 
   return (
-    <div className="min-h-screen overflow-x-clip bg-white text-zinc-900 scroll-smooth">
+    <div ref={root} className="min-h-screen overflow-x-clip bg-white text-zinc-900 scroll-smooth">
       <Header primary={primary} signedIn={signedIn} />
       <main>
         <Hero primary={primary} />
@@ -88,6 +89,33 @@ export function LandingPage() {
   );
 }
 
+/**
+ * Fades [data-reveal] blocks in as they scroll into view. The hiding CSS only applies once
+ * `.reveal-on` is set here, so without this script (or IntersectionObserver) nothing hides.
+ */
+function useReveal() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add('is-visible');
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { rootMargin: '0px 0px -10% 0px', threshold: 0.05 },
+    );
+    el.querySelectorAll('[data-reveal]').forEach((n) => io.observe(n));
+    el.classList.add('reveal-on');
+    return () => io.disconnect();
+  }, []);
+  return ref;
+}
+
 /* ------------------------------------------------------------------ */
 /* Layout pieces                                                       */
 /* ------------------------------------------------------------------ */
@@ -103,7 +131,9 @@ function Section({
 }) {
   return (
     <section id={id} className={cx('scroll-mt-20 px-4 py-20 sm:px-6 lg:py-28', className)}>
-      <div className="mx-auto max-w-6xl">{children}</div>
+      <div className="mx-auto max-w-6xl" data-reveal>
+        {children}
+      </div>
     </section>
   );
 }
@@ -160,6 +190,41 @@ function Heading({
   );
 }
 
+/** A rounded photo with an optional caption chip pinned to its bottom-left corner. */
+function PhotoCard({
+  src,
+  alt,
+  className,
+  children,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  children?: ReactNode;
+}) {
+  return (
+    <figure
+      className={cx(
+        'group relative overflow-hidden rounded-3xl bg-zinc-100 shadow-pop ring-1 ring-zinc-950/5',
+        className,
+      )}
+    >
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        className="size-full object-cover object-top transition duration-700 group-hover:scale-105"
+      />
+      <div
+        className="absolute inset-0 bg-linear-to-t from-zinc-950/45 via-transparent to-transparent"
+        aria-hidden
+      />
+      {children && <figcaption className="absolute bottom-4 left-4 right-4">{children}</figcaption>}
+    </figure>
+  );
+}
+
 function CtaLink({
   to,
   children,
@@ -167,7 +232,7 @@ function CtaLink({
 }: {
   to: string;
   children: ReactNode;
-  variant?: 'primary' | 'ghost' | 'light';
+  variant?: 'primary' | 'ghost' | 'light' | 'glass';
 }) {
   const isHash = to.startsWith('#');
   const className = cx(
@@ -176,11 +241,13 @@ function CtaLink({
       'bg-brand-600 text-white shadow-lg shadow-brand-600/25 hover:bg-brand-700',
     variant === 'ghost' && 'bg-white text-zinc-800 ring-1 ring-zinc-200 hover:bg-zinc-50',
     variant === 'light' && 'bg-white text-brand-900 hover:bg-brand-50',
+    variant === 'glass' &&
+      'bg-white/10 text-white ring-1 ring-white/30 backdrop-blur hover:bg-white/20',
   );
   const inner = (
     <>
       {children}
-      {variant !== 'ghost' && <ArrowRight className="size-4" aria-hidden />}
+      {variant !== 'ghost' && variant !== 'glass' && <ArrowRight className="size-4" aria-hidden />}
     </>
   );
   return isHash ? (
@@ -210,22 +277,36 @@ function Header({
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Over the hero photo the header is see-through with light text; once the page
+  // scrolls (or the mobile menu opens) it turns solid white with dark text.
+  const overHero = !scrolled && !open;
+
   return (
     <header
       className={cx(
         'sticky top-0 z-40 transition',
-        scrolled || open
-          ? 'border-b border-zinc-200/70 bg-white/85 backdrop-blur-lg'
-          : 'bg-transparent',
+        overHero ? 'bg-transparent' : 'border-b border-zinc-200/70 bg-white/85 backdrop-blur-lg',
       )}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <a href="#top" aria-label="Agrowth, back to top">
-          <Logo />
+          <Logo inverted={overHero} />
         </a>
-        <nav className="hidden items-center gap-7 text-sm font-medium text-zinc-600 md:flex">
+        <nav
+          className={cx(
+            'hidden items-center gap-7 text-sm font-medium md:flex',
+            overHero ? 'text-white/85' : 'text-zinc-600',
+          )}
+        >
           {NAV.map((n) => (
-            <a key={n.href} href={n.href} className="hover:text-brand-700">
+            <a
+              key={n.href}
+              href={n.href}
+              className={cx(
+                'underline-offset-[6px] hover:underline',
+                overHero ? 'hover:text-white' : 'hover:text-brand-700',
+              )}
+            >
               {n.label}
             </a>
           ))}
@@ -234,7 +315,12 @@ function Header({
           {!signedIn && (
             <Link
               to="/sign-in"
-              className="text-sm font-semibold text-zinc-700 hover:text-brand-700"
+              className={cx(
+                'rounded-lg px-3 py-2 text-sm font-semibold transition',
+                overHero
+                  ? 'text-white ring-1 ring-white/30 hover:bg-white/10'
+                  : 'text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50 hover:text-brand-700',
+              )}
             >
               Sign in
             </Link>
@@ -248,7 +334,10 @@ function Header({
         </div>
         <button
           type="button"
-          className="grid size-10 place-items-center rounded-lg text-zinc-700 hover:bg-zinc-100 md:hidden"
+          className={cx(
+            'grid size-10 place-items-center rounded-lg md:hidden',
+            overHero ? 'text-white hover:bg-white/10' : 'text-zinc-700 hover:bg-zinc-100',
+          )}
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-label={open ? 'Close menu' : 'Open menu'}
@@ -288,22 +377,40 @@ function Header({
 
 function Hero({ primary }: { primary: { to: string; label: string } }) {
   return (
-    <section id="top" className="relative -mt-16 px-4 pt-28 pb-16 sm:px-6 lg:pt-36 lg:pb-24">
-      <div className="pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden>
-        <div className="absolute -top-40 left-1/2 size-[56rem] -translate-x-1/2 rounded-full bg-brand-100/70 blur-3xl" />
-        <div className="absolute top-40 -right-40 size-[28rem] rounded-full bg-amber-100/60 blur-3xl" />
-        <FieldRows className="absolute right-0 bottom-0 left-0 h-40 text-brand-200/60" />
+    <section
+      id="top"
+      className="relative isolate -mt-16 overflow-hidden bg-brand-950 px-4 pt-28 pb-20 sm:px-6 lg:pt-36 lg:pb-28"
+    >
+      {/* Background photo: harvest in northern Nigeria, under a deep green wash so the text stays readable. */}
+      <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
+        <picture>
+          <source media="(max-width: 767px)" srcSet="/images/landing/hero-sm.webp" />
+          <img
+            src="/images/landing/hero.webp"
+            alt=""
+            fetchPriority="high"
+            className="size-full object-cover object-[60%_center] motion-safe:animate-ken-burns"
+          />
+        </picture>
+        <div className="absolute inset-0 bg-linear-to-r from-brand-950/95 via-brand-950/80 to-brand-950/45" />
+        <div className="absolute inset-0 bg-brand-950/35 md:hidden" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-linear-to-t from-brand-950/80 to-transparent" />
+        <div className="absolute -top-32 -left-32 size-112 rounded-full bg-brand-500/25 blur-3xl" />
+        <FieldRows className="absolute right-0 bottom-0 left-0 h-32 text-white/10" />
       </div>
 
       <div className="mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-[1.05fr_1fr]">
-        <div>
-          <p className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1.5 text-xs font-medium text-brand-800 shadow-sm ring-1 ring-brand-100">
-            <span className="size-1.5 rounded-full bg-brand-500" />
-            Agrowth 2.0 · rebuilt from the ground up
+        <div className="motion-safe:animate-hero-in">
+          <p className="mb-6 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-medium text-brand-50 ring-1 ring-white/20 backdrop-blur">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-brand-300 opacity-75 motion-reduce:hidden" />
+              <span className="relative inline-flex size-2 rounded-full bg-brand-300" />
+            </span>
+            Agrowth · Farm investments that you can trust
           </p>
-          <h1 className="text-4xl leading-[1.08] font-semibold tracking-tight text-balance text-zinc-950 sm:text-5xl lg:text-6xl">
+          <h1 className="text-4xl leading-[1.08] font-semibold tracking-tight text-balance text-white sm:text-5xl lg:text-6xl">
             Farm finance you can{' '}
-            <span className="relative whitespace-nowrap text-brand-600">
+            <span className="relative whitespace-nowrap text-brand-300">
               verify
               <svg
                 viewBox="0 0 200 12"
@@ -322,7 +429,7 @@ function Hero({ primary }: { primary: { to: string; label: string } }) {
             </span>
             , from wallet to field to buyer.
           </h1>
-          <p className="mt-7 max-w-xl text-lg leading-relaxed text-pretty text-zinc-600">
+          <p className="mt-7 max-w-xl text-lg leading-relaxed text-pretty text-brand-50/85">
             Agrowth connects the people who fund farming with the smallholders who do it, without
             asking anyone to take it on trust. Money sits with a licensed trustee, the harvest is
             sold before a naira is raised, every farm is mapped and visited, and inputs go straight
@@ -331,11 +438,11 @@ function Hero({ primary }: { primary: { to: string; label: string } }) {
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <CtaLink to={primary.to}>{primary.label}</CtaLink>
-            <CtaLink to="#how" variant="ghost">
+            <CtaLink to="#how" variant="glass">
               See how it works
             </CtaLink>
           </div>
-          <ul className="mt-10 grid max-w-lg grid-cols-2 gap-x-6 gap-y-3 text-sm text-zinc-600">
+          <ul className="mt-10 grid max-w-lg grid-cols-2 gap-x-6 gap-y-3 text-sm text-brand-50/90">
             {[
               'No guaranteed-return promises',
               'The platform never holds your money',
@@ -343,7 +450,7 @@ function Hero({ primary }: { primary: { to: string; label: string } }) {
               'Every farm GPS-verified',
             ].map((t) => (
               <li key={t} className="flex items-start gap-2">
-                <Check className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
+                <Check className="mt-0.5 size-4 shrink-0 text-brand-300" aria-hidden />
                 {t}
               </li>
             ))}
@@ -383,8 +490,8 @@ function HeroVisual() {
   ] as const;
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="absolute -inset-4 -z-10 rounded-[2rem] bg-linear-to-br from-brand-200/60 via-white to-amber-100/70 blur-2xl" />
-      <div className="rounded-3xl bg-white p-5 shadow-pop ring-1 ring-zinc-200/70 sm:p-6">
+      <div className="absolute -inset-4 -z-10 rounded-4xl bg-linear-to-br from-brand-400/30 via-transparent to-amber-300/25 blur-2xl" />
+      <div className="rounded-3xl bg-white p-5 shadow-2xl shadow-brand-950/40 ring-1 ring-white/20 motion-safe:animate-hero-in sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-zinc-500">Farm cycle · Maize, wet season</p>
@@ -501,13 +608,13 @@ function HeroVisual() {
       </div>
 
       {/* Floating notes */}
-      <div className="absolute top-40 -left-8 hidden rounded-2xl bg-white px-3.5 py-2.5 shadow-pop ring-1 ring-zinc-200/70 sm:block">
+      <div className="absolute top-40 -left-8 hidden rounded-2xl bg-white px-3.5 py-2.5 shadow-pop ring-1 ring-zinc-200/70 motion-safe:animate-float sm:block">
         <p className="flex items-center gap-2 text-xs font-semibold text-zinc-800">
           <QrCode className="size-4 text-brand-600" aria-hidden /> Voucher redeemed
         </p>
         <p className="mt-0.5 text-[11px] text-zinc-500">Fertiliser · approved agro-dealer</p>
       </div>
-      <div className="absolute -right-3 -bottom-5 hidden rounded-2xl bg-brand-950 px-3.5 py-2.5 text-white shadow-pop sm:block">
+      <div className="absolute -right-3 -bottom-5 hidden rounded-2xl bg-brand-950 px-3.5 py-2.5 text-white shadow-pop ring-1 ring-white/15 motion-safe:animate-float-delayed sm:block">
         <p className="flex items-center gap-2 text-xs font-semibold">
           <BookLock className="size-4 text-brand-300" aria-hidden /> Ledger entry
         </p>
@@ -659,7 +766,10 @@ function Causes() {
   ];
   return (
     <section className="px-4 sm:px-6">
-      <div className="mx-auto max-w-6xl rounded-[2rem] bg-zinc-950 px-6 py-14 text-white sm:px-12">
+      <div
+        data-reveal
+        className="mx-auto max-w-6xl rounded-4xl bg-zinc-950 px-6 py-14 text-white sm:px-12"
+      >
         <div className="grid gap-10 lg:grid-cols-[1fr_1.4fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold tracking-wide text-amber-300 uppercase">
@@ -695,7 +805,12 @@ function Causes() {
 /* The approach                                                        */
 /* ------------------------------------------------------------------ */
 
-const PRINCIPLES: { icon: LucideIcon; title: string; fixes: string; text: string }[] = [
+const PRINCIPLES: {
+  icon: LucideIcon;
+  title: string;
+  fixes: string;
+  text: string;
+}[] = [
   {
     icon: Landmark,
     title: 'Trustee custody',
@@ -797,6 +912,8 @@ function RuleCard({ icon: Icon, title, text }: { icon: LucideIcon; title: string
 const PHASES = [
   {
     name: 'Prepare',
+    photo: '/images/landing/prepare.webp',
+    alt: 'A farmer with field organisers in a wheat field',
     icon: Users,
     color: 'bg-sky-50 text-sky-700 ring-sky-100',
     steps: [
@@ -816,6 +933,8 @@ const PHASES = [
   },
   {
     name: 'Fund',
+    photo: '/images/landing/fund.webp',
+    alt: 'A smiling farmer with members of her cooperative',
     icon: Landmark,
     color: 'bg-violet-50 text-violet-700 ring-violet-100',
     steps: [
@@ -831,6 +950,8 @@ const PHASES = [
   },
   {
     name: 'Grow',
+    photo: '/images/landing/grow.webp',
+    alt: 'A farmer transplanting rice seedlings in a flooded paddy',
     icon: Sprout,
     color: 'bg-brand-50 text-brand-700 ring-brand-100',
     steps: [
@@ -846,6 +967,8 @@ const PHASES = [
   },
   {
     name: 'Harvest & settle',
+    photo: '/images/landing/harvest.webp',
+    alt: 'Farm workers threshing a maize harvest in Kaduna State',
     icon: Wheat,
     color: 'bg-amber-50 text-amber-700 ring-amber-100',
     steps: [
@@ -875,16 +998,26 @@ function HowItWorks() {
         lead="Everything on Agrowth revolves around the farm cycle: one season, one crop, one group of farms, with its own budget, buyer, insurance and ledger. Here is how a cycle moves from idea to settlement."
       />
       <div className="grid gap-6 lg:grid-cols-4">
-        {PHASES.map(({ name, icon: Icon, color, steps }, phase) => (
+        {PHASES.map(({ name, icon: Icon, color, photo, alt, steps }, phase) => (
           <div key={name} className="flex flex-col">
-            <div
-              className={cx(
-                'mb-4 inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold ring-1',
-                color,
-              )}
-            >
-              <Icon className="size-4" aria-hidden />
-              {name}
+            <div className="group relative mb-4 aspect-[4/3] overflow-hidden rounded-2xl bg-zinc-100 shadow-card">
+              <img
+                src={photo}
+                alt={alt}
+                loading="lazy"
+                decoding="async"
+                className="size-full object-cover transition duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-linear-to-t from-zinc-950/50 via-transparent to-transparent" />
+              <div
+                className={cx(
+                  'absolute bottom-3 left-3 inline-flex w-fit items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold shadow-sm ring-1',
+                  color,
+                )}
+              >
+                <Icon className="size-4" aria-hidden />
+                {name}
+              </div>
             </div>
             <ol className="flex flex-col gap-4">
               {steps.map((s, i) => {
@@ -912,15 +1045,26 @@ function HowItWorks() {
 
 function MoneyFlow() {
   const nodes = [
-    { icon: Users, title: 'Funders', text: 'Investors or a government programme' },
+    {
+      icon: Users,
+      title: 'Funders',
+      text: 'Investors or a government programme',
+    },
     { icon: Landmark, title: 'Trustee', text: 'Holds every naira, per cycle' },
-    { icon: Store, title: 'Agro-dealers', text: 'Paid for inputs, by milestone' },
+    {
+      icon: Store,
+      title: 'Agro-dealers',
+      text: 'Paid for inputs, by milestone',
+    },
     { icon: Tractor, title: 'Farmers', text: 'Grow and deliver the harvest' },
     { icon: Truck, title: 'Buyer', text: 'Pays the trustee for the crop' },
   ];
   return (
     <section className="px-4 sm:px-6">
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-brand-950 px-6 py-16 sm:px-12">
+      <div
+        data-reveal
+        className="relative mx-auto max-w-6xl overflow-hidden rounded-4xl bg-brand-950 px-6 py-16 sm:px-12"
+      >
         <div
           className="pointer-events-none absolute -top-32 -right-24 size-[30rem] rounded-full bg-brand-500/20 blur-3xl"
           aria-hidden
@@ -1004,9 +1148,21 @@ function Returns() {
 
   const rows = [
     { label: 'Management fee', value: FEE, tone: 'bg-zinc-400' },
-    { label: 'Funders’ capital back', value: capitalBack, tone: 'bg-brand-600' },
-    { label: 'Funders’ share of profit (60%)', value: funders, tone: 'bg-brand-400' },
-    { label: 'Farmers’ share of profit (40%)', value: farmers, tone: 'bg-amber-400' },
+    {
+      label: 'Funders’ capital back',
+      value: capitalBack,
+      tone: 'bg-brand-600',
+    },
+    {
+      label: 'Funders’ share of profit (60%)',
+      value: funders,
+      tone: 'bg-brand-400',
+    },
+    {
+      label: 'Farmers’ share of profit (40%)',
+      value: farmers,
+      tone: 'bg-amber-400',
+    },
   ];
 
   return (
@@ -1253,11 +1409,25 @@ const PEOPLE: { icon: LucideIcon; who: string; gets: string }[] = [
 function People() {
   return (
     <Section id="people">
-      <Heading
-        eyebrow="Who it’s for"
-        title="Everyone in the chain, each with exactly the access their job needs."
-        lead="Agrowth gives every participant their own view. Each role sees and does only what it should, and the database itself enforces it, not just the screens."
-      />
+      <div className="mb-12 grid items-center gap-10 lg:grid-cols-[1.1fr_1fr]">
+        <div className="[&>div]:mb-0">
+          <Heading
+            eyebrow="Who it’s for"
+            title="Everyone in the chain, each with exactly the access their job needs."
+            lead="Agrowth gives every participant their own view. Each role sees and does only what it should, and the database itself enforces it, not just the screens."
+          />
+        </div>
+        <PhotoCard
+          src="/images/landing/people.webp"
+          alt="A farmer carrying freshly harvested crops across a green field"
+          className="aspect-[3/2]"
+        >
+          <span className="inline-flex items-center gap-2 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold text-zinc-800 shadow-sm backdrop-blur">
+            <Tractor className="size-4 text-brand-600" aria-hidden />
+            Farmers share in the profit, by what they deliver
+          </span>
+        </PhotoCard>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {PEOPLE.map(({ icon: Icon, who, gets }) => (
           <div
@@ -1320,6 +1490,16 @@ function FieldReady() {
             title="Designed for rural Nigeria, not a city office."
             lead="Verification only works if it works where farms are: patchy signal, shared phones, busy shop counters. Every feature is built for those conditions."
           />
+          <PhotoCard
+            src="/images/landing/field.webp"
+            alt="A smiling farmer carrying a 20 kg bag of produce on a motorbike"
+            className="-mt-4 aspect-[4/3]"
+          >
+            <span className="inline-flex items-center gap-2 rounded-xl bg-brand-950/85 px-3 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur">
+              <WifiOff className="size-4 text-brand-300" aria-hidden />
+              Visits saved offline, sent when the signal returns
+            </span>
+          </PhotoCard>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           {features.map(({ icon: Icon, title, text }) => (
@@ -1475,7 +1655,21 @@ function Faq() {
 function FinalCta({ primary }: { primary: { to: string; label: string } }) {
   return (
     <section className="px-4 py-20 sm:px-6">
-      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[2rem] bg-linear-to-br from-brand-600 to-brand-900 px-6 py-16 text-center text-white sm:px-12">
+      <div
+        data-reveal
+        className="relative isolate mx-auto max-w-6xl overflow-hidden rounded-4xl bg-brand-900 px-6 py-20 text-center text-white sm:px-12"
+      >
+        <img
+          src="/images/landing/cta.webp"
+          alt=""
+          loading="lazy"
+          decoding="async"
+          className="absolute inset-0 -z-10 size-full object-cover"
+        />
+        <div
+          className="absolute inset-0 -z-10 bg-linear-to-br from-brand-700/90 via-brand-900/85 to-brand-950/95"
+          aria-hidden
+        />
         <FieldRows className="pointer-events-none absolute inset-x-0 bottom-0 h-32 text-white/10" />
         <div className="relative mx-auto max-w-2xl">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-white/15">
@@ -1505,6 +1699,78 @@ function FinalCta({ primary }: { primary: { to: string; label: string } }) {
   );
 }
 
+/*
+ * Photos are from Wikimedia Commons, resized and compressed for the web. CC BY-SA images
+ * must keep this attribution: title, author, source and licence. Keep the list in step with
+ * public/images/landing/.
+ */
+const PHOTO_CREDITS: {
+  title: string;
+  author: string;
+  source: string;
+  license: string;
+  licenseUrl?: string;
+}[] = [
+  {
+    title: 'Harvest in progress',
+    author: 'Photobyamin',
+    source: 'https://commons.wikimedia.org/wiki/File:Harvest_in_progress.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    title: 'Maize cultivation, Kaduna city, Nigeria 06',
+    author: 'Onisp',
+    source:
+      'https://commons.wikimedia.org/wiki/File:Maize_cultivation,_Kaduna_city,_Nigeria_06.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    title: 'Female farmer with organizers',
+    author: 'Ishaku Ajeje',
+    source: 'https://commons.wikimedia.org/wiki/File:Female_farmer_with_organizers.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    title: 'Nigeria farmer (14329939606)',
+    author: 'USAID in Africa',
+    source: 'https://commons.wikimedia.org/wiki/File:Nigeria_farmer_(14329939606).jpg',
+    license: 'Public domain (US Government work)',
+    licenseUrl: undefined,
+  },
+  {
+    title: 'Transplanting rice',
+    author: 'Aminucrus',
+    source: 'https://commons.wikimedia.org/wiki/File:Transplanting_rice.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    title: 'Farm workers threshing maize at Makarfi Local Government of Kaduna State Nigeria 01',
+    author: 'MKALM7',
+    source:
+      'https://commons.wikimedia.org/wiki/File:Farm_workers_threshing_maize_at_Makarfi_Local_Government_of_Kaduna_State_Nigeria_01.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+  {
+    title: 'Nigeria farmer (14349734271)',
+    author: 'USAID in Africa',
+    source: 'https://commons.wikimedia.org/wiki/File:Nigeria_farmer_(14349734271).jpg',
+    license: 'Public domain (US Government work)',
+    licenseUrl: undefined,
+  },
+  {
+    title: 'Farmer at harvest',
+    author: 'Photobyamin',
+    source: 'https://commons.wikimedia.org/wiki/File:Farmer_at_harvest.jpg',
+    license: 'CC BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+  },
+];
+
 function Footer() {
   return (
     <footer className="border-t border-zinc-100 px-4 py-10 sm:px-6">
@@ -1532,6 +1798,40 @@ function Footer() {
         past results do not predict future ones. Investment offers are made only through a licensed
         operator. © {new Date().getFullYear()} Agrowth.
       </p>
+      <details className="group mx-auto mt-4 max-w-6xl text-xs text-zinc-400">
+        <summary className="inline-flex list-none items-center gap-1 font-medium text-zinc-500 hover:text-brand-700 [&::-webkit-details-marker]:hidden">
+          Photo credits
+          <ChevronDown className="size-3.5 transition group-open:rotate-180" aria-hidden />
+        </summary>
+        <ul className="mt-2 space-y-1 leading-relaxed">
+          {PHOTO_CREDITS.map((c) => (
+            <li key={c.source}>
+              <a
+                href={c.source}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-zinc-300 underline-offset-2 hover:text-brand-700"
+              >
+                {c.title}
+              </a>{' '}
+              by {c.author},{' '}
+              {c.licenseUrl ? (
+                <a
+                  href={c.licenseUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline decoration-zinc-300 underline-offset-2 hover:text-brand-700"
+                >
+                  {c.license}
+                </a>
+              ) : (
+                c.license
+              )}
+              , via Wikimedia Commons. Resized and cropped.
+            </li>
+          ))}
+        </ul>
+      </details>
     </footer>
   );
 }
