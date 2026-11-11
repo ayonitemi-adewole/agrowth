@@ -99,7 +99,7 @@ export function FarmerDetailPage() {
 
   return (
     <>
-      <Link to="/farmers" className="mb-2 inline-block text-sm text-zinc-500 hover:text-zinc-800">
+      <Link to="/farmers" className="link-back mb-2">
         ← Farmers
       </Link>
       <PageHeader
@@ -144,7 +144,7 @@ export function FarmerDetailPage() {
             <Item label="BVN">{f.bvn_last4 ? `•••••••${f.bvn_last4}` : '—'}</Item>
             <Item label="Cooperative">
               {f.cooperatives ? (
-                <Link to={`/farmers?cooperative=${f.cooperatives.id}`} className="hover:underline">
+                <Link to={`/farmers?cooperative=${f.cooperatives.id}`} className="link">
                   {f.cooperatives.name}
                 </Link>
               ) : (

@@ -33,7 +33,7 @@ export function CertificatePage() {
         <Alert>
           There is no certificate for this pledge: it hasn't been paid, or was refunded.
         </Alert>
-        <Link to="/portfolio" className="mt-4 inline-block text-sm text-zinc-600 hover:underline">
+        <Link to="/portfolio" className="link-back mt-4">
           ← My investments
         </Link>
       </div>
@@ -45,7 +45,7 @@ export function CertificatePage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 print:max-w-none print:p-0">
       <div className="mb-6 flex items-center justify-between gap-3 print:hidden">
-        <Link to="/portfolio" className="text-sm text-zinc-500 hover:text-zinc-800">
+        <Link to="/portfolio" className="link-back">
           ← My investments
         </Link>
         <Button onClick={() => window.print()}>

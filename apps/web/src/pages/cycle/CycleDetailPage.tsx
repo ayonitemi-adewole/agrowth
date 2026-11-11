@@ -79,7 +79,7 @@ export function CycleDetailPage() {
     <>
       <PageHeader
         eyebrow={
-          <Link to="/cycles" className="hover:text-zinc-800">
+          <Link to="/cycles" className="link-back">
             ← Funding cycles
           </Link>
         }

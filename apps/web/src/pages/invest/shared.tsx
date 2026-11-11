@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  CardCta,
   Modal,
   Progress,
   cx,
@@ -148,6 +149,7 @@ export function ListingCard({ listing, to }: { listing: Listing; to: string }) {
           </div>
           <Progress value={taken} />
         </div>
+        <CardCta>View opportunity</CardCta>
       </Card>
     </Link>
   );

@@ -230,7 +230,7 @@ function PositionHeader({ p, onChange }: { p: Position; onChange: () => void }) 
       <div className="min-w-0">
         <Link
           to={`/invest/${p.cycle_id}`}
-          className="font-semibold text-zinc-950 hover:text-brand-700"
+          className="link font-semibold"
         >
           {titleCase(p.cycle.crop)} · {p.cycle.season}
         </Link>

@@ -1,4 +1,4 @@
-import { Inbox, Loader2, X } from 'lucide-react';
+import { ArrowRight, Inbox, Loader2, X } from 'lucide-react';
 import {
   useEffect,
   useRef,
@@ -23,7 +23,8 @@ const variants: Record<Variant, string> = {
   secondary:
     'bg-white text-zinc-800 shadow-sm ring-1 ring-zinc-950/10 hover:bg-zinc-50 disabled:text-zinc-400',
   danger: 'bg-red-600 text-white shadow-sm hover:bg-red-700 disabled:bg-red-600/50',
-  ghost: 'text-zinc-600 hover:bg-zinc-950/5 hover:text-zinc-900 disabled:text-zinc-400',
+  ghost:
+    'bg-zinc-950/[0.04] text-zinc-700 hover:bg-zinc-950/[0.08] hover:text-zinc-900 disabled:bg-transparent disabled:text-zinc-400',
   subtle: 'bg-brand-50 text-brand-800 hover:bg-brand-100 disabled:opacity-50',
 };
 
@@ -57,6 +58,19 @@ export function Button({
       {busy && <Loader2 className="animate-spin" aria-hidden />}
       {children}
     </button>
+  );
+}
+
+/**
+ * The "this card opens something" cue at the foot of a clickable card. The card's link must
+ * carry the `group` class so the arrow nudges when the card is hovered.
+ */
+export function CardCta({ children = 'View details' }: { children?: ReactNode }) {
+  return (
+    <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 group-hover:text-brand-800 group-hover:underline group-hover:underline-offset-[3px]">
+      {children}
+      <ArrowRight className="size-4 transition group-hover:translate-x-0.5" aria-hidden />
+    </span>
   );
 }
 

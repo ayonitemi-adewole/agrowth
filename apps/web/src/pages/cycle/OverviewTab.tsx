@@ -486,7 +486,7 @@ function ReadinessList({
               {onFix && !c.ok ? (
                 <button
                   onClick={() => onFix(c.key)}
-                  className="text-left text-zinc-800 hover:text-brand-700 hover:underline"
+                  className="link text-left"
                 >
                   {c.label}
                 </button>

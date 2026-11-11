@@ -7,6 +7,7 @@ import {
   Badge,
   Button,
   Card,
+  CardCta,
   EmptyState,
   Modal,
   PageHeader,
@@ -123,6 +124,7 @@ function ProgrammeCard({ p }: { p: ProgrammeSummary }) {
             </div>
           ))}
         </dl>
+        <CardCta>View programme</CardCta>
       </Card>
     </Link>
   );

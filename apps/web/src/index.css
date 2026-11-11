@@ -57,6 +57,44 @@ body {
   .grid > * {
     min-width: 0;
   }
+
+  /*
+   * Anything you can click shows the hand cursor. Tailwind v4 resets buttons to the arrow
+   * cursor, which makes them feel like static text; this restores the familiar cue.
+   */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab'],
+  summary,
+  select:not(:disabled),
+  label:has(> input[type='checkbox']:not(:disabled)),
+  label:has(> input[type='radio']:not(:disabled)),
+  input[type='checkbox']:not(:disabled),
+  input[type='radio']:not(:disabled),
+  input[type='file']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* A clear ring for keyboard users on every link and control that doesn't draw its own. */
+  :where(a, button, [role='button'], [role='tab'], summary):focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+}
+
+/*
+ * Text links: brand colour plus a soft underline at rest, so they read as links before
+ * anyone hovers. The underline darkens on hover.
+ */
+@layer components {
+  .link {
+    @apply font-medium text-brand-700 underline decoration-brand-700/30 decoration-1 underline-offset-[3px] transition-colors hover:text-brand-800 hover:decoration-current;
+  }
+  /* "← Back" style links: brand colour, underline on hover. The arrow already shows they go somewhere. */
+  .link-back {
+    @apply inline-flex items-center gap-1 text-sm font-medium text-brand-700 transition-colors hover:text-brand-800 hover:underline hover:underline-offset-[3px];
+  }
 }
 
 /* Keep Leaflet's controls under menus and dialogs. */

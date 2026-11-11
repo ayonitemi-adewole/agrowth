@@ -397,7 +397,7 @@ function PaymentTable({
             )}
           </td>
           <td>
-            <Link to={`/cycles/${p.cycle_id}`} className="hover:underline">
+            <Link to={`/cycles/${p.cycle_id}`} className="link">
               {p.cycle_code}
             </Link>
           </td>

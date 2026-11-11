@@ -242,7 +242,7 @@ function BackLink({ investor }: { investor: boolean }) {
   return (
     <Link
       to={investor ? '/invest' : '/cycles'}
-      className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
+      className="link-back"
     >
       <ArrowLeft className="size-4" aria-hidden /> {investor ? 'Marketplace' : 'Cycles'}
     </Link>

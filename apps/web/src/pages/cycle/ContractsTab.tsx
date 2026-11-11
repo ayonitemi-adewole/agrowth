@@ -234,14 +234,14 @@ function Header({
         <p className="font-semibold text-zinc-950">{title}</p>
         {badge}
       </div>
-      <div className="flex">
+      <div className="flex gap-1.5">
         {onEdit && (
-          <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit">
+          <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit" title="Edit">
             <Pencil aria-hidden />
           </Button>
         )}
         {onDelete && (
-          <Button variant="ghost" size="sm" onClick={onDelete} aria-label="Delete">
+          <Button variant="ghost" size="sm" onClick={onDelete} aria-label="Delete" title="Delete">
             <Trash2 aria-hidden />
           </Button>
         )}

@@ -136,7 +136,7 @@ export function MapFarmPage() {
     <>
       <Link
         to={`/farmers/${farmerId}`}
-        className="mb-2 inline-block text-sm text-zinc-500 hover:text-zinc-800"
+        className="link-back mb-2"
       >
         ← {data.data.farmer.full_name}
       </Link>
@@ -243,7 +243,7 @@ export function MapFarmPage() {
                   <ul className="mt-2 list-disc pl-5">
                     {error.clashes.map((c) => (
                       <li key={c.farm_id}>
-                        <Link to={`/farmers/${c.farmer_id}`} className="underline">
+                        <Link to={`/farmers/${c.farmer_id}`} className="font-medium underline underline-offset-2 hover:decoration-2">
                           Overlaps a registered farm by {formatHectares(c.overlap_hectares)}
                         </Link>
                       </li>

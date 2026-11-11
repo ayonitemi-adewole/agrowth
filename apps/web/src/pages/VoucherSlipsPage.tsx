@@ -72,7 +72,7 @@ export function VoucherSlipsPage() {
     <div className="mx-auto max-w-4xl px-4 py-8 print:max-w-none print:p-0">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <Link to={`/cycles/${id}`} className="text-sm text-zinc-500 hover:text-zinc-800">
+          <Link to={`/cycles/${id}`} className="link-back">
             ← Back to cycle
           </Link>
           <h1 className="mt-1 text-xl font-semibold text-zinc-950">

@@ -70,7 +70,7 @@ export function FarmsTab({ data, reload }: TabProps) {
             {data.farms.map((f) => (
               <tr key={f.id}>
                 <td className="font-medium text-zinc-900">
-                  <Link to={`/farmers/${f.farmer_id}`} className="hover:text-brand-700">
+                  <Link to={`/farmers/${f.farmer_id}`} className="link">
                     {f.farmer_name}
                   </Link>
                 </td>
@@ -87,6 +87,7 @@ export function FarmsTab({ data, reload }: TabProps) {
                       size="sm"
                       onClick={() => remove(f.id)}
                       aria-label={`Remove ${f.farmer_name}'s farm`}
+                      title="Remove from cycle"
                     >
                       <Trash2 aria-hidden />
                     </Button>

@@ -7,6 +7,7 @@ import { CycleStatusBadge } from '../components/StatusBadges';
 import {
   Alert,
   Button,
+  CardCta,
   EmptyState,
   Modal,
   PageHeader,
@@ -170,6 +171,7 @@ export function CyclesPage() {
                   </span>
                 )}
               </div>
+              <CardCta />
             </Link>
           ))}
         </div>

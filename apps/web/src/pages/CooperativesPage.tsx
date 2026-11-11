@@ -83,7 +83,7 @@ export function CooperativesPage() {
           {list.data!.map((c) => (
             <tr key={c.id} className="hover:bg-zinc-50">
               <td className="px-4 py-3 font-medium text-zinc-900">
-                <Link to={`/farmers?cooperative=${c.id}`} className="hover:underline">
+                <Link to={`/farmers?cooperative=${c.id}`} className="link">
                   {c.name}
                 </Link>
               </td>

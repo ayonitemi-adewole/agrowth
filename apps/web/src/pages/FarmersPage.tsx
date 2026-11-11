@@ -132,7 +132,7 @@ export function FarmersPage() {
             {farmers.data!.items.map((f) => (
               <tr key={f.id} className="hover:bg-zinc-50">
                 <td className="px-4 py-3 font-medium text-zinc-900">
-                  <Link to={`/farmers/${f.id}`} className="hover:underline">
+                  <Link to={`/farmers/${f.id}`} className="link">
                     {f.full_name}
                   </Link>
                 </td>

@@ -305,7 +305,7 @@ export function FieldVisitPage() {
     <>
       <PageHeader
         eyebrow={
-          <Link to="/field" className="hover:text-zinc-800">
+          <Link to="/field" className="link-back">
             ← Field visits
           </Link>
         }

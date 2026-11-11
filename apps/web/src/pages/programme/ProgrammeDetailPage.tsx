@@ -261,7 +261,7 @@ function BackLink() {
   return (
     <Link
       to="/programmes"
-      className="inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-800"
+      className="link-back"
     >
       <ArrowLeft className="size-4" aria-hidden /> Programmes
     </Link>
@@ -373,7 +373,7 @@ function UnderDelivered({ dashboard: d }: { dashboard: ProgrammeDashboard }) {
           {d.under_delivered.map((u) => (
             <tr key={`${u.cycle_id}-${u.farmer_id}`}>
               <td className="font-medium text-zinc-900">
-                <Link to={`/farmers/${u.farmer_id}`} className="hover:text-brand-700">
+                <Link to={`/farmers/${u.farmer_id}`} className="link">
                   {u.farmer_name}
                 </Link>
               </td>
@@ -382,7 +382,7 @@ function UnderDelivered({ dashboard: d }: { dashboard: ProgrammeDashboard }) {
                 {u.ward}, {u.lga}
               </td>
               <td className="font-mono text-xs text-zinc-600">
-                <Link to={`/cycles/${u.cycle_id}`} className="hover:text-brand-700">
+                <Link to={`/cycles/${u.cycle_id}`} className="link">
                   {u.cycle_code}
                 </Link>
               </td>
@@ -458,7 +458,7 @@ function Cycles({ dashboard: d }: { dashboard: ProgrammeDashboard }) {
           {d.cycles.map((c) => (
             <tr key={c.id}>
               <td className="font-mono text-xs">
-                <Link to={`/cycles/${c.id}`} className="text-zinc-900 hover:text-brand-700">
+                <Link to={`/cycles/${c.id}`} className="link">
                   {c.code}
                 </Link>
               </td>

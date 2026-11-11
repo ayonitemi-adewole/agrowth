@@ -1,4 +1,4 @@
-import { CloudRain, Sun, Thermometer } from 'lucide-react';
+import { ChevronRight, CloudRain, Sun, Thermometer } from 'lucide-react';
 import { Link } from 'react-router';
 import { supabase } from '../lib/supabase';
 import { useAsync } from '../lib/useAsync';
@@ -29,10 +29,16 @@ export function WeatherWatch() {
           <li key={a.cycle_id}>
             <Link
               to={`/cycles/${a.cycle_id}?tab=weather`}
-              className="block rounded-xl px-2 py-3 transition hover:bg-zinc-50"
+              className="group block rounded-xl px-2 py-3 transition hover:bg-zinc-50"
             >
-              <p className="text-sm font-medium text-zinc-900">
-                {a.code} <span className="font-normal text-zinc-500">· {a.crop}</span>
+              <p className="flex items-center gap-1 text-sm font-medium text-zinc-900">
+                <span className="min-w-0 flex-1 truncate">
+                  {a.code} <span className="font-normal text-zinc-500">· {a.crop}</span>
+                </span>
+                <ChevronRight
+                  className="size-4 shrink-0 text-brand-600 transition group-hover:translate-x-0.5"
+                  aria-hidden
+                />
               </p>
               <ul className="mt-1 space-y-1">
                 {a.flags.map((f) => {

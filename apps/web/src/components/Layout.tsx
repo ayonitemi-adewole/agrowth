@@ -266,7 +266,7 @@ function SyncStatus() {
           <button
             onClick={() => void syncNow()}
             disabled={!online || syncing}
-            className="ml-auto flex items-center gap-1 rounded-md px-1.5 py-0.5 text-brand-200 hover:bg-white/10 disabled:opacity-60"
+            className="ml-auto flex items-center gap-1 rounded-md bg-white/10 px-1.5 py-0.5 font-medium text-white ring-1 ring-white/15 hover:bg-white/20 disabled:opacity-60"
           >
             <CloudUpload className={cx('size-3.5', syncing && 'animate-pulse')} aria-hidden />
             {pending} to send

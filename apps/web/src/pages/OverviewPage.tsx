@@ -403,9 +403,15 @@ export function OverviewPage() {
                       <li key={s.label}>
                         <Link
                           to={`/cycles?stage=${s.filter}`}
-                          className="block h-full rounded-xl bg-zinc-50 px-3 py-3 ring-1 ring-zinc-950/5 transition hover:bg-brand-50 hover:ring-brand-600/20"
+                          className="group block h-full rounded-xl bg-zinc-50 px-3 py-3 ring-1 ring-zinc-950/5 transition hover:bg-brand-50 hover:ring-brand-600/20"
                         >
-                          <p className="text-xs font-medium text-zinc-500">{s.label}</p>
+                          <p className="flex items-center justify-between gap-1 text-xs font-medium text-zinc-500">
+                            {s.label}
+                            <ArrowRight
+                              className="size-3.5 shrink-0 text-brand-600 transition group-hover:translate-x-0.5"
+                              aria-hidden
+                            />
+                          </p>
                           <p className="mt-1 text-2xl font-semibold text-zinc-950 tabular-nums">
                             {s.count}
                           </p>
@@ -485,7 +491,7 @@ export function OverviewPage() {
                             {n}
                           </span>
                           <ArrowRight
-                            className="size-4 text-zinc-300 transition group-hover:translate-x-0.5 group-hover:text-zinc-500"
+                            className="size-4 text-brand-600 transition group-hover:translate-x-0.5 group-hover:text-brand-800"
                             aria-hidden
                           />
                         </Link>
@@ -516,7 +522,7 @@ export function OverviewPage() {
                           <p className="mt-0.5 text-xs text-zinc-500">
                             <Link
                               to={`/cycles/${e.cycle_id}?tab=history`}
-                              className="font-mono hover:text-brand-700"
+                              className="link font-mono"
                             >
                               {e.cycles?.code}
                             </Link>{' '}
