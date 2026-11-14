@@ -1,6 +1,7 @@
 import { BadgeCheck, ImageOff, XCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { FarmMap } from '../../components/FarmMap';
+import { StoredPhotos } from '../../components/Photos';
 import { Badge, DescriptionList, Modal, Skeleton } from '../../components/ui';
 import { signedUrls } from '../../lib/cycles';
 import { formatHectares, titleCase } from '../../lib/format';
@@ -135,6 +136,26 @@ function Evidence({
           ))}
         </p>
       )}
+
+      <div className="flex items-start gap-4 rounded-xl bg-zinc-50 p-3">
+        {v.portrait_path ? (
+          <StoredPhotos
+            bucket="field-photos"
+            paths={[v.portrait_path]}
+            alt={`Portrait of ${farm.farmer_name}`}
+            className="w-24 shrink-0"
+            imgClassName="aspect-[3/4]"
+          />
+        ) : null}
+        <div className="text-sm">
+          <p className="font-medium text-zinc-900">Portrait of the farmer</p>
+          <p className="mt-0.5 text-zinc-500">
+            {v.portrait_path
+              ? `Taken at the visit. Compare it with the portrait from enrolment on ${farm.farmer_name}'s page.`
+              : 'None: recorded before portraits were required, or missing.'}
+          </p>
+        </div>
+      </div>
 
       <DescriptionList
         items={[

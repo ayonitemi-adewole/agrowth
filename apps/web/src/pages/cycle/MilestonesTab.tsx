@@ -322,6 +322,7 @@ function failReason(v: TabProps['data']['visits'][number]) {
   if (v.crop_condition === 'failed') return 'Failed: crop reported as failed';
   if (!v.checklist_passed) return 'Failed: checklist not passed';
   if (v.photo_paths.length === 0) return 'Failed: no photo';
+  if (!v.portrait_path) return 'Failed: no portrait of the farmer';
   return 'Failed';
 }
 

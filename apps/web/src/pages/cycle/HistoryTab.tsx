@@ -1,6 +1,7 @@
 import {
   BadgeCheck,
   Ban,
+  CalendarClock,
   ClipboardCheck,
   Coins,
   History,
@@ -9,6 +10,7 @@ import {
   RotateCcw,
   Send,
   ShieldCheck,
+  Sprout,
   Undo2,
   type LucideIcon,
 } from 'lucide-react';
@@ -29,6 +31,8 @@ const ICONS: Record<string, { icon: LucideIcon; tone: string }> = {
   milestone_awaiting_verification: { icon: ClipboardCheck, tone: 'bg-amber-100 text-amber-700' },
   release_instructed: { icon: Landmark, tone: 'bg-sky-100 text-sky-700' },
   milestone_released: { icon: Landmark, tone: 'bg-brand-100 text-brand-700' },
+  monitoring_interval: { icon: CalendarClock, tone: 'bg-sky-100 text-sky-700' },
+  farm_check_alert: { icon: Sprout, tone: 'bg-amber-100 text-amber-700' },
 };
 
 /** The cycle's append-only history, newest first. */

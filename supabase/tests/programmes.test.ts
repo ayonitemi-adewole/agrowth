@@ -75,14 +75,15 @@ describe('government programmes', () => {
       agent,
       `select public.register_farmer(p_first_name => 'Farmer', p_last_name => $1,
          p_phone => '+2348033330000', p_state => $2, p_lga => $3, p_nin => $4,
-         p_gender => $5, p_cooperative_id => $6) as id`,
+         p_gender => $5, p_cooperative_id => $6, p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
       [last, where[0], where[1], String(nextNin++), gender, cooperative],
     );
     await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmer]);
-    const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
-      farmer,
-      JSON.stringify(square(lon, 11.7, size)),
-    ]);
+    const [{ id }] = await as<{ id: string }>(
+      agent,
+      `select public.map_farm($1, $2, p_photo_paths => array[auth.uid()::text || '/farm.jpg']) as id`,
+      [farmer, JSON.stringify(square(lon, 11.7, size))],
+    );
     return id;
   };
 
@@ -317,7 +318,7 @@ describe('government programmes', () => {
         for (const [i, f] of farms.entries()) {
           await as(
             agent,
-            `select public.record_field_visit($1, $2, $3, 11.70045, 5, 'good', true, $4)`,
+            `select public.record_field_visit($1, $2, $3, 11.70045, 5, 'good', true, $4, p_portrait_path => 'visit/portrait.jpg')`,
             [f, m, lons[i] + 0.00045, ['visit/photo.jpg']],
           );
         }

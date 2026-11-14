@@ -60,6 +60,8 @@ export interface Farmer {
   lga: string;
   ward: string | null;
   photo_url: string | null;
+  /** The portrait taken at enrolment, in "registry-photos". Older records may have none. */
+  portrait_path: string | null;
   cooperative_id: string | null;
   registered_by: string;
   created_at: string;
@@ -80,6 +82,8 @@ export interface FarmMap {
   centroid_lat: number;
   cooperative_id: string | null;
   created_at: string;
+  /** Photos of the farm's condition when it was mapped, in "registry-photos". */
+  photo_paths: string[];
 }
 
 export interface Page<T> {
@@ -138,6 +142,8 @@ export interface Cycle {
   management_fee_bps: number;
   funder_profit_share_bps: number;
   programme_id: string | null;
+  /** Routine farm checks: every farm is checked this often once the season has begun. */
+  monitoring_interval_days: number;
   harvest_completed_at: string | null;
   settlement_started_at: string | null;
   settled_at: string | null;
@@ -261,7 +267,42 @@ export interface FieldVisit {
   crop_condition: CropCondition;
   notes: string | null;
   photo_paths: string[];
+  /** The portrait of the farmer. Visits from before portraits were required have none. */
+  portrait_path: string | null;
   passed: boolean;
+}
+
+/** A routine check of a farm (farm_check_evidence): separate from milestones and money. */
+export interface FarmCheck {
+  id: string;
+  cycle_id: string;
+  farm_id: string;
+  agent_id: string;
+  visited_at: string;
+  created_at: string;
+  lon: number;
+  lat: number;
+  gps_accuracy_m: number;
+  distance_from_boundary_m: number;
+  /** Made at the farm; only these count towards the schedule. */
+  gps_ok: boolean;
+  crop_condition: CropCondition;
+  notes: string | null;
+  portrait_path: string;
+  photo_paths: string[];
+}
+
+/** When a farm in a running cycle is due its next routine check (farm_check_schedule). */
+export interface FarmCheckDue {
+  cycle_id: string;
+  farm_id: string;
+  interval_days: number;
+  starts_on: string;
+  last_check_at: string | null;
+  last_condition: CropCondition | null;
+  checks: number;
+  next_due_on: string;
+  days_overdue: number;
 }
 
 export interface Disbursement {

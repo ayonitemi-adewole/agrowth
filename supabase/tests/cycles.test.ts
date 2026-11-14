@@ -54,16 +54,17 @@ describe('a funding cycle, end to end', () => {
   const enrol = async (nin: string, last: string) => {
     const [{ id }] = await as<{ id: string }>(
       agent,
-      `select public.register_farmer($1, $2, '+2348012345678', 'Kaduna', 'Zaria', $3) as id`,
+      `select public.register_farmer($1, $2, '+2348012345678', 'Kaduna', 'Zaria', $3, p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
       ['Farmer', last, nin],
     );
     return id;
   };
   const mapFarm = async (farmer: string, lon: number) => {
-    const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
-      farmer,
-      JSON.stringify(square(lon, 11.1)),
-    ]);
+    const [{ id }] = await as<{ id: string }>(
+      agent,
+      `select public.map_farm($1, $2, p_photo_paths => array[auth.uid()::text || '/farm.jpg']) as id`,
+      [farmer, JSON.stringify(square(lon, 11.1))],
+    );
     return id;
   };
 
@@ -376,7 +377,7 @@ describe('a funding cycle, end to end', () => {
       };
       return as<{ r: { passed: boolean; gps_ok: boolean; milestone_status: string } }>(
         agent,
-        `select public.record_field_visit($1, $2, $3, 11.10045, $4, $5, $6, $7) as r`,
+        `select public.record_field_visit($1, $2, $3, 11.10045, $4, $5, $6, $7, p_portrait_path => 'visit/portrait.jpg') as r`,
         [farm, v.milestone, lon, v.accuracy, v.condition, v.checklist, v.photos],
       ).then((rows) => rows[0].r);
     };

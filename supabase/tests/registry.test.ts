@@ -28,7 +28,7 @@ describe('registry', () => {
       const { rows } = await tx.query<{ id: string }>(
         `select public.register_farmer(
            p_first_name => $1, p_last_name => $2, p_phone => $3, p_state => $4, p_lga => $5,
-           p_nin => $6, p_bvn => $7, p_cooperative_id => $8) as id`,
+           p_nin => $6, p_bvn => $7, p_cooperative_id => $8, p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
         [
           args.p_first_name,
           args.p_last_name,
@@ -47,7 +47,7 @@ describe('registry', () => {
   const mapFarm = (userId: string, farmer: string, boundary: unknown, crop?: string) =>
     asUser(db, userId, async (tx) => {
       const { rows } = await tx.query<{ id: string }>(
-        `select public.map_farm(p_farmer_id => $1, p_boundary => $2, p_primary_crop => $3) as id`,
+        `select public.map_farm(p_farmer_id => $1, p_boundary => $2, p_primary_crop => $3, p_photo_paths => array[auth.uid()::text || '/farm.jpg']) as id`,
         [farmer, JSON.stringify(boundary), crop ?? null],
       );
       return rows[0].id;

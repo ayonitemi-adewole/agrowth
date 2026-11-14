@@ -42,6 +42,7 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
     funding_deadline: cycle?.funding_deadline ?? '',
     start_date: cycle?.start_date ?? '',
     expected_harvest_date: cycle?.expected_harvest_date ?? '',
+    check_days: String(cycle?.monitoring_interval_days ?? 14),
     description: cycle?.description ?? '',
     fee_pct: ((cycle?.management_fee_bps ?? 0) / 100).toString(),
     funder_share_pct: ((cycle?.funder_profit_share_bps ?? 3000) / 100).toString(),
@@ -92,6 +93,9 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
 
     let row: Record<string, unknown>;
     try {
+      const checkDays = Number(form.check_days);
+      if (!Number.isInteger(checkDays) || checkDays < 1 || checkDays > 90)
+        throw new Error('Farm checks must be every 1 to 90 days');
       row = {
         code: form.code.trim().toUpperCase(),
         crop: form.crop.trim().toLowerCase(),
@@ -110,6 +114,7 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
         funding_deadline: form.funding_deadline || null,
         start_date: form.start_date || null,
         expected_harvest_date: form.expected_harvest_date || null,
+        monitoring_interval_days: checkDays,
         description: form.description.trim() || null,
         management_fee_bps: bps('Management fee', form.fee_pct, 20),
         funder_profit_share_bps: bps("Funders' share of profit", form.funder_share_pct, 100),
@@ -348,6 +353,21 @@ export function CycleForm({ cycle, onDone }: { cycle?: Cycle; onDone: (saved: bo
             />
           </Field>
         </div>
+        <Field
+          label="Farm checks every (days)"
+          hint="Once the season begins, a field agent checks each farm this often. Separate from milestones."
+        >
+          <Input
+            type="number"
+            min={1}
+            max={90}
+            step={1}
+            required
+            value={form.check_days}
+            onChange={set('check_days')}
+            className="sm:w-40"
+          />
+        </Field>
         <Field label="Notes" hint="Optional: anything a reviewer or funder should know">
           <Textarea
             rows={3}

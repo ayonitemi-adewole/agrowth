@@ -1,11 +1,22 @@
 import type { Outbox } from './store';
-import type { QueuedVisit, VisitResult } from './types';
+import {
+  visitKind,
+  type CheckResult,
+  type QueuedPhoto,
+  type QueuedVisit,
+  type VisitResult,
+} from './types';
 
 /** What syncing needs from the server. */
 export interface Remote {
   /** Uploads a photo. Uploading the same path twice must succeed (it's already there). */
   upload(path: string, photo: { blob: Blob; type: string }): Promise<void>;
-  recordVisit(visit: QueuedVisit, photoPaths: string[]): Promise<VisitResult>;
+  /** Records a milestone visit or a routine check, by the visit's kind. */
+  recordVisit(
+    visit: QueuedVisit,
+    photoPaths: string[],
+    portraitPath: string | null,
+  ): Promise<VisitResult | CheckResult>;
 }
 
 export interface SyncReport {
@@ -18,9 +29,22 @@ export interface SyncReport {
 /** Synced visits are kept this long so the agent can see their results, then forgotten. */
 export const KEEP_SYNCED_MS = 7 * 86_400_000;
 
+/**
+ * The folder for a visit's photos in "field-photos": <milestone id>/<farm id> for a
+ * milestone visit, checks/<cycle id>/<farm id> for a routine check.
+ */
+const folder = (v: QueuedVisit) =>
+  visitKind(v) === 'check' ? `checks/${v.cycleId}/${v.farmId}` : `${v.milestoneId}/${v.farmId}`;
+
+const safeName = (p: QueuedPhoto) => p.name.replace(/[^A-Za-z0-9._-]+/g, '-').slice(-60);
+
 /** Where a queued visit's photo goes. Fixed per visit, so a retry overwrites nothing new. */
 export const photoPath = (v: QueuedVisit, i: number) =>
-  `${v.milestoneId}/${v.farmId}/${v.id}-${i}-${v.photos[i].name.replace(/[^A-Za-z0-9._-]+/g, '-').slice(-60)}`;
+  `${folder(v)}/${v.id}-${i}-${safeName(v.photos[i])}`;
+
+/** Where a queued visit's portrait of the farmer goes. */
+export const portraitPath = (v: QueuedVisit & { portrait: QueuedPhoto }) =>
+  `${folder(v)}/${v.id}-portrait-${safeName(v.portrait)}`;
 
 /**
  * A connection problem (try again later) rather than the database refusing the visit
@@ -49,7 +73,8 @@ const messageOf = (err: unknown) =>
   (err as { message?: string } | null)?.message || 'The server refused this visit';
 
 /**
- * Sends every queued visit for this user, oldest first: photos, then the visit itself.
+ * Sends every queued visit for this user, oldest first: the portrait and photos, then the
+ * visit itself.
  * Stops at the first connection problem, leaving the rest queued. A visit the database
  * refuses is marked failed with its reason. Old synced visits are tidied away.
  */
@@ -78,17 +103,23 @@ export async function syncOutbox(
     };
     try {
       const paths = v.photos.map((_, i) => photoPath(v, i));
-      for (const [i, path] of paths.entries()) {
+      const portrait = v.portrait ? portraitPath({ ...v, portrait: v.portrait }) : null;
+      const files: [string, QueuedPhoto][] = [
+        ...(portrait && v.portrait ? [[portrait, v.portrait] as [string, QueuedPhoto]] : []),
+        ...paths.map((p, i) => [p, v.photos[i]] as [string, QueuedPhoto]),
+      ];
+      for (const [path, photo] of files) {
         if (v.uploaded.includes(path)) continue;
-        await remote.upload(path, v.photos[i]);
+        await remote.upload(path, photo);
         v.uploaded.push(path);
         await box.put(v);
       }
-      const result = await remote.recordVisit(v, paths);
+      const result = await remote.recordVisit(v, paths, portrait);
       // The photos have done their job; keep the record of what happened, not the files.
       const done: QueuedVisit = {
         ...v,
         photos: [],
+        portrait: null,
         state: 'synced',
         result,
         syncedAt: now().toISOString(),

@@ -189,7 +189,7 @@ describe('identity checks', () => {
       await as<{ id: string }>(
         agent,
         `select public.register_farmer('Amina', $1, '+2348031234567', 'Kaduna', 'Zaria',
-           $2, $3, null, '1990-04-21') as id`,
+           $2, $3, null, '1990-04-21', p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
         [last, nin, bvn],
       )
     )[0].id;
