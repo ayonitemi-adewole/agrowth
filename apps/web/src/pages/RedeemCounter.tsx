@@ -48,12 +48,17 @@ export function Counter({
   }, []);
   const needsPhone = rules.data?.needs_phone ?? false;
   // A scan that needs nothing more is checked straight away.
-  const autoCheck = useAsync(async () => {
-    if (!scan || !rules.data || rules.data.needs_phone) return null;
-    const { data, error } = await supabase.rpc('check_scanned_voucher', { p_scanned: scan });
-    if (error) throw error;
-    return data as VoucherCheck;
-  }, [scan, rules.data?.needs_phone]);
+  const autoCheck = useAsync(
+    async () => {
+      if (!scan || !rules.data || rules.data.needs_phone) return null;
+      const { data, error } = await supabase.rpc('check_scanned_voucher', { p_scanned: scan });
+      if (error) throw error;
+      return data as VoucherCheck;
+    },
+    [scan, rules.data?.needs_phone],
+    // Each check counts towards the lockout on guessing, so a pull doesn't repeat it.
+    { refresh: false },
+  );
   const shown = found ?? (autoCheck.data?.ok ? autoCheck.data : null);
 
   const reset = () => {

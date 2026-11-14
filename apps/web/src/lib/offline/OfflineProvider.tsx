@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useAuth } from '../../auth/AuthProvider';
+import { onRefresh } from '../refresh';
 import { can } from '../roles';
 import { supabase } from '../supabase';
 import { available, outbox } from './store';
@@ -127,6 +128,9 @@ export function OfflineProvider({ children }: { children: ReactNode }) {
     const t = setTimeout(() => void refresh().then(() => (online ? syncNow() : null)), 0);
     return () => clearTimeout(t);
   }, [refresh, syncNow, online]);
+
+  // Pulling a page down to refresh also sends what's waiting on the phone.
+  useEffect(() => onRefresh(() => syncNow()), [syncNow]);
 
   const pending = visits.filter((v) => v.state === 'queued').length;
   useEffect(() => {

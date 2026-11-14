@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { onRefresh } from './refresh';
 
 export interface AsyncState<T> {
   /** The latest result. Kept while a reload is in flight, so the page doesn't flash empty. */
@@ -14,11 +15,24 @@ export interface AsyncState<T> {
   reload: () => void;
 }
 
+export interface AsyncOptions {
+  /**
+   * Load again when the person pulls the page down to refresh (default true). Turn it off
+   * for a load with side effects, such as confirming a payment or checking a scanned voucher.
+   */
+  refresh?: boolean;
+}
+
 /**
- * Runs `load` whenever `deps` change, and exposes loading/error state.
+ * Runs `load` whenever `deps` change, and exposes loading/error state. It also runs again
+ * on pull to refresh, unless `options.refresh` is false.
  * `deps` must be simple values (ids, search text, page numbers).
  */
-export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncState<T> {
+export function useAsync<T>(
+  load: () => Promise<T>,
+  deps: unknown[],
+  options: AsyncOptions = {},
+): AsyncState<T> {
   const [tick, setTick] = useState(0);
   const depsKey = JSON.stringify(deps);
   const key = `${depsKey}#${tick}`;
@@ -29,16 +43,44 @@ export function useAsync<T>(load: () => Promise<T>, deps: unknown[]): AsyncState
     loadRef.current = load;
   });
 
+  // Pulls waiting for the next load to finish, so the spinner stops when the data is in.
+  const waiting = useRef<(() => void)[]>([]);
+  const settle = () => waiting.current.splice(0).forEach((done) => done());
+
   useEffect(() => {
     let cancelled = false;
     loadRef.current().then(
-      (data) => !cancelled && setResult({ key, data }),
-      (error: unknown) => !cancelled && setResult((prev) => ({ key, data: prev?.data, error })),
+      (data) => {
+        if (cancelled) return;
+        setResult({ key, data });
+        settle();
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        setResult((prev) => ({ key, data: prev?.data, error }));
+        settle();
+      },
     );
     return () => {
       cancelled = true;
     };
   }, [key]);
+
+  const refreshable = options.refresh !== false;
+  useEffect(() => {
+    if (!refreshable) return;
+    const off = onRefresh(
+      () =>
+        new Promise<void>((resolve) => {
+          waiting.current.push(resolve);
+          setTick((t) => t + 1);
+        }),
+    );
+    return () => {
+      off();
+      settle();
+    };
+  }, [refreshable]);
 
   const loading = result?.key !== key;
   const stale = result !== undefined && !result.key.startsWith(`${depsKey}#`);

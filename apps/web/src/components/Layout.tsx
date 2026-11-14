@@ -31,6 +31,7 @@ import { useOffline } from '../lib/offline/OfflineProvider';
 import { can, ROLE_LABELS } from '../lib/roles';
 import type { Role } from '../lib/types';
 import { preloadRoute } from '../pages/lazy';
+import { PullToRefresh } from './PullToRefresh';
 import { SplashScreen } from './SplashScreen';
 import { DemoSwitcher } from './DemoSignIn';
 import { Avatar, cx } from './ui';
@@ -232,8 +233,10 @@ export function Layout() {
         </button>
       </header>
 
+      <PullToRefresh />
+
       {open && (
-        <div className="fixed inset-0 z-40 lg:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden" data-no-pull>
           <div
             className="absolute inset-0 animate-fade-in bg-zinc-950/40"
             onClick={() => setOpen(false)}
