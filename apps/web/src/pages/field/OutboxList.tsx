@@ -2,12 +2,12 @@ import { CheckCircle2, CloudUpload, Hourglass, Trash2, XCircle } from 'lucide-re
 import { useState } from 'react';
 import { Badge, Button, Card, Modal, SectionTitle, cx } from '../../components/ui';
 import { useOffline } from '../../lib/offline/OfflineProvider';
-import type { QueuedVisit } from '../../lib/offline/types';
+import { isCheckResult, type QueuedVisit } from '../../lib/offline/types';
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' });
 
-/** Visits on this phone: waiting to send, refused by the database, or recently sent. */
+/** Visits and checks on this phone: waiting to send, refused by the database, or recently sent. */
 export function OutboxList() {
   const { visits, online, syncing, pending, syncNow } = useOffline();
   if (visits.length === 0) return null;
@@ -41,7 +41,9 @@ export function OutboxList() {
 }
 
 function OutboxRow({ v }: { v: QueuedVisit }) {
-  const passed = v.result?.passed;
+  // A routine check has no pass or fail; it "passes" here when it counts (made at the farm).
+  const passed = isCheckResult(v.result) ? v.result.gps_ok : v.result?.passed;
+  const isCheck = isCheckResult(v.result);
   return (
     <li className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0">
       {v.state === 'queued' ? (
@@ -62,7 +64,7 @@ function OutboxRow({ v }: { v: QueuedVisit }) {
           <p className="mt-1 text-xs text-red-700">
             {v.result?.gps_ok
               ? 'Did not pass. The release is on hold until a passing visit.'
-              : `Check-in was ${Math.round(v.result?.distance_from_boundary_m ?? 0)} m from the boundary, or the GPS wasn't precise enough.`}
+              : `Check-in was ${Math.round(v.result?.distance_from_boundary_m ?? 0)} m from the boundary, or the GPS wasn't precise enough.${isCheck ? " Kept, but it doesn't count as the farm's check." : ''}`}
           </p>
         )}
       </div>
@@ -79,9 +81,13 @@ function OutboxRow({ v }: { v: QueuedVisit }) {
           ? `Waiting${v.attempts ? ` · tried ${v.attempts}×` : ''}`
           : v.state === 'failed'
             ? 'Not accepted'
-            : passed
-              ? 'Sent · passed'
-              : 'Sent · did not pass'}
+            : isCheck
+              ? passed
+                ? 'Sent'
+                : 'Sent · not counted'
+              : passed
+                ? 'Sent · passed'
+                : 'Sent · did not pass'}
       </Badge>
       {v.state === 'failed' && <DiscardButton v={v} />}
     </li>
@@ -99,7 +105,7 @@ function DiscardButton({ v }: { v: QueuedVisit }) {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Remove this visit from the phone?"
+        title="Remove this from the phone?"
         description="The database didn't accept it, so it isn't recorded anywhere else. Remove it once you've noted why, or recorded a new visit."
       >
         <p className={cx('mb-4 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800')}>{v.error}</p>

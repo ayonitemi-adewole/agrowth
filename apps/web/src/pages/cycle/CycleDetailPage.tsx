@@ -7,6 +7,7 @@ import { errorMessage } from '../../lib/errors';
 import { titleCase } from '../../lib/format';
 import { can } from '../../lib/roles';
 import { ContractsTab } from './ContractsTab';
+import { FarmChecksTab } from './FarmChecksTab';
 import { FarmsTab } from './FarmsTab';
 import { FundingTab } from './FundingTab';
 import { HarvestTab } from './HarvestTab';
@@ -22,6 +23,7 @@ const TABS = [
   'overview',
   'farms',
   'milestones',
+  'checks',
   'contracts',
   'funding',
   'vouchers',
@@ -65,6 +67,9 @@ export function CycleDetailPage() {
     'harvested',
     'settled',
   ].includes(cycle.status);
+  // Routine farm checks run from when the season begins; their record stays afterwards.
+  const checked =
+    seesFarms && ['funded', 'in_progress', 'harvested', 'settled'].includes(cycle.status);
   const usesVouchers =
     data.vouchers.length > 0 || data.disbursements.some((d) => d.payee_kind === 'input_voucher');
 
@@ -109,6 +114,7 @@ export function CycleDetailPage() {
             ? [{ id: 'farms' as const, label: 'Farms', count: data.farms.length }]
             : []),
           { id: 'milestones', label: 'Milestones', count: data.milestones.length },
+          ...(checked ? [{ id: 'checks' as const, label: 'Farm checks' }] : []),
           {
             id: 'contracts',
             label: 'Offtake & insurance',
@@ -137,6 +143,7 @@ export function CycleDetailPage() {
         {tab === 'overview' && <OverviewTab {...props} goTo={setTab} />}
         {tab === 'farms' && <FarmsTab {...props} />}
         {tab === 'milestones' && <MilestonesTab {...props} />}
+        {tab === 'checks' && <FarmChecksTab {...props} />}
         {tab === 'contracts' && <ContractsTab {...props} />}
         {tab === 'funding' && <FundingTab {...props} />}
         {tab === 'vouchers' && <VouchersTab {...props} />}

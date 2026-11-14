@@ -13,7 +13,7 @@ import { MOCK_ENDINGS, mockProvider } from '../functions/_shared/identity/mock.t
 import { runIdentityCheck } from '../functions/_shared/identity/run.ts';
 import type { NumberType, Subject } from '../functions/_shared/identity/types.ts';
 import type { SeedApi, Session } from './api.ts';
-import { fieldPhoto, type FieldStage } from './field-photo.ts';
+import { farmerPortrait, fieldPhoto, type FieldStage } from './field-photo.ts';
 import {
   COOPERATIVES,
   CYCLES,
@@ -376,7 +376,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       let kyc: Kyc = 'verified';
       if (!spec) kyc = i - taken[coop.key] < UNASSIGNED_REJECTED ? 'rejected' : 'pending';
       else if (spec.pendingKyc?.includes(placed.position)) kyc = 'pending';
-      const farm = await enrolAndMap(agent, coop, i, first, last, gender, kyc);
+      const farm = await enrolAndMap(agent, ids[coop.agent], coop, i, first, last, gender, kyc);
       farmerCount++;
       if (kyc === 'verified') {
         await compliance.rpc('set_farmer_kyc', { p_farmer_id: farm.farmerId, p_status: kyc });
@@ -397,6 +397,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
 
   async function enrolAndMap(
     agent: Session,
+    agentId: string,
     coop: CoopSpec,
     i: number,
     first: string,
@@ -418,6 +419,14 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     } else if (kyc === 'pending' && nin) {
       nin = `${6_180_000 + n}${MOCK_ENDINGS.partial}`;
     }
+    // The agent takes the farmer's portrait at enrolment.
+    const portraitPath = `${agentId}/${crypto.randomUUID()}-portrait.svg`;
+    await agent.upload(
+      'registry-photos',
+      portraitPath,
+      farmerPortrait({ name: `${first} ${last}`, takenAt: new Date(), variant: n }),
+      'image/svg+xml',
+    );
     const farmerId = await agent.rpc<string>('register_farmer', {
       p_first_name: first,
       p_last_name: last,
@@ -430,6 +439,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       p_date_of_birth: day(-Math.round(between(25, 58) * 365.25)),
       p_ward: coop.wards[i % coop.wards.length],
       p_cooperative_id: coopIds[coop.key],
+      p_portrait_path: portraitPath,
     });
     // Most farmers have an account for their harvest surplus, many of them mobile money;
     // a few don't, and are paid by hand.
@@ -446,6 +456,22 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     if (bvn) await checkIdentity(agent, 'farmer', farmerId, 'bvn', bvn);
     const boundary = farmBoundary(coop.origin, i, rand);
     const farmName = FARM_NAMES[i % FARM_NAMES.length];
+    // And a photo of the farm's condition when mapping it, before the season.
+    const farmPhotoPath = `${agentId}/${crypto.randomUUID()}-farm.svg`;
+    await agent.upload(
+      'registry-photos',
+      farmPhotoPath,
+      fieldPhoto({
+        stage: 'soil',
+        title: `${farmName} · ${first} ${last}`,
+        lat: boundary.centre[1],
+        lon: boundary.centre[0],
+        accuracy: 4,
+        takenAt: new Date(),
+        variant: n * 13,
+      }),
+      'image/svg+xml',
+    );
     const farmId = await agent.rpc<string>('map_farm', {
       p_farmer_id: farmerId,
       p_boundary: boundary.geojson,
@@ -453,6 +479,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       p_primary_crop: MAIN_CROP[coop.key],
       p_tenure_type: TENURE[i % TENURE.length],
       p_soil_notes: SOILS[(i * 3) % SOILS.length],
+      p_photo_paths: [farmPhotoPath],
     });
     const [farm] = await agent.select('farms', 'area_hectares', { id: farmId });
     return {
@@ -512,6 +539,8 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
       funding_deadline: plan(spec.deadline),
       start_date: plan(spec.start),
       expected_harvest_date: plan(spec.harvest),
+      // Routine farm checks: weekly on the demo, so a check falls due within the live season.
+      monitoring_interval_days: 7,
       management_fee_bps: Math.round(spec.feePct * 100),
       funder_profit_share_bps: Math.round(spec.funderSharePct * 100),
       ...(spec.programme ? { programme_id: programmeIds.get(spec.programme) } : {}),
@@ -714,6 +743,19 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         variant: Math.floor(rand() * 1000),
       });
       await agent.upload('field-photos', path, photo, 'image/svg+xml');
+      const portraitPath = `${milestoneId}/${farm.farmId}/${crypto.randomUUID()}-portrait.svg`;
+      await agent.upload(
+        'field-photos',
+        portraitPath,
+        farmerPortrait({
+          name: farm.farmerName,
+          takenAt: new Date(),
+          variant: Math.floor(rand() * 1000),
+          lat,
+          lon,
+        }),
+        'image/svg+xml',
+      );
       const result = await agent.rpc<{ passed: boolean }>('record_field_visit', {
         p_farm_id: farm.farmId,
         p_milestone_id: milestoneId,
@@ -723,6 +765,7 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
         p_crop_condition: rand() < 0.7 ? 'good' : 'fair',
         p_checklist_passed: true,
         p_photo_paths: [path],
+        p_portrait_path: portraitPath,
         p_notes: pass
           ? spec.milestones[m].visitNotes
           : 'Checked in from the village: the farm track was flooded after the rain.',
@@ -957,6 +1000,62 @@ export async function seedDemo(api: SeedApi, opts: SeedOptions): Promise<SeedRes
     }
 
     await restoreDates();
+
+    // Routine farm checks on the live season, separate from milestone visits. The season
+    // began 10 days ago and farms are checked weekly: every farm has had its first check
+    // except one, which is now overdue. One check found the crop in poor shape.
+    if (spec.stage === 'in_progress') {
+      for (const [i, farm] of farms.entries()) {
+        if (i === 1) continue;
+        const visitedAt = new Date(date(-3).getTime() - between(1, 30) * 3_600_000);
+        const accuracy = 3 + Math.floor(rand() * 6);
+        const lon = farm.centre[0] + (rand() - 0.5) * 0.0001;
+        const lat = farm.centre[1] + (rand() - 0.5) * 0.0001;
+        const dir = `checks/${cycleId}/${farm.farmId}/${crypto.randomUUID()}`;
+        const poor = i === farms.length - 1;
+        await agent.upload(
+          'field-photos',
+          `${dir}-portrait.svg`,
+          farmerPortrait({
+            name: farm.farmerName,
+            takenAt: visitedAt,
+            variant: Math.floor(rand() * 1000),
+            lat,
+            lon,
+          }),
+          'image/svg+xml',
+        );
+        await agent.upload(
+          'field-photos',
+          `${dir}-farm.svg`,
+          fieldPhoto({
+            stage: 'green',
+            title: `${farm.farmName} · ${farm.farmerName}`,
+            lat,
+            lon,
+            accuracy,
+            takenAt: visitedAt,
+            variant: Math.floor(rand() * 1000),
+          }),
+          'image/svg+xml',
+        );
+        await agent.rpc('record_farm_check', {
+          p_cycle_id: cycleId,
+          p_farm_id: farm.farmId,
+          p_lon: lon,
+          p_lat: lat,
+          p_gps_accuracy_m: accuracy,
+          p_crop_condition: poor ? 'poor' : rand() < 0.7 ? 'good' : 'fair',
+          p_portrait_path: `${dir}-portrait.svg`,
+          p_photo_paths: [`${dir}-farm.svg`],
+          p_notes: poor
+            ? 'Stem borer damage on the eastern rows; about a fifth of plants affected. Farmer advised to spray.'
+            : 'Crop emerging evenly. Weeding done.',
+          p_visited_at: visitedAt.toISOString(),
+          p_client_ref: crypto.randomUUID(),
+        });
+      }
+    }
 
     // A claim under way on the live maize cycle: reported and the insurer told, waiting
     // for its loss assessor, so a demo can record the assessment.

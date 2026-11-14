@@ -1,7 +1,9 @@
 import { Crosshair, LocateFixed, Trash2, Undo2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
+import { PhotoPicker } from '../components/Photos';
 import {
   Alert,
   Button,
@@ -16,6 +18,7 @@ import {
 import { errorMessage, overlappingFarms, type OverlappingFarm } from '../lib/errors';
 import { formatHectares } from '../lib/format';
 import { approxHectares, polygonFromPoints, selfIntersects, type LonLat } from '../lib/geo';
+import { uploadRegistryPhoto } from '../lib/photos';
 import { supabase } from '../lib/supabase';
 import type { Farmer, FarmMap as Farm, TenureType } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -26,7 +29,9 @@ const MAX_GPS_ACCURACY_M = 20;
 export function MapFarmPage() {
   const { id: farmerId } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [points, setPoints] = useState<LonLat[]>([]);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [details, setDetails] = useState({
     name: '',
     primary_crop: '',
@@ -108,9 +113,19 @@ export function MapFarmPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const boundary = polygonFromPoints(points);
-    if (!boundary) return;
+    if (!boundary || photos.length === 0) return;
     setBusy(true);
     setError(null);
+    let photoPaths: string[];
+    try {
+      photoPaths = await Promise.all(
+        photos.map((p) => uploadRegistryPhoto(profile!.id, p, 'farm')),
+      );
+    } catch (err) {
+      setBusy(false);
+      setError({ message: `Could not upload the photos: ${errorMessage(err)}`, clashes: [] });
+      return;
+    }
     const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
     const { error } = await supabase.rpc('map_farm', {
       p_farmer_id: farmerId,
@@ -119,6 +134,7 @@ export function MapFarmPage() {
       p_primary_crop: orNull(details.primary_crop),
       p_tenure_type: details.tenure_type,
       p_soil_notes: orNull(details.soil_notes),
+      p_photo_paths: photoPaths,
     });
     setBusy(false);
     if (error) {
@@ -139,7 +155,7 @@ export function MapFarmPage() {
       </Link>
       <PageHeader
         title="Map a farm"
-        description="Walk the boundary and add a corner at each turn, or tap the corners on the satellite map. Go around in order."
+        description="Walk the boundary and add a corner at each turn, or tap the corners on the satellite map. Go around in order. Then photograph the farm as it is today."
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -224,6 +240,13 @@ export function MapFarmPage() {
                 <option value="other">Other</option>
               </Select>
             </Field>
+            <div className="space-y-1.5">
+              <p className="text-sm font-medium text-zinc-700">Condition of the farm</p>
+              <p className="text-xs text-zinc-500">
+                At least one photo: the land as it is today, before the season.
+              </p>
+              <PhotoPicker value={photos} onChange={setPhotos} />
+            </div>
             <Field label="Soil notes">
               <Textarea
                 rows={3}
@@ -255,11 +278,16 @@ export function MapFarmPage() {
             <Button
               type="submit"
               busy={busy}
-              disabled={points.length < 3 || crossing}
+              disabled={points.length < 3 || crossing || photos.length === 0}
               className="w-full"
             >
               Save farm
             </Button>
+            {points.length >= 3 && !crossing && photos.length === 0 && (
+              <p className="text-center text-xs text-zinc-500">
+                Needs at least one photo of the farm.
+              </p>
+            )}
           </form>
         </Card>
       </div>

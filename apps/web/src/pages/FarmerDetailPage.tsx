@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
 import { EditBankAccount } from '../components/BankAccountForm';
+import { StoredPhotos } from '../components/Photos';
 import { IdentityChecks } from '../components/IdentityChecks';
 import {
   Alert,
@@ -137,6 +138,22 @@ export function FarmerDetailPage() {
             <h2 className="font-semibold text-zinc-900">Details</h2>
             <KycBadge status={f.kyc_status} />
           </div>
+          {f.portrait_path ? (
+            <div className="flex items-end gap-3">
+              <StoredPhotos
+                bucket="registry-photos"
+                paths={[f.portrait_path]}
+                alt={`Portrait of ${f.full_name}`}
+                className="w-28"
+                imgClassName="aspect-[3/4]"
+              />
+              <p className="text-xs text-zinc-500">Portrait taken at enrolment</p>
+            </div>
+          ) : (
+            <p className="rounded-lg bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+              No portrait: enrolled before portraits were required.
+            </p>
+          )}
           <dl className="space-y-3 text-sm">
             <Item label="Phone">{f.phone}</Item>
             <Item label="Gender">{f.gender ? titleCase(f.gender) : '—'}</Item>
@@ -284,13 +301,30 @@ export function FarmerDetailPage() {
               <FarmMap farms={farms.data} />
               <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white text-sm">
                 {farms.data!.map((farm) => (
-                  <li key={farm.id} className="flex flex-wrap justify-between gap-2 px-4 py-3">
-                    <span className="font-medium text-zinc-900">{farm.name ?? 'Unnamed farm'}</span>
-                    <span className="text-zinc-600">
-                      {formatHectares(farm.area_hectares)}
-                      {farm.primary_crop && ` · ${farm.primary_crop}`} ·{' '}
-                      {titleCase(farm.tenure_type)} tenure
-                    </span>
+                  <li key={farm.id} className="space-y-3 px-4 py-3">
+                    <div className="flex flex-wrap justify-between gap-2">
+                      <span className="font-medium text-zinc-900">
+                        {farm.name ?? 'Unnamed farm'}
+                      </span>
+                      <span className="text-zinc-600">
+                        {formatHectares(farm.area_hectares)}
+                        {farm.primary_crop && ` · ${farm.primary_crop}`} ·{' '}
+                        {titleCase(farm.tenure_type)} tenure
+                      </span>
+                    </div>
+                    {farm.photo_paths?.length > 0 && (
+                      <div>
+                        <p className="mb-1.5 text-xs text-zinc-500">
+                          Condition when mapped, {formatDate(farm.created_at)}
+                        </p>
+                        <StoredPhotos
+                          bucket="registry-photos"
+                          paths={farm.photo_paths}
+                          alt={`Photo of ${farm.name ?? 'the farm'}`}
+                          className="grid grid-cols-3 gap-2 sm:grid-cols-4"
+                        />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

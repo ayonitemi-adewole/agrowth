@@ -1,17 +1,9 @@
-import {
-  Camera,
-  CheckCircle2,
-  CloudOff,
-  Crosshair,
-  FlaskConical,
-  ImagePlus,
-  X,
-  XCircle,
-} from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { CheckCircle2, CloudOff, Crosshair, FlaskConical, XCircle } from 'lucide-react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useAuth } from '../auth/AuthProvider';
 import { FarmMap } from '../components/FarmMap';
+import { PhotoPicker, PortraitPicker } from '../components/Photos';
 import {
   Alert,
   Button,
@@ -25,11 +17,12 @@ import {
 } from '../components/ui';
 import { demo } from '../lib/demo';
 import { errorMessage } from '../lib/errors';
-import { formatHectares } from '../lib/format';
+import { formatDate, formatHectares } from '../lib/format';
+import { dueLabel } from '../lib/offline/due';
 import { useOffline } from '../lib/offline/OfflineProvider';
 import { snapshots } from '../lib/offline/store';
 import { isNetworkError } from '../lib/offline/sync';
-import type { QueuedVisit } from '../lib/offline/types';
+import { isCheckResult, type QueuedVisit, type VisitFarm } from '../lib/offline/types';
 import { supabase } from '../lib/supabase';
 import type { CropCondition, FarmMap as Farm } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -58,60 +51,114 @@ interface Fix {
   at: string;
 }
 
-type VisitFarm = Pick<
-  Farm,
-  'id' | 'name' | 'area_hectares' | 'primary_crop' | 'boundary' | 'centroid_lon' | 'centroid_lat'
-> & { farmer: string };
+/** What the visit is for: verifying a milestone, or a routine check of the farm. */
+type Purpose =
+  | { kind: 'milestone'; id: string; sequence: number; name: string; code: string }
+  | {
+      kind: 'check';
+      cycleId: string;
+      code: string;
+      intervalDays: number;
+      /** When the farm's next check is due; null if it isn't on the schedule (yet). */
+      nextDueOn: string | null;
+    };
 
-interface VisitMilestone {
-  id: string;
-  sequence: number;
-  name: string;
-  code: string;
-}
+type Wanted = { kind: 'milestone'; id: string } | { kind: 'check'; cycleId: string };
 
-/** The farm and milestone from the server, or from the work list saved on the phone. */
-async function loadVisit(
-  userId: string,
-  farmId: string,
-  milestoneId: string,
-): Promise<{ fromPhone: boolean; farm: VisitFarm | null; milestone: VisitMilestone | null }> {
-  try {
-    const [farm, milestone] = await Promise.all([
-      supabase.from('farm_maps').select('*, farmers(full_name)').eq('id', farmId).maybeSingle(),
-      supabase
-        .from('milestones')
-        .select('id, sequence, name, cycles(code)')
-        .eq('id', milestoneId)
-        .maybeSingle(),
-    ]);
-    if (farm.error) throw farm.error;
-    if (milestone.error) throw milestone.error;
-    const f = farm.data as (Farm & { farmers: { full_name: string } }) | null;
-    const m = milestone.data as unknown as {
+type FarmRow = Farm & { farmers: { full_name: string } };
+
+const toVisitFarm = (f: FarmRow): VisitFarm => ({ ...f, farmer: f.farmers.full_name });
+
+async function fetchPurpose(wanted: Wanted, farmId: string): Promise<Purpose | null> {
+  if (wanted.kind === 'milestone') {
+    const { data, error } = await supabase
+      .from('milestones')
+      .select('id, sequence, name, cycles(code)')
+      .eq('id', wanted.id)
+      .maybeSingle();
+    if (error) throw error;
+    const m = data as unknown as {
       id: string;
       sequence: number;
       name: string;
       cycles: { code: string };
     } | null;
-    return {
-      fromPhone: false,
-      farm: f ? { ...f, farmer: f.farmers.full_name } : null,
-      milestone: m ? { id: m.id, sequence: m.sequence, name: m.name, code: m.cycles.code } : null,
-    };
+    return m
+      ? { kind: 'milestone', id: m.id, sequence: m.sequence, name: m.name, code: m.cycles.code }
+      : null;
+  }
+  const [cycle, due] = await Promise.all([
+    supabase
+      .from('cycles')
+      .select('id, code, monitoring_interval_days')
+      .eq('id', wanted.cycleId)
+      .maybeSingle(),
+    supabase
+      .from('farm_check_schedule')
+      .select('next_due_on')
+      .eq('cycle_id', wanted.cycleId)
+      .eq('farm_id', farmId)
+      .maybeSingle(),
+  ]);
+  if (cycle.error) throw cycle.error;
+  if (due.error) throw due.error;
+  const c = cycle.data as { id: string; code: string; monitoring_interval_days: number } | null;
+  return c
+    ? {
+        kind: 'check',
+        cycleId: c.id,
+        code: c.code,
+        intervalDays: c.monitoring_interval_days,
+        nextDueOn: (due.data?.next_due_on as string | undefined) ?? null,
+      }
+    : null;
+}
+
+/** The farm and what the visit is for, from the server or the work list saved on the phone. */
+async function loadVisit(
+  userId: string,
+  farmId: string,
+  wanted: Wanted,
+): Promise<{ fromPhone: boolean; farm: VisitFarm | null; purpose: Purpose | null }> {
+  try {
+    const [farm, purpose] = await Promise.all([
+      supabase.from('farm_maps').select('*, farmers(full_name)').eq('id', farmId).maybeSingle(),
+      fetchPurpose(wanted, farmId),
+    ]);
+    if (farm.error) throw farm.error;
+    const f = farm.data as FarmRow | null;
+    return { fromPhone: false, farm: f ? toVisitFarm(f) : null, purpose };
   } catch (err) {
     if (!isNetworkError(err)) throw err;
     const saved = await snapshots.get(userId);
-    const a = saved?.assignments.find((x) => x.milestone.id === milestoneId);
+    if (wanted.kind === 'milestone') {
+      const a = saved?.assignments.find((x) => x.milestone.id === wanted.id);
+      return {
+        fromPhone: true,
+        farm: a?.farms.find((x) => x.id === farmId) ?? null,
+        purpose: a
+          ? {
+              kind: 'milestone',
+              id: a.milestone.id,
+              sequence: a.milestone.sequence,
+              name: a.milestone.name,
+              code: a.milestone.cycle.code,
+            }
+          : null,
+      };
+    }
+    const c = saved?.checks?.find((x) => x.cycle.id === wanted.cycleId);
+    const f = c?.farms.find((x) => x.id === farmId);
     return {
       fromPhone: true,
-      farm: a?.farms.find((x) => x.id === farmId) ?? null,
-      milestone: a
+      farm: f ?? null,
+      purpose: c
         ? {
-            id: a.milestone.id,
-            sequence: a.milestone.sequence,
-            name: a.milestone.name,
-            code: a.milestone.cycle.code,
+            kind: 'check',
+            cycleId: c.cycle.id,
+            code: c.cycle.code,
+            intervalDays: c.cycle.interval_days,
+            nextDueOn: f?.next_due_on ?? null,
           }
         : null,
     };
@@ -120,14 +167,18 @@ async function loadVisit(
 
 export function FieldVisitPage() {
   const [params] = useSearchParams();
-  const milestoneId = params.get('milestone')!;
   const farmId = params.get('farm')!;
+  const milestoneId = params.get('milestone');
+  const cycleId = params.get('cycle');
+  const wanted: Wanted = milestoneId
+    ? { kind: 'milestone', id: milestoneId }
+    : { kind: 'check', cycleId: cycleId! };
   const { profile } = useAuth();
   const { queue, online } = useOffline();
 
   const info = useAsync(
-    () => loadVisit(profile!.id, farmId, milestoneId),
-    [profile?.id, farmId, milestoneId],
+    () => loadVisit(profile!.id, farmId, wanted),
+    [profile?.id, farmId, milestoneId, cycleId],
   );
 
   // Live GPS: keep the best fix while the page is open.
@@ -183,30 +234,43 @@ export function FieldVisitPage() {
   const [checks, setChecks] = useState<boolean[]>(CHECKLIST.map(() => false));
   const [condition, setCondition] = useState<CropCondition | null>(null);
   const [notes, setNotes] = useState('');
+  const [portrait, setPortrait] = useState<File | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<QueuedVisit | null>(null);
 
-  const previews = usePreviews(photos);
-
   if (info.loading && (!info.data || info.stale)) return <PageSkeleton variant="detail" />;
   if (info.error) return <Alert>{errorMessage(info.error)}</Alert>;
-  const { farm, milestone, fromPhone } = info.data!;
-  if (!farm || !milestone)
+  const { farm, purpose, fromPhone } = info.data!;
+  if (!farm || !purpose)
     return (
       <Alert>
         {fromPhone
           ? "This farm isn't in the work list saved on this phone. Open Field visits with a connection to update it."
-          : "Farm or milestone not found, or you don't have access."}
+          : wanted.kind === 'milestone'
+            ? "Farm or milestone not found, or you don't have access."
+            : "Farm or cycle not found, or you don't have access."}
       </Alert>
     );
 
+  const isCheck = purpose.kind === 'check';
+  const noun = isCheck ? 'check' : 'visit';
+  const purposeLabel =
+    purpose.kind === 'milestone'
+      ? `${purpose.code}, milestone ${purpose.sequence}: ${purpose.name}`
+      : `${purpose.code}, routine farm check`;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!fix || !condition) return;
+    if (!fix || !condition || !portrait || photos.length === 0) return;
     setBusy(true);
     setError(null);
+    const photo = (p: File, fallback: string) => ({
+      name: p.name || fallback,
+      type: p.type,
+      blob: p,
+    });
     try {
       // Every visit is saved on the phone first, then sent: nothing is lost if the signal
       // drops part-way, and a resend can't record it twice.
@@ -214,14 +278,17 @@ export function FieldVisitPage() {
         id: crypto.randomUUID(),
         userId: profile!.id,
         farmId,
-        milestoneId,
+        ...(purpose.kind === 'milestone'
+          ? { kind: 'milestone' as const, milestoneId: purpose.id }
+          : { kind: 'check' as const, cycleId: purpose.cycleId }),
         farmLabel: `${farm.farmer} · ${farm.name ?? 'Farm'}`,
-        milestoneLabel: `${milestone.code}, milestone ${milestone.sequence}: ${milestone.name}`,
+        milestoneLabel: purposeLabel,
         fix,
         condition,
-        checklistPassed: checks.every(Boolean),
+        checklistPassed: isCheck || checks.every(Boolean),
         notes: notes.trim() || null,
-        photos: photos.map((p) => ({ name: p.name || 'photo.jpg', type: p.type, blob: p })),
+        portrait: photo(portrait, 'portrait.jpg'),
+        photos: photos.map((p) => photo(p, 'photo.jpg')),
         createdAt: new Date().toISOString(),
         state: 'queued',
         attempts: 0,
@@ -239,67 +306,57 @@ export function FieldVisitPage() {
   if (result && !result.result) {
     const refused = result.state === 'failed';
     return (
-      <div className="mx-auto max-w-lg py-8 text-center">
-        <div
-          className={cx(
-            'mx-auto grid size-16 place-items-center rounded-full',
-            refused ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700',
-          )}
-        >
-          {refused ? <XCircle className="size-8" /> : <CloudOff className="size-8" />}
-        </div>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-950">
-          {refused ? 'The visit was not accepted' : 'Saved on this phone'}
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          {refused
-            ? result.error
+      <Outcome
+        tone={refused ? 'bad' : 'waiting'}
+        title={refused ? `The ${noun} was not accepted` : 'Saved on this phone'}
+      >
+        {refused
+          ? result.error
+          : isCheck
+            ? 'No connection right now. The check, its GPS fix and photos are stored on this phone and are sent automatically when you have signal, dated when you were here.'
             : 'No connection right now. The visit, its GPS fix and photos are stored on this phone and are sent automatically when you have signal. The database then decides whether it passes, using the time you were here.'}
-        </p>
-        <div className="mt-8 flex justify-center gap-2">
-          <Link to="/field">
-            <Button>Back to field visits</Button>
-          </Link>
-        </div>
-      </div>
+      </Outcome>
     );
   }
 
   if (result?.result) {
     const r = result.result;
-    return (
-      <div className="mx-auto max-w-lg py-8 text-center">
-        <div
-          className={cx(
-            'mx-auto grid size-16 place-items-center rounded-full',
-            r.passed ? 'bg-brand-100 text-brand-700' : 'bg-red-100 text-red-600',
-          )}
+    if (isCheckResult(r)) {
+      return (
+        <Outcome
+          tone={r.gps_ok ? 'good' : 'bad'}
+          title={r.gps_ok ? 'Check recorded' : "Check recorded, but it doesn't count"}
         >
-          {r.passed ? <CheckCircle2 className="size-8" /> : <XCircle className="size-8" />}
-        </div>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-950">
-          {r.passed ? 'Visit passed' : 'Visit did not pass'}
-        </h1>
-        <p className="mt-2 text-sm text-zinc-600">
-          {r.passed
-            ? r.milestone_status === 'verified'
-              ? 'Every farm has now passed. The cycle manager can release this milestone.'
-              : 'Recorded. The milestone is released once every farm passes.'
-            : !r.gps_ok
-              ? `Your check-in was ${Math.round(r.distance_from_boundary_m)} m from the mapped boundary, or the GPS wasn't precise enough. The release is on hold until a passing visit.`
+          {r.gps_ok
+            ? r.next_due_on
+              ? `The next check of this farm is due ${formatDate(r.next_due_on)}.`
+              : 'Recorded with its photos and GPS position.'
+            : `Your check-in was ${Math.round(r.distance_from_boundary_m)} m from the mapped boundary, or the GPS wasn't precise enough. It's kept, but the farm is still due a check made at the farm.`}
+        </Outcome>
+      );
+    }
+    return (
+      <Outcome
+        tone={r.passed ? 'good' : 'bad'}
+        title={r.passed ? 'Visit passed' : 'Visit did not pass'}
+      >
+        {r.passed
+          ? r.milestone_status === 'verified'
+            ? 'Every farm has now passed. The cycle manager can release this milestone.'
+            : 'Recorded. The milestone is released once every farm passes.'
+          : !r.gps_ok
+            ? `Your check-in was ${Math.round(r.distance_from_boundary_m)} m from the mapped boundary, or the GPS wasn't precise enough. The release is on hold until a passing visit.`
+            : r.has_portrait === false
+              ? 'There was no portrait of the farmer. The release is on hold until a passing visit.'
               : 'The release for this milestone is on hold until a passing visit.'}
-        </p>
-        <div className="mt-8 flex justify-center gap-2">
-          <Link to="/field">
-            <Button>Back to field visits</Button>
-          </Link>
-        </div>
-      </div>
+      </Outcome>
     );
   }
 
   const precise = !!fix && fix.accuracy <= MAX_ACCURACY_M;
-  const canSubmit = !!fix && !!condition && photos.length > 0;
+  const canSubmit = !!fix && !!condition && !!portrait && photos.length > 0;
+  let step = 0;
+  const n = () => ++step;
 
   return (
     <>
@@ -310,14 +367,27 @@ export function FieldVisitPage() {
           </Link>
         }
         title={farm.farmer}
-        description={`${farm.name ?? 'Farm'} · ${formatHectares(farm.area_hectares)} · ${milestone.code}, milestone ${milestone.sequence}: ${milestone.name}`}
+        description={
+          purpose.kind === 'check'
+            ? `${farm.name ?? 'Farm'} · ${formatHectares(farm.area_hectares)} · ${purpose.code} · routine check every ${purpose.intervalDays} days${purpose.nextDueOn ? ` · ${dueLabel(purpose.nextDueOn)}` : ''}`
+            : `${farm.name ?? 'Farm'} · ${formatHectares(farm.area_hectares)} · ${purposeLabel}`
+        }
       />
+
+      {isCheck && (
+        <div className="mb-6">
+          <Alert tone="info" title="Routine farm check">
+            A regular look at how the farm is doing. It isn&apos;t tied to a milestone and
+            doesn&apos;t hold back or release any money.
+          </Alert>
+        </div>
+      )}
 
       {!online && (
         <div className="mb-6">
           <Alert tone="warning" title="No connection">
-            You can still record this visit. It&apos;s saved on this phone and sent when you&apos;re
-            back in coverage. GPS works without signal; the map imagery doesn&apos;t.
+            You can still record this {noun}. It&apos;s saved on this phone and sent when
+            you&apos;re back in coverage. GPS works without signal; the map imagery doesn&apos;t.
           </Alert>
         </div>
       )}
@@ -332,7 +402,7 @@ export function FieldVisitPage() {
           />
           <Card>
             <SectionTitle
-              title="1. Check in"
+              title={`${n()}. Check in`}
               description="Stand inside the farm and wait for a precise fix."
             />
             {!watching ? (
@@ -381,11 +451,19 @@ export function FieldVisitPage() {
               </div>
             )}
           </Card>
+
+          <Card>
+            <SectionTitle
+              title={`${n()}. Portrait of the farmer`}
+              description="Required at every visit."
+            />
+            <PortraitPicker value={portrait} onChange={setPortrait} />
+          </Card>
         </div>
 
         <div className="space-y-4 lg:col-span-2">
           <Card>
-            <SectionTitle title="2. Crop condition" />
+            <SectionTitle title={`${n()}. Crop condition`} />
             <div className="grid grid-cols-2 gap-2">
               {CONDITIONS.map((c) => (
                 <button
@@ -408,66 +486,38 @@ export function FieldVisitPage() {
             </div>
           </Card>
 
-          <Card>
-            <SectionTitle title="3. Checklist" description="Every item must be true to pass." />
-            <ul className="space-y-3">
-              {CHECKLIST.map((item, i) => (
-                <li key={item}>
-                  <label className="flex cursor-pointer gap-3 text-sm text-zinc-800">
-                    <input
-                      type="checkbox"
-                      checked={checks[i]}
-                      onChange={(e) =>
-                        setChecks(checks.map((c, j) => (i === j ? e.target.checked : c)))
-                      }
-                      className="mt-0.5 size-4 rounded accent-brand-700"
-                    />
-                    {item}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </Card>
+          {!isCheck && (
+            <Card>
+              <SectionTitle
+                title={`${n()}. Checklist`}
+                description="Every item must be true to pass."
+              />
+              <ul className="space-y-3">
+                {CHECKLIST.map((item, i) => (
+                  <li key={item}>
+                    <label className="flex cursor-pointer gap-3 text-sm text-zinc-800">
+                      <input
+                        type="checkbox"
+                        checked={checks[i]}
+                        onChange={(e) =>
+                          setChecks(checks.map((c, j) => (i === j ? e.target.checked : c)))
+                        }
+                        className="mt-0.5 size-4 rounded accent-brand-700"
+                      />
+                      {item}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           <Card>
             <SectionTitle
-              title="4. Photos"
-              description="At least one: the crop, and any issue you report."
+              title={`${n()}. Condition of the farm`}
+              description="At least one photo: the crop, and any issue you report."
             />
-            <div className="grid grid-cols-3 gap-2">
-              {previews.map((src, i) => (
-                <div
-                  key={src}
-                  className="relative aspect-square overflow-hidden rounded-xl bg-zinc-100"
-                >
-                  <img src={src} alt={`Photo ${i + 1}`} className="size-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
-                    className="absolute top-1 right-1 rounded-full bg-zinc-950/60 p-1 text-white"
-                    aria-label={`Remove photo ${i + 1}`}
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              ))}
-              <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-zinc-300 text-zinc-500 hover:border-brand-400 hover:text-brand-700">
-                <span className="flex flex-col items-center gap-1 text-xs">
-                  {photos.length ? <ImagePlus className="size-5" /> : <Camera className="size-5" />}
-                  {photos.length ? 'Add' : 'Take photo'}
-                </span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  multiple
-                  className="sr-only"
-                  onChange={(e) =>
-                    setPhotos([...photos, ...Array.from(e.target.files ?? [])].slice(0, 6))
-                  }
-                />
-              </label>
-            </div>
+            <PhotoPicker value={photos} onChange={setPhotos} />
           </Card>
 
           <Card>
@@ -483,11 +533,12 @@ export function FieldVisitPage() {
 
           {error && <Alert>{error}</Alert>}
           <Button type="submit" busy={busy} disabled={!canSubmit} className="w-full">
-            {online ? 'Submit visit' : 'Save visit on this phone'}
+            {online ? `Submit ${noun}` : `Save ${noun} on this phone`}
           </Button>
           {!canSubmit && (
             <p className="text-center text-xs text-zinc-500">
-              Needs a GPS fix, a crop condition and at least one photo.
+              Needs a GPS fix, a crop condition, a portrait of the farmer and at least one photo of
+              the farm.
             </p>
           )}
         </div>
@@ -496,14 +547,38 @@ export function FieldVisitPage() {
   );
 }
 
-/** Object URLs for image previews, revoked when they're no longer shown. */
-function usePreviews(files: File[]) {
-  const [urls, setUrls] = useState<string[]>([]);
-  useEffect(() => {
-    const next = files.map((f) => URL.createObjectURL(f));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setUrls(next);
-    return () => next.forEach((u) => URL.revokeObjectURL(u));
-  }, [files]);
-  return urls;
+/** The screen after submitting: passed, saved for later, or refused. */
+function Outcome({
+  tone,
+  title,
+  children,
+}: {
+  tone: 'good' | 'bad' | 'waiting';
+  title: string;
+  children: ReactNode;
+}) {
+  const Icon = tone === 'good' ? CheckCircle2 : tone === 'bad' ? XCircle : CloudOff;
+  return (
+    <div className="mx-auto max-w-lg py-8 text-center">
+      <div
+        className={cx(
+          'mx-auto grid size-16 place-items-center rounded-full',
+          tone === 'good'
+            ? 'bg-brand-100 text-brand-700'
+            : tone === 'bad'
+              ? 'bg-red-100 text-red-600'
+              : 'bg-amber-100 text-amber-700',
+        )}
+      >
+        <Icon className="size-8" />
+      </div>
+      <h1 className="mt-5 text-2xl font-semibold tracking-tight text-zinc-950">{title}</h1>
+      <p className="mt-2 text-sm text-zinc-600">{children}</p>
+      <div className="mt-8 flex justify-center gap-2">
+        <Link to="/field">
+          <Button>Back to field visits</Button>
+        </Link>
+      </div>
+    </div>
+  );
 }

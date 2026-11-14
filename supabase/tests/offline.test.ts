@@ -38,7 +38,7 @@ describe('offline field visits', () => {
   ) =>
     as<{ r: VisitResult }>(
       user,
-      `select public.record_field_visit($1, $2, $3, 11.30045, 5, 'good', true, $4, null, $5, $6) as r`,
+      `select public.record_field_visit($1, $2, $3, 11.30045, 5, 'good', true, $4, null, $5, $6, p_portrait_path => 'visit/portrait.jpg') as r`,
       [farm, milestone, lon + 0.00045, ['m/f/photo.jpg'], visitedAt, ref],
     ).then((rows) => rows[0].r);
 
@@ -54,16 +54,17 @@ describe('offline field visits', () => {
     for (const [i, last] of ['Audu', 'Bello'].entries()) {
       const [{ id: farmer }] = await as<{ id: string }>(
         agent,
-        `select public.register_farmer('Farmer', $1, '+2348044440000', 'Kaduna', 'Zaria', $2) as id`,
+        `select public.register_farmer('Farmer', $1, '+2348044440000', 'Kaduna', 'Zaria', $2, p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
         [last, String(90_000_000_000 + i)],
       );
       await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [
         farmer,
       ]);
-      const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
-        farmer,
-        JSON.stringify(square(8.5 + i * 0.01, 11.3)),
-      ]);
+      const [{ id }] = await as<{ id: string }>(
+        agent,
+        `select public.map_farm($1, $2, p_photo_paths => array[auth.uid()::text || '/farm.jpg']) as id`,
+        [farmer, JSON.stringify(square(8.5 + i * 0.01, 11.3))],
+      );
       farms.push(id);
     }
     const [{ id: cycle }] = await as<{ id: string }>(

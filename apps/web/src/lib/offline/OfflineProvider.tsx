@@ -12,12 +12,12 @@ import { can } from '../roles';
 import { supabase } from '../supabase';
 import { available, outbox } from './store';
 import { syncOutbox, type Remote, type SyncReport } from './sync';
-import type { QueuedVisit, VisitResult } from './types';
+import { visitKind, type CheckResult, type QueuedVisit, type VisitResult } from './types';
 
 interface OfflineState {
   /** The browser's view of the connection. */
   online: boolean;
-  /** This agent's queued, failed and recently synced visits, oldest first. */
+  /** This agent's queued, failed and recently synced visits and checks, oldest first. */
   visits: QueuedVisit[];
   pending: number;
   failed: number;
@@ -40,19 +40,31 @@ const remote: Remote = {
     // Already there from an earlier attempt that lost its connection on the way back.
     if (error && !/already exists|duplicate/i.test(error.message)) throw error;
   },
-  recordVisit: async (v, paths) => {
-    const { data, error } = await supabase.rpc('record_field_visit', {
+  recordVisit: async (v, paths, portrait) => {
+    const common = {
       p_farm_id: v.farmId,
-      p_milestone_id: v.milestoneId,
       p_lon: v.fix.lon,
       p_lat: v.fix.lat,
       p_gps_accuracy_m: Math.round(v.fix.accuracy * 10) / 10,
       p_crop_condition: v.condition,
-      p_checklist_passed: v.checklistPassed,
       p_photo_paths: paths,
+      p_portrait_path: portrait,
       p_notes: v.notes,
       p_visited_at: v.fix.at,
       p_client_ref: v.id,
+    };
+    if (visitKind(v) === 'check') {
+      const { data, error } = await supabase.rpc('record_farm_check', {
+        ...common,
+        p_cycle_id: v.cycleId,
+      });
+      if (error) throw error;
+      return data as CheckResult;
+    }
+    const { data, error } = await supabase.rpc('record_field_visit', {
+      ...common,
+      p_milestone_id: v.milestoneId,
+      p_checklist_passed: v.checklistPassed,
     });
     if (error) throw error;
     return data as VisitResult;

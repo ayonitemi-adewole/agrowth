@@ -51,7 +51,8 @@ How the platform reaches the market is still open. It could be operated directly
 | Cycle builder | Budget, yield and price ranges, farms, milestones, offtake contract, insurance, documents | Done |
 | Approval | Readiness checklist, compliance review, separation of duties | Done |
 | Funding | Trustee-confirmed deposits; full refunds if a cycle misses its deadline or is cancelled | Done |
-| Field verification | GPS check-in inside the boundary, checklist, photos; a failed visit blocks the money | Done |
+| Field verification | GPS check-in inside the boundary, checklist, a portrait of the farmer and photos of the farm; a failed visit blocks the money | Done |
+| Routine farm checks | Once a season begins, every farm is checked every N days (set per cycle) with a farmer portrait and farm photos; overdue farms are flagged. Separate from milestones and money | Done |
 | Disbursement | Staged releases per milestone, 20% cash cap, trustee-confirmed payments | Done |
 | Vendors and vouchers | Agro-dealer registry; per-farm input vouchers redeemed at the shop counter, by scanning the slip's QR code or typing its code; vendors paid on redemption | Done |
 | Ledger | Double-entry, append-only, balanced, no money moving between cycles | Done |
@@ -124,7 +125,7 @@ Everyone who signs up starts as an **investor**. Only an **admin** can give an a
 | Role | Who it is | Can do | Cannot do |
 | --- | --- | --- | --- |
 | **Admin** | The operator's system administrator | Assign roles, deactivate accounts, link a shop's counter account to its vendor and a buyer's account to its company, edit investor settings (caps, cooling-off, escrow account, risk disclosure); everything a manager, agent or compliance officer can do | Confirm money (that's the trustee only); change their own role |
-| **Field agent** | Extension officer in the field | Create cooperatives, enrol farmers, map farms, register vendors, record verification visits (online or offline), record harvest deliveries | Verify KYC, approve anything, touch money |
+| **Field agent** | Extension officer in the field | Create cooperatives, enrol farmers, map farms, register vendors, record verification visits and routine farm checks (online or offline), record harvest deliveries | Verify KYC, approve anything, touch money |
 | **Compliance officer** | The operator's compliance team | Verify or reject farmer KYC and investor KYC (and classify investors), approve or return cycles, approve or suspend vendors, void a wrong redemption, read the ledger | Build cycles, confirm money, approve a vendor they registered |
 | **Cycle manager** | Runs cycles for the operator | Build and edit draft cycles, submit them, request field verification, instruct milestone releases, complete the harvest, close vouchers, cancel cycles | Approve their own cycle, confirm money |
 | **Programme manager** | Government or donor programme lead | Everything a cycle manager can, plus design, activate and close **programmes**, and see programme dashboards | Approve cycles, confirm money |
@@ -174,23 +175,29 @@ Sign in at the app's address. On the demo there's a button per account and a **D
 **Enrol farmers**
 
 1. **Cooperatives → New cooperative**: name, registration number, state, LGA, wards.
-2. **Farmers → Enrol farmer**: name, phone, state and LGA, cooperative, and a **NIN or BVN** (at least one). If that NIN or BVN is already registered, enrolment is refused and the existing farmer is shown, so nobody is enrolled twice.
+2. **Farmers → Enrol farmer**: a **portrait of the farmer** (required), name, phone, state and LGA, cooperative, and a **NIN or BVN** (at least one). If that NIN or BVN is already registered, enrolment is refused and the existing farmer is shown, so nobody is enrolled twice.
 3. On the farmer's page, **Payout account → Add account**: where their share of a harvest is paid, at a bank or with mobile money (OPay, PalmPay, Moniepoint, Kuda). It must be in the farmer's own name, and the change is recorded. Without one, their surplus is paid by hand.
-4. Open the farmer → **Map a farm**. Either tap the corners on the satellite map, or walk the boundary with GPS. The database computes the area and refuses a boundary that overlaps another farm by more than 5%.
+4. Open the farmer → **Map a farm**. Either tap the corners on the satellite map, or walk the boundary with GPS, then take **at least one photo of the farm's condition** (required). The database computes the area and refuses a boundary that overlaps another farm by more than 5%. The portrait and the farm photos show on the farmer's page.
 
 **Register an agro-dealer:** **Vendors → Register vendor** with the dealer's licence number, shop address and bank account. Compliance must approve it before it can take vouchers.
 
 **Verification visits.** When a cycle manager asks for verification, the farms appear under **Field visits**.
 
 1. Press **Visit** on a farm. Stand inside the farm and press **Start GPS**; wait for "Precise fix" (within 20 m). On the demo, **Simulate GPS at this farm** stands in for being there.
-2. Choose the crop condition, tick the checklist (all four must be true to pass), take at least one photo, add notes, then **Submit visit**.
-3. The database decides: the visit passes only if the fix is precise and within 20 m of the boundary, the checklist passed, the crop hasn't failed and there's a photo. A failed visit puts that milestone's money on hold until a passing revisit.
+2. Take a **portrait of the farmer**, choose the crop condition, tick the checklist (all four must be true to pass), take at least one photo of the farm, add notes, then **Submit visit**.
+3. The database decides: the visit passes only if the fix is precise and within 20 m of the boundary, the checklist passed, the crop hasn't failed, and there's a portrait of the farmer and a photo of the farm. A failed visit puts that milestone's money on hold until a passing revisit.
+
+**Routine farm checks.** Once a cycle's season has begun, its farms also appear under **Field visits → Routine farm checks**, soonest due first. Each farm is due a check a set number of days after its last one (the cycle's interval, e.g. every 14 days). These checks track how the farm is doing; they aren't tied to milestones and never hold back or release money.
+
+1. Press **Check** on a farm. Overdue farms are marked in red.
+2. Check in with GPS as for a visit, take a **portrait of the farmer** and at least one **photo of the farm**, choose the crop condition, add notes, then **Submit check**. There's no checklist.
+3. The check is always kept, but it only counts (and moves the farm's next check on) if the GPS fix was precise and at the farm. A crop reported **poor** or **failed** is flagged in the cycle's history for the manager.
 
 **Working without signal.** Install the app first (see [section 8](#8-running-the-platform)).
 
 1. Open **Field visits** once while online. The work list is then saved on the phone.
 2. In the field with no signal, the app still opens. Farms, boundaries and GPS all work; only map imagery needs a connection.
-3. Record the visit as usual. The button reads **Save visit on this phone**.
+3. Record the visit or check as usual. The button reads **Save visit on this phone** (or **Save check on this phone**).
 4. It is sent automatically when you're back in coverage. The menu shows **Offline** and how many visits are waiting; **Send now** forces a try.
 5. If the database won't accept a queued visit (for example, the milestone was already verified), it shows **Not accepted** with the reason, and you can remove it.
 
@@ -212,7 +219,7 @@ Sign in at the app's address. On the demo there's a button per account and a **D
 1. **Basics:** a code (e.g. `KD-MAIZE-27W-01`), crop, season and cooperative. **Funded by** is investors, a programme or blended. For programme or blended, choose the programme.
 2. **Budget:** the target, budget per hectare, and low/expected/high yield (t/ha) and price (₦/t). These are shown as ranges, never promises.
 3. **Settlement terms:** the management fee (% of capital) and the funders' share of profit.
-4. **Dates:** funding deadline, season start, expected harvest.
+4. **Dates:** funding deadline, season start, expected harvest, and how often farms get a routine check (**Farm checks every … days**, 14 by default).
 5. **Farms** tab: add mapped farms. A farm can only be in one live cycle at a time.
 6. **Milestones** tab: e.g. land preparation, planting, mid-season, harvest. Each has an amount, and they must add up to the target exactly.
 7. **Offtake & insurance** tab: the signed buyer agreement (volume, price terms, signed PDF) and the insurance policy (sum insured, cover dates, PDF).
@@ -227,6 +234,8 @@ Sign in at the app's address. On the demo there's a button per account and a **D
    - **input vouchers** for farmers,
    - cash to farmers, which can be at most 20% of the milestone.
 3. Repeat for each milestone in order.
+
+**Farm checks:** from the season start (or the first release, if earlier) the cycle has a **Farm checks** tab. It shows each farm's last check, crop condition and next due date, flags overdue farms, and lists every check with its portrait, farm photos and GPS check-in on the map. Change the interval there; the change is recorded in the history. Checks end when the harvest is in.
 
 **Watch the weather:** each cycle has a **Weather** tab from submission until settlement.
 - It shows daily rainfall at the farms for the last 60 days and the coming week, against the usual for the time of year (the 10-year average). Farms within about 11 km share a reading.
@@ -391,6 +400,8 @@ These are enforced by the database itself. They hold even if the web app has a b
   - every farmer KYC-verified.
 - **Separation of duties.** The cycle's own manager can never approve it, and whoever registers a vendor can't approve it.
 - **Money follows verification.** A milestone is released only after every farm passes a visit, milestones go in order, and at most 20% may go to farmers as cash.
+- **Photos of the farmer and the farm.** Enrolment needs a portrait the agent uploaded; mapping a farm needs a photo of its condition; every milestone visit and routine check needs a portrait of the farmer and a photo of the farm. A milestone visit without a portrait doesn't pass.
+- **Farms are checked on schedule, apart from the money.** While a season is under way, each farm is due a routine check every N days. Only a check made at the farm counts, and checks never change a milestone.
 - **Inputs, not cash.** Vouchers are redeemable only at approved vendors, with a code plus the farmer's phone digits, or by scanning the slip's QR code. The QR holds a secret token that can't be worked out from the printed code, and an admin can require the phone digits after a scan too. Guessing is locked out. Vendors are paid only to their registered account, and new bank details need a fresh approval.
 - **The ledger is append-only and balanced.** There are no edits or deletions, only reversing entries. Every entry sums to zero, and no money moves between cycles.
 - **One farmer, one record; one piece of land, one farm.** Duplicate NIN/BVN and overlapping boundaries are refused. Identity numbers are stored only as keyed hashes.
@@ -401,8 +412,8 @@ These are enforced by the database itself. They hold even if the web app has a b
   - Money can't be added during cooling-off.
   - Investors never read the underlying tables.
 - **Programmes fund only what fits them.** Eligibility is checked at submission and approval, terms are fixed once a programme is active, and deposits can't exceed the budget.
-- **Offline visits are judged like any other.** They're checked at the time the agent was at the farm, and a resend can't count twice.
-- **Evidence is permanent.** Visits, cycle history and uploaded documents can't be edited or deleted.
+- **Offline visits are judged like any other.** Visits and checks are judged at the time the agent was at the farm, and a resend can't count twice.
+- **Evidence is permanent.** Visits, farm checks, cycle history and uploaded documents can't be edited or deleted.
 
 ---
 

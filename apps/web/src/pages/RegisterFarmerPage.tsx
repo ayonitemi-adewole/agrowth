@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { useAuth } from '../auth/AuthProvider';
+import { PortraitPicker } from '../components/Photos';
 import { Alert, Button, Card, Field, Input, PageHeader, Select } from '../components/ui';
 import { duplicateFarmerId, errorMessage } from '../lib/errors';
 import { describeOutcomes, runIdentityChecks } from '../lib/identity';
+import { uploadRegistryPhoto } from '../lib/photos';
 import { supabase } from '../lib/supabase';
 import type { Cooperative } from '../lib/types';
 import { useAsync } from '../lib/useAsync';
@@ -23,7 +26,9 @@ const empty = {
 
 export function RegisterFarmerPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [form, setForm] = useState(empty);
+  const [portrait, setPortrait] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ message: string; existingId: string | null } | null>(null);
   const set = (k: keyof typeof empty) => (e: { target: { value: string } }) =>
@@ -59,7 +64,22 @@ export function RegisterFarmerPage() {
       });
       return;
     }
+    if (!portrait) {
+      setError({ message: 'Take a portrait of the farmer to enrol them.', existingId: null });
+      return;
+    }
     setBusy(true);
+    let portraitPath: string;
+    try {
+      portraitPath = await uploadRegistryPhoto(profile!.id, portrait, 'portrait');
+    } catch (err) {
+      setBusy(false);
+      setError({
+        message: `Could not upload the portrait: ${errorMessage(err)}`,
+        existingId: null,
+      });
+      return;
+    }
     const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
     const { data, error } = await supabase.rpc('register_farmer', {
       p_first_name: form.first_name,
@@ -73,6 +93,7 @@ export function RegisterFarmerPage() {
       p_date_of_birth: orNull(form.date_of_birth),
       p_ward: orNull(form.ward),
       p_cooperative_id: orNull(form.cooperative_id),
+      p_portrait_path: portraitPath,
     });
     if (error) {
       setBusy(false);
@@ -106,10 +127,14 @@ export function RegisterFarmerPage() {
     <>
       <PageHeader
         title="Enrol a farmer"
-        description="NIN and BVN are checked with the identity provider, then kept only as a fingerprint that stops duplicate enrolments, and the last four digits."
+        description="NIN and BVN are checked with the identity provider, then kept only as a fingerprint that stops duplicate enrolments, and the last four digits. A portrait of the farmer is required."
       />
       <Card className="max-w-3xl">
         <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5 sm:col-span-2">
+            <p className="text-sm font-medium text-zinc-700">Portrait of the farmer</p>
+            <PortraitPicker value={portrait} onChange={setPortrait} />
+          </div>
           <Field label="First name">
             <Input value={form.first_name} onChange={set('first_name')} required maxLength={100} />
           </Field>
@@ -201,7 +226,7 @@ export function RegisterFarmerPage() {
             </div>
           )}
           <div className="flex gap-2 sm:col-span-2">
-            <Button type="submit" busy={busy}>
+            <Button type="submit" busy={busy} disabled={!portrait}>
               Enrol farmer
             </Button>
             <Link to="/farmers">

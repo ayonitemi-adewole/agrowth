@@ -42,14 +42,15 @@ describe('investor edition', () => {
   const verifiedFarm = async (lastName: string, phone: string, lon: number) => {
     const [{ id: farmer }] = await as<{ id: string }>(
       agent,
-      `select public.register_farmer('Farmer', $1, $2, 'Kaduna', 'Zaria', $3) as id`,
+      `select public.register_farmer('Farmer', $1, $2, 'Kaduna', 'Zaria', $3, p_portrait_path => auth.uid()::text || '/portrait.jpg') as id`,
       [lastName, phone, String(nextNin++)],
     );
     await as(compliance, `select public.set_farmer_kyc($1, 'verified', 'NIN slip seen')`, [farmer]);
-    const [{ id }] = await as<{ id: string }>(agent, `select public.map_farm($1, $2) as id`, [
-      farmer,
-      JSON.stringify(square(lon, 11.2)),
-    ]);
+    const [{ id }] = await as<{ id: string }>(
+      agent,
+      `select public.map_farm($1, $2, p_photo_paths => array[auth.uid()::text || '/farm.jpg']) as id`,
+      [farmer, JSON.stringify(square(lon, 11.2))],
+    );
     return id;
   };
 
