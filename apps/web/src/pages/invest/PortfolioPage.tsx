@@ -50,6 +50,8 @@ export function PortfolioPage() {
           )
         : null,
     [returned],
+    // Confirming a payment is done once, on the way back from the gateway.
+    { refresh: false },
   );
   const paymentResult =
     returned && check.loading ? { ok: true, text: 'Checking your payment…' } : check.data;
